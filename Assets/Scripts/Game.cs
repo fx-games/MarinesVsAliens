@@ -140,9 +140,10 @@ public class Game : MonoBehaviour
     {
         if (selectedUnit != null && validTargets.Contains(targetedPos))
         {
-            var isMelee = (gameMap.AreNeighbors(gameMap.WorldToCell(selectedUnit.transform.position),targetedPos));
+            var unitPos = gameMap.WorldToCell(selectedUnit.transform.position);
+            var isMelee = gameMap.AreNeighbors(unitPos,targetedPos);
             var weapon = isMelee ? selectedUnit.MeleeWeapon : selectedUnit.RangedWeapon;
-            var areaOfEffect = gameMap.AreaOfEffect(weapon, targetedPos);
+            var areaOfEffect = gameMap.AreaOfEffect(unitPos, weapon, targetedPos);
             foreach (var aoePos in areaOfEffect)
             {
                 if (gameMap.AoEAllowed(selectedUnit, weapon, targetedPos, aoePos))
@@ -214,14 +215,14 @@ public class Game : MonoBehaviour
             var weaponRules = unit.RangedWeapon.Rules;
             if (weaponRules.StraightLineOnly)
             {
-                validTargets.UnionWith(gameMap.GetLine(unitPos, Map.Direction.North, maxDistance));
-                validTargets.UnionWith(gameMap.GetLine(unitPos, Map.Direction.South, maxDistance));
-                validTargets.UnionWith(gameMap.GetLine(unitPos, Map.Direction.East, maxDistance));
-                validTargets.UnionWith(gameMap.GetLine(unitPos, Map.Direction.West, maxDistance));
-                validTargets.UnionWith(gameMap.GetLine(unitPos, Map.Direction.NorthEast, maxDistance));
-                validTargets.UnionWith(gameMap.GetLine(unitPos, Map.Direction.NorthWest, maxDistance));
-                validTargets.UnionWith(gameMap.GetLine(unitPos, Map.Direction.SouthEast, maxDistance));
-                validTargets.UnionWith(gameMap.GetLine(unitPos, Map.Direction.SouthWest, maxDistance));   
+                validTargets.UnionWith(gameMap.GetStraightLine(unitPos, Map.Direction.North, maxDistance));
+                validTargets.UnionWith(gameMap.GetStraightLine(unitPos, Map.Direction.South, maxDistance));
+                validTargets.UnionWith(gameMap.GetStraightLine(unitPos, Map.Direction.East, maxDistance));
+                validTargets.UnionWith(gameMap.GetStraightLine(unitPos, Map.Direction.West, maxDistance));
+                validTargets.UnionWith(gameMap.GetStraightLine(unitPos, Map.Direction.NorthEast, maxDistance));
+                validTargets.UnionWith(gameMap.GetStraightLine(unitPos, Map.Direction.NorthWest, maxDistance));
+                validTargets.UnionWith(gameMap.GetStraightLine(unitPos, Map.Direction.SouthEast, maxDistance));
+                validTargets.UnionWith(gameMap.GetStraightLine(unitPos, Map.Direction.SouthWest, maxDistance));   
             }
             else
             {

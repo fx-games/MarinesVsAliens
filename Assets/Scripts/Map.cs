@@ -132,7 +132,7 @@ public class Map : MonoBehaviour, IGridMap
                 if (i * i + j * j < radius * radius)
                     LineCast(position.x, position.y, position.x + i, position.y + j, true);
     }
-    public HashSet<Vector3Int> GetLine(Vector3Int unitPos, Direction rayDirection, int maxDistance)
+    public HashSet<Vector3Int> GetStraightLine(Vector3Int unitPos, Direction rayDirection, int maxDistance)
     {
         HashSet<Vector3Int> linePositions = new HashSet<Vector3Int>();
         var prevPos = unitPos;
@@ -147,6 +147,29 @@ public class Map : MonoBehaviour, IGridMap
 
             linePositions.Add(nextPos);
             prevPos = nextPos;
+        }
+
+        return linePositions;
+    }
+    
+    public HashSet<Vector3Int> GetStraightLine(Vector3Int posOne, Vector3Int posTwo)
+    {
+        HashSet<Vector3Int> linePositions = new HashSet<Vector3Int>();
+                
+        Vector3Int rayDirVector = posOne.x < posTwo.x ? Vector3Int.right : posOne.x > posTwo.x ? Vector3Int.left : Vector3Int.zero;
+        rayDirVector += posOne.y < posTwo.y ? Vector3Int.up : posOne.y > posTwo.y ? Vector3Int.down : Vector3Int.zero;
+        var prevPos = posOne;
+        var nextPos = prevPos + rayDirVector;
+        while (nextPos != posTwo)
+        {
+            if (!IsNeighborVisible(prevPos, nextPos))
+            {
+                return linePositions;
+            }
+
+            linePositions.Add(nextPos);
+            prevPos = nextPos;
+            nextPos = prevPos + rayDirVector;
         }
 
         return linePositions;
@@ -467,8 +490,14 @@ public class Map : MonoBehaviour, IGridMap
         return reachableNeighbors.ConvertAll(elem => new Point(elem.x, elem.y));
     }
 
-    public bool AreNeighbors(Vector3Int posOne, Vector3Int posTwo)
+    public bool AreNeighbors(Vector3Int posOne, Vector3Int posTwo, bool includeDiagonals = false)
     {
+        if (includeDiagonals)
+        {
+            var areNeighbors = Mathf.Abs(posOne.y - posTwo.y) == 1 && Mathf.Abs(posOne.x - posTwo.x) == 1;
+            if (areNeighbors)
+                return true;
+        }
         return posOne.x == posTwo.x && Mathf.Abs(posOne.y - posTwo.y) == 1
                || posOne.y == posTwo.y && Mathf.Abs(posOne.x - posTwo.x) == 1;
     }
@@ -482,11 +511,18 @@ public class Map : MonoBehaviour, IGridMap
         }
     }
 
-    public List<Vector3Int> AreaOfEffect(Weapon weapon, Vector3Int mapPos)
+    public List<Vector3Int> AreaOfEffect(Vector3Int unitPos, Weapon weapon, Vector3Int mapPos)
     {
         var rules = weapon.Rules;
         var radius = rules.Radius;
         HashSet<Vector3Int> affectedTiles = new HashSet<Vector3Int>(){mapPos};
+        if (rules.DamageLineOfFire)
+        {
+            affectedTiles.UnionWith(GetStraightLine(unitPos, mapPos));
+            affectedTiles.Remove(unitPos);
+            affectedTiles.RemoveWhere(pos => AreNeighbors(unitPos, pos, true));
+        }
+        
         if (radius > 0)
         {
             for (int i = mapPos.x - radius; i <= mapPos.x + radius; i++)
