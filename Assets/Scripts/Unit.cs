@@ -5,28 +5,34 @@ using static Map;
 
 public class Unit : MonoBehaviour
 {
-    enum UnitState { Idle, Moving }
+    public enum UnitState { Idle, Moving }
+
+    public GameObject bloodSplatter;
     public int mobility = 4;
     public int visionRange = 20;
+    public int health = 1;
+    public int armor = 2;
+
     private Map gameMap;
     private int currentPathIndex;
     private List<Vector3Int> currentPath;
-    private UnitState state = UnitState.Idle;
+    public UnitState State { get; private set; } = UnitState.Idle;
     private float lastMoveTime;
     public double moveDelay = 0.5f;
+    private Mod mod;
     
-
     public event UnitEvent FinishedMoving;
     // Start is called before the first frame update
-    void Start()
+    void Awake()
     {
         gameMap = FindObjectOfType<Map>();
+        mod = FindObjectOfType<Mod>();
     }
 
     // Update is called once per frame
     void Update()
     {
-        if (state == UnitState.Moving && (Time.time - lastMoveTime) > moveDelay)
+        if (State == UnitState.Moving && (Time.time - lastMoveTime) > moveDelay)
         {
             NextMove();
         }
@@ -69,14 +75,14 @@ public class Unit : MonoBehaviour
         {
             var lastPos = gameMap.WorldToCell(transform.position);
             var nextPos = currentPath[currentPathIndex];
-            state = UnitState.Moving;
+            State = UnitState.Moving;
             lastMoveTime = Time.time;
             AnimateMovement(nextPos);
             UpdateDirection(lastPos, nextPos);
         }
         else
         {
-            state = UnitState.Idle;
+            State = UnitState.Idle;
             currentPathIndex = -1;
             currentPath = null;
             OnFinishedMoving();
@@ -145,7 +151,7 @@ public class Unit : MonoBehaviour
         var oldMapPos = gameMap.WorldToCell(transform.position);
         currentPathIndex = 0;
         currentPath = path;
-        state = UnitState.Moving;
+        State = UnitState.Moving;
         lastMoveTime = Time.time;
         // TELEPORT INSTANTLY TO THE END OF THE PATH ON THE MAP - BECAUSE OF PATHFINDING OF OTHER UNITS
         gameMap.MoveUnit(this, oldMapPos, path.Last());
@@ -157,6 +163,25 @@ public class Unit : MonoBehaviour
         var cellToWorld = gameMap.CellToWorld(mapPos);
         transform.position = cellToWorld;
         gameMap.UpdateFOV(mapPos, visionRange);
+    }
+
+    public void InflictDamage(int damage)
+    {
+        health -= damage;
+    }
+
+    public void UnitDeath()
+    {
+        Instantiate(bloodSplatter, transform.position, Quaternion.identity);
+        Destroy(gameObject);
+    }
+
+    public void LoadRules(string unitType)
+    {
+        var rules = mod.GetUnitRule(unitType);
+        mobility = rules.Movement;
+        health = rules.Health;
+        armor = rules.Armor;
     }
 }
 

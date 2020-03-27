@@ -12,6 +12,7 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 using UnityEngine.UI;
 using Color = UnityEngine.Color;
+using Random = UnityEngine.Random;
 
 public class Map : MonoBehaviour, IGridMap
 {
@@ -27,6 +28,8 @@ public class Map : MonoBehaviour, IGridMap
         SouthWest,
     }
 
+    public const int MapWidth = 16;
+    public const int MapHeight = 16;
     public GameObject selectionRect;
     public Tile floorTile;
     public Tile northWall;
@@ -34,10 +37,10 @@ public class Map : MonoBehaviour, IGridMap
     public Tile southWall;
     public Tile westWall;
     private Dictionary<string, Tilemap> layerMap = new Dictionary<string, Tilemap>();
-    private Unit[,] unitMap = new Unit[16,16];
+    private Unit[,] unitMap = new Unit[MapWidth,MapHeight];
     private Camera gameCamera;
     public GameObject blanktilePrefab;
-    private List<GameObject> allHighlights = new List<GameObject>();
+    private List<GameObject>[] allHighlights = new List<GameObject>[4]{ new List<GameObject>(), new List<GameObject>(), new List<GameObject>(), new List<GameObject>()};
     public Vector3Int CurrentCursorPosition { get; private set; }
     private HashSet<Vector3Int> visibleTiles = new HashSet<Vector3Int>();
 
@@ -45,8 +48,7 @@ public class Map : MonoBehaviour, IGridMap
     void Awake()
     {
         //CreateBlankSprite();
-        Width = 16;
-        Height = 16;
+
         var mapLayers = GetComponentsInChildren<Tilemap>();
         foreach (var layer in mapLayers)
         {
@@ -122,15 +124,15 @@ public class Map : MonoBehaviour, IGridMap
         return layerMap["Floors"].WorldToCell(pos);
     }
 
-    public void HighlightTile(Vector3Int mapPos, Color color)
+    public void HighlightTile(Vector3Int mapPos, Color color, int layer = 0)
     {
         var hilite = Instantiate(blanktilePrefab, CellToWorld(mapPos), quaternion.identity);
         hilite.GetComponent<SpriteRenderer>().color = color;
-        allHighlights.Add(hilite);
+        allHighlights[layer].Add(hilite);
     }
-    public void RemoveAllHighlights()
+    public void RemoveAllHighlights(int layer = 0)
     {
-        foreach (var highlight in allHighlights)
+        foreach (var highlight in allHighlights[layer])
         {
             Destroy(highlight);
         }
@@ -148,6 +150,7 @@ public class Map : MonoBehaviour, IGridMap
 
     public void UpdateFOV(Vector3Int position, int radius)
     {
+        //Debug.Log("UpdateFoV: " + position);
         int i, j;
         for (i = -radius; i <= radius; i++)
             for (j = -radius; j <= radius; j++)
@@ -157,26 +160,9 @@ public class Map : MonoBehaviour, IGridMap
     
     public HashSet<Vector3Int> GetFOV(Vector3Int position, int radius)
     {
-        HashSet<Vector3Int> visible = new HashSet<Vector3Int>();
-        int i, j;
-        for (i = -radius; i <= radius; i++)
-        {
-            for (j = -radius; j <= radius; j++)
-            {
-                if (i * i + j * j < radius * radius)
-                {
-                    if (HasLOS(position.x, position.y, position.x + i, position.y + j, true))
-                    {
-                        visible.Add(new Vector3Int(position.x + i, position.y + j, 0));
-                    }
-
-                }
-            
-            }
-
-        }
-
-        return visible;
+        visibleTiles.Clear();
+        UpdateFOV(position, radius);
+        return visibleTiles;
     }
 
     private bool HasLOS(int x0, int y0, int x1, int y1, bool removeFog = false)
@@ -197,10 +183,8 @@ public class Map : MonoBehaviour, IGridMap
         //calculate length of line to cast (distance from start to final tile)
         dist = math.sqrt(dx * dx + dy * dy);
 
-        var previousTile = Vector3Int.zero;
         while (xnext != x1 || ynext != y1) //essentially casting a ray of length radius: (radius^3)
         {
-            // TODO: check map bounds if required
             if (!IsNeighborVisible(new Vector3Int(prevX, prevY, 0), new Vector3Int(xnext, ynext, 0)))
             {
                 //tag_memorised(xnext, ynext); // make a note of the wall
@@ -230,18 +214,20 @@ public class Map : MonoBehaviour, IGridMap
 
     public void ResetFog()
     {
-        visibleTiles.Clear();
         layerMap["FogOfWar"].BoxFill(new Vector3Int(1,1,0), floorTile, 0,0,Width,Height);
     }
     
     private void RemoveFog(Vector3Int position)
     {
-        visibleTiles.Remove(position);
         layerMap["FogOfWar"].SetTile(position, null);
     }
 
     bool IsNeighborVisible(Vector3Int tileOne, Vector3Int tileTwo)
     {
+        if (!Contains(tileOne.x, tileOne.y) || !Contains(tileTwo.x, tileTwo.y))
+        {
+            return false;
+        }
         if (tileOne.x == tileTwo.x || tileOne.y == tileTwo.y)
         {
             return !IsWallBetween(tileOne, tileTwo);
@@ -401,8 +387,17 @@ public class Map : MonoBehaviour, IGridMap
         return true;
     }
 
-    public int Width { get; private set; }
-    public int Height { get; private set; }
+    public int Width
+    {
+        get { return MapWidth; }
+    }
+    public int Height
+    {
+        get { return MapHeight; }
+    }
+
+    public Vector3Int RandomPosition => new Vector3Int(Random.Range(0, Width -1), Random.Range(0, Height - 1), 0);
+
     public bool Contains(int x, int y)
     {
         return (x >= 0 && y >= 0) && (x < Width && y < Height);
@@ -432,4 +427,5 @@ public class Map : MonoBehaviour, IGridMap
 
         return reachableNeighbors.ConvertAll(elem => new Point(elem.x, elem.y));
     }
+
 }

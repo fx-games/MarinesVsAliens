@@ -44,6 +44,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6de6faf0488604afb89d26432d543eb8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  bloodSplatter: {fileID: 5972786585338085383, guid: 18b98604ca4274cdcbb7ea9a3dfce325,
+    type: 3}
+  mobility: 4
+  visionRange: 20
+  health: 1
+  moveDelay: 0.5
 --- !u!212 &3510056058709453014
 SpriteRenderer:
   m_ObjectHideFlags: 0
