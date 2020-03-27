@@ -1,11 +1,8 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using GridPathFinder.Map;
-using Unity.Mathematics;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 using Color = UnityEngine.Color;
@@ -103,7 +100,7 @@ public class Map : MonoBehaviour, IGridMap
 
     public void HighlightTile(Vector3Int mapPos, Color color, int layer = 0)
     {
-        var hilite = Instantiate(blanktilePrefab, CellToWorld(mapPos), quaternion.identity);
+        var hilite = Instantiate(blanktilePrefab, CellToWorld(mapPos), Quaternion.identity);
         hilite.GetComponent<SpriteRenderer>().color = color;
         allHighlights[layer].Add(hilite);
     }
@@ -158,7 +155,7 @@ public class Map : MonoBehaviour, IGridMap
         ynext = prevY = y0;
     
         //calculate length of line to cast (distance from start to final tile)
-        dist = math.sqrt(dx * dx + dy * dy);
+        dist = Mathf.Sqrt(dx * dx + dy * dy);
 
         while (xnext != x1 || ynext != y1) //essentially casting a ray of length radius: (radius^3)
         {
@@ -171,9 +168,9 @@ public class Map : MonoBehaviour, IGridMap
             prevX = xnext;
             prevY = ynext;
             // Line-to-point distance formula < 0.5 
-            if(math.abs(dy * (xnext - x0 + sx) - dx * (ynext - y0)) / dist < 0.5f)
+            if(Mathf.Abs(dy * (xnext - x0 + sx) - dx * (ynext - y0)) / dist < 0.5f)
                 xnext += sx;
-            else if(math.abs(dy * (xnext - x0) - dx * (ynext - y0 + sy)) / dist < 0.5f)
+            else if(Mathf.Abs(dy * (xnext - x0) - dx * (ynext - y0 + sy)) / dist < 0.5f)
                 ynext += sy;
             else
             {
@@ -407,8 +404,8 @@ public class Map : MonoBehaviour, IGridMap
 
     public bool AreNeighbors(Vector3Int posOne, Vector3Int posTwo)
     {
-        return posOne.x == posTwo.x && math.abs(posOne.y - posTwo.y) == 1
-               || posOne.y == posTwo.y && math.abs(posOne.x - posTwo.x) == 1;
+        return posOne.x == posTwo.x && Mathf.Abs(posOne.y - posTwo.y) == 1
+               || posOne.y == posTwo.y && Mathf.Abs(posOne.x - posTwo.x) == 1;
     }
 
     public void RemoveUnit(Unit unit)
@@ -433,7 +430,7 @@ public class Map : MonoBehaviour, IGridMap
                 {
                     var nextPos = new Vector3Int(i, j, 0);
                     var euclideanDistance = GetEuclideanDistance(mapPos, nextPos);
-                    if (math.floor(euclideanDistance) <= radius)
+                    if (Mathf.Floor(euclideanDistance) <= radius)
                     {
                         affectedTiles.Add(nextPos);
                     }

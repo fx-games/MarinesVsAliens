@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using GridPathFinder;
-using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -11,7 +10,6 @@ using static Mod;
 using static Mod.RuleFaction;
 using static Unit;
 using Color = UnityEngine.Color;
-using Random = UnityEngine.Random;
 
 public class Game : MonoBehaviour
 {
@@ -148,10 +146,10 @@ public class Game : MonoBehaviour
             {
                 if (gameMap.IsAffected(selectedUnit, weapon, mapPos, targetPos))
                 {
-                    CreateExplosion(mapPos);
-                    if (gameMap.IsUnitOn(mapPos))
+                    CreateExplosion(targetPos);
+                    if (gameMap.IsUnitOn(targetPos))
                     {
-                        var hitUnit = gameMap.GetUnitAt(mapPos);
+                        var hitUnit = gameMap.GetUnitAt(targetPos);
                         ResolveAttack(selectedUnit, hitUnit);
                     }
                 }
@@ -193,7 +191,7 @@ public class Game : MonoBehaviour
 
     private void CreateExplosion(Vector3Int mapPos)
     {
-        Instantiate(explosionPrefab, gameMap.CellToWorld(mapPos), quaternion.identity);
+        Instantiate(explosionPrefab, gameMap.CellToWorld(mapPos), Quaternion.identity);
     }
 
     public void AttackButtonClicked()
