@@ -47,8 +47,9 @@ MonoBehaviour:
   bloodSplatter: {fileID: 5972786585338085383, guid: 18b98604ca4274cdcbb7ea9a3dfce325,
     type: 3}
   mobility: 4
-  visionRange: 20
+  visionRange: 3
   health: 1
+  armor: 2
   moveDelay: 0.5
 --- !u!212 &3510056058709453014
 SpriteRenderer:

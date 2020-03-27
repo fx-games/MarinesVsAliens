@@ -14,7 +14,7 @@ public class Unit : MonoBehaviour
     public Weapon MeleeWeapon { get; set; }
     public GameObject bloodSplatter;
     public int mobility = 4;
-    public int visionRange = 20;
+    public int visionRange = 2;
     public int health = 1;
     public int armor = 2;
 
@@ -45,6 +45,8 @@ public class Unit : MonoBehaviour
 
         return melee + ranged;
     } }
+
+    public RuleFaction Faction { get; set; }
 
     private float lastMoveTime;
     public double moveDelay = 0.5f;
@@ -212,8 +214,9 @@ public class Unit : MonoBehaviour
         Destroy(gameObject);
     }
 
-    public void LoadRules(string unitType, RuleLoadout loadout)
+    public void LoadRules(string unitType, RuleFaction faction, RuleLoadout loadout)
     {
+        Faction = faction;
         foreach (var weaponType in loadout.Weapons)
         {
             var weaponRules = mod.GetWeaponRule(weaponType);

@@ -110,7 +110,7 @@ public class Game : MonoBehaviour
     private void UnitSelected(Vector3Int mapPos)
     {
         selectedUnit = gameMap.GetUnitAt(mapPos);
-        ShowReachableTiles(mapPos, selectedUnit.mobility);
+        ShowReachableTiles(selectedUnit, selectedUnit.mobility);
         gameState = GameState.MoveTargetSelection;
     }
 
@@ -136,20 +136,21 @@ public class Game : MonoBehaviour
         }
     }
 
-    private void OnAttackTargetSelected(Vector3Int mapPos)
+    private void OnAttackTargetSelected(Vector3Int targetedPos)
     {
-        if (selectedUnit != null && validTargets.Contains(mapPos))
+        if (selectedUnit != null && validTargets.Contains(targetedPos))
         {
-            var isMelee = (gameMap.AreNeighbors(gameMap.WorldToCell(selectedUnit.transform.position),mapPos));
+            var isMelee = (gameMap.AreNeighbors(gameMap.WorldToCell(selectedUnit.transform.position),targetedPos));
             var weapon = isMelee ? selectedUnit.MeleeWeapon : selectedUnit.RangedWeapon;
-            foreach (var targetPos in gameMap.AreaOfEffect(weapon, mapPos))
+            var areaOfEffect = gameMap.AreaOfEffect(weapon, targetedPos);
+            foreach (var aoePos in areaOfEffect)
             {
-                if (gameMap.IsAffected(selectedUnit, weapon, mapPos, targetPos))
+                if (gameMap.AoEAllowed(selectedUnit, weapon, targetedPos, aoePos))
                 {
-                    CreateExplosion(targetPos);
-                    if (gameMap.IsUnitOn(targetPos))
+                    CreateExplosion(aoePos);
+                    if (gameMap.IsUnitOn(aoePos))
                     {
-                        var hitUnit = gameMap.GetUnitAt(targetPos);
+                        var hitUnit = gameMap.GetUnitAt(aoePos);
                         ResolveAttack(selectedUnit, hitUnit);
                     }
                 }
@@ -200,63 +201,70 @@ public class Game : MonoBehaviour
         {
             gameMap.RemoveAllHighlights(0);
             gameMap.RemoveAllHighlights(1);
-            PreviewAttack(selectedUnit, gameMap.WorldToCell(selectedUnit.transform.position), 20);
+            PreviewAttack(selectedUnit, gameMap.WorldToCell(selectedUnit.transform.position), 3);
             gameState = GameState.AttackTargetSelection;
         }
     }
 
-    private void PreviewAttack(Unit unit, Vector3Int mapPos, int maxDistance)
+    private void PreviewAttack(Unit unit, Vector3Int unitPos, int maxDistance)
     {
-        gameMap.RemoveAllHighlights();
         validTargets.Clear();
         if (unit.HasRangedWeapon)
         {
-            validTargets = gameMap.GetFOV(mapPos, maxDistance);
-            validTargets.Remove(mapPos);
+            validTargets = gameMap.GetFOV(unitPos, maxDistance);
+            validTargets.Remove(unitPos);
         }
         
-        if (!unit.HasMeleeWeapon)
+        if (!unit.HasMeleeWeapon) // can only attack these tiles with melee
         {
-            validTargets.Remove(mapPos + Vector3Int.right);
-            validTargets.Remove(mapPos + Vector3Int.up);
-            validTargets.Remove(mapPos + Vector3Int.down);
-            validTargets.Remove(mapPos + Vector3Int.left);
+            validTargets.Remove(unitPos + Vector3Int.right);
+            validTargets.Remove(unitPos + Vector3Int.up);
+            validTargets.Remove(unitPos + Vector3Int.down);
+            validTargets.Remove(unitPos + Vector3Int.left);
         }
         else
         {
-            AddToValidTargets(mapPos + Vector3Int.right);
-            AddToValidTargets(mapPos + Vector3Int.up);
-            AddToValidTargets(mapPos + Vector3Int.down);
-            AddToValidTargets(mapPos + Vector3Int.left);
+            AddToValidMeleeTargets(unit,unitPos,unitPos + Vector3Int.right);
+            AddToValidMeleeTargets(unit,unitPos,unitPos + Vector3Int.up);
+            AddToValidMeleeTargets(unit,unitPos,unitPos + Vector3Int.down);
+            AddToValidMeleeTargets(unit,unitPos,unitPos + Vector3Int.left);
         }
-        validTargets.Remove(mapPos + Vector3Int.up + Vector3Int.right);
-        validTargets.Remove(mapPos + Vector3Int.down + Vector3Int.left);
-        validTargets.Remove(mapPos + Vector3Int.down + Vector3Int.right);
-        validTargets.Remove(mapPos + Vector3Int.up + Vector3Int.left);
+        validTargets.Remove(unitPos + Vector3Int.up + Vector3Int.right);
+        validTargets.Remove(unitPos + Vector3Int.down + Vector3Int.left);
+        validTargets.Remove(unitPos + Vector3Int.down + Vector3Int.right);
+        validTargets.Remove(unitPos + Vector3Int.up + Vector3Int.left);
         foreach (var tile in validTargets)
         {
             gameMap.HighlightTile(tile, new Color(0.6f, 0f, 0, 0.5f));
         }
     }
 
-    private void AddToValidTargets(Vector3Int pos)
+    private void AddToValidMeleeTargets(Unit unit, Vector3Int unitPos, Vector3Int pos)
     {
-        if (gameMap.Contains(pos.x, pos.y))
+        if (gameMap.Contains(pos.x, pos.y) && !gameMap.IsWallBetween(unitPos, pos) && gameMap.IsUnitOn(pos))
         {
             validTargets.Add(pos);
         }
     }
 
-    private void ShowReachableTiles(Vector3Int mapPos, int maxDistance)
+    private void ShowReachableTiles(Unit unit, int maxDistance)
     {
+        var startPos = gameMap.WorldToCell(unit.transform.position);
         gameMap.RemoveAllHighlights();
         pathfinder.MaxCost = maxDistance;
-        pathfinder.Dijkstra(new HashSet<Point>(){new Point(mapPos.x, mapPos.y)}, new HashSet<Point>());
+        pathfinder.CurrentUnit = unit;
+        
+        pathfinder.Dijkstra(new HashSet<Point>(){new Point(startPos.x, startPos.y)}, new HashSet<Point>());
         //pathfinder.PrintDistMap();
+        
         var nodeList = pathfinder.ReachableList.ToList().ConvertAll(point => new Vector3Int(point.X, point.Y, 0));
+        
         foreach (var reachablePos in nodeList)
         {
-            gameMap.HighlightTile(reachablePos, new Color(0, 0.8f, 0, 0.5f));
+            if (!gameMap.IsUnitOn(reachablePos))
+            {
+                gameMap.HighlightTile(reachablePos, new Color(0, 0.8f, 0, 0.5f));
+            }
         }
     }
 
@@ -330,7 +338,7 @@ public class Game : MonoBehaviour
         if (gameMap.AddUnit(unit, spawnPosition))
         {
             unit.GetComponent<SpriteRenderer>().color = ColorFromArray(ruleFaction.Color);
-            unit.LoadRules(unitType, loadout);
+            unit.LoadRules(unitType, ruleFaction, loadout);
             unit.FinishedMoving += UnitFinishedMoving;
             allUnits.Add(unit);
             gameMap.UpdateFOV(spawnPosition, unit.visionRange);

@@ -53,6 +53,8 @@ namespace GridPathFinder
             get { return mCardinalCost; }
         }
 
+        public Unit CurrentUnit { get; set; }
+
         public Pathfinder(IGridMap map, float cardinalCost, float diagonalCost)
         {
             mMap = map;
@@ -83,7 +85,7 @@ namespace GridPathFinder
                     continue;
 
                 //Console.WriteLine("Expanding Node: " + smallestDistCell.GridCoordinate + " (" + smallestDistCell.TentativeDistance + ")");
-                List<Point> neighbors = mMap.GetNeighbors(smallestDistCell.GridCoordinate);
+                List<Point> neighbors = mMap.GetNeighbors(CurrentUnit, smallestDistCell.GridCoordinate);
                 foreach (Point neighbor in neighbors)
                 {
                     if (!ClosedList.Contains(neighbor))

@@ -125,21 +125,36 @@ public class Map : MonoBehaviour, IGridMap
     public void UpdateFOV(Vector3Int position, int radius)
     {
         //Debug.Log("UpdateFoV: " + position);
+        radius++;
         int i, j;
         for (i = -radius; i <= radius; i++)
             for (j = -radius; j <= radius; j++)
                 if (i * i + j * j < radius * radius)
-                    HasLOS(position.x, position.y, position.x + i, position.y + j, true);     
+                    RayCasting(position.x, position.y, position.x + i, position.y + j, true);
     }
     
     public HashSet<Vector3Int> GetFOV(Vector3Int position, int radius)
     {
-        visibleTiles.Clear();
-        UpdateFOV(position, radius);
-        return visibleTiles;
+        var fieldOfView = new HashSet<Vector3Int>();
+        radius++;
+        int i, j;
+        for (i = -radius; i <= radius; i++)
+        {
+            for (j = -radius; j <= radius; j++)
+            {
+                if (i * i + j * j < radius * radius)
+                {
+                    if (RayCasting(position.x, position.y, position.x + i, position.y + j, true))
+                    {
+                        fieldOfView.Add(new Vector3Int(position.x + i, position.y + j, 0));
+                    }
+                }
+            }
+        }
+        return fieldOfView;
     }
 
-    private bool HasLOS(int x0, int y0, int x1, int y1, bool removeFog = false)
+    private bool RayCasting(int x0, int y0, int x1, int y1, bool removeFog = false)
     {
         int sx, sy, xnext, ynext, dx, dy, prevX, prevY;
         float dist;
@@ -168,6 +183,7 @@ public class Map : MonoBehaviour, IGridMap
             prevX = xnext;
             prevY = ynext;
             // Line-to-point distance formula < 0.5 
+            // decide on the direction for the next step; horiz, verti, diag
             if(Mathf.Abs(dy * (xnext - x0 + sx) - dx * (ynext - y0)) / dist < 0.5f)
                 xnext += sx;
             else if(Mathf.Abs(dy * (xnext - x0) - dx * (ynext - y0 + sy)) / dist < 0.5f)
@@ -178,9 +194,13 @@ public class Map : MonoBehaviour, IGridMap
                 ynext += sy;
             }
         }
-
-        var litTile = new Vector3Int(prevX, prevY, 0);
-        visibleTiles.Add(litTile);
+        if (!IsNeighborVisible(new Vector3Int(prevX, prevY, 0), new Vector3Int(xnext, ynext, 0)))
+        {
+            //tag_memorised(xnext, ynext); // make a note of the wall
+            return false;
+        }
+        
+        var litTile = new Vector3Int(xnext, ynext, 0);
         if (removeFog)
             RemoveFog(litTile);
         return true;
@@ -188,6 +208,7 @@ public class Map : MonoBehaviour, IGridMap
 
     public void ResetFog()
     {
+        //layerMap["FogOfWar"].ClearAllTiles();
         layerMap["FogOfWar"].BoxFill(new Vector3Int(1,1,0), floorTile, 0,0,Width,Height);
     }
     
@@ -234,7 +255,8 @@ public class Map : MonoBehaviour, IGridMap
 
         return true;
     }
-    bool IsWallBetween(Vector3Int tileOne, Vector3Int tileTwo)
+
+    public bool IsWallBetween(Vector3Int tileOne, Vector3Int tileTwo)
     {
         if (tileOne.Equals(tileTwo)) return false;
         if (tileOne.y == tileTwo.y)
@@ -376,7 +398,7 @@ public class Map : MonoBehaviour, IGridMap
     {
         return (x >= 0 && y >= 0) && (x < Width && y < Height);
     }
-    public List<Point> GetNeighbors(Point position)
+    public List<Point> GetNeighbors(Unit currentUnit, Point position)
     {
         Vector3Int mapPos = new Vector3Int(position.X, position.Y, 0);
         List<Vector3Int> reachableNeighbors = new List<Vector3Int>();
@@ -393,7 +415,7 @@ public class Map : MonoBehaviour, IGridMap
         };
         foreach (var neighbor in neighbors)
         {
-            if (IsNeighborVisible(mapPos, neighbor) && Contains(neighbor.x, neighbor.y) && !IsUnitOn(neighbor))
+            if (IsNeighborVisible(mapPos, neighbor) && Contains(neighbor.x, neighbor.y) && !IsOtherFactionOn(currentUnit, neighbor))
             {
                 reachableNeighbors.Add(neighbor);
             }
@@ -445,12 +467,14 @@ public class Map : MonoBehaviour, IGridMap
     {
         return (float) Math.Sqrt(Math.Pow((pointOne.x - pointTwo.x), 2) + Math.Pow(pointOne.y - pointTwo.y, 2));
     }
-    public bool IsAffected(Unit attacker, Weapon weapon, Vector3Int mapPos, Vector3Int affectedPos)
+    public bool AoEAllowed(Unit attacker, Weapon weapon, Vector3Int mapPos, Vector3Int affectedPos)
     {
+        if (mapPos == affectedPos) return true;
         if (weapon.HasAreaOfEffect)
         {
             // affectedPos may be one of the aoe tiles
-            return HasLOS(mapPos.x, mapPos.y, affectedPos.x, affectedPos.y);
+            var hasLos = RayCasting(mapPos.x, mapPos.y, affectedPos.x, affectedPos.y);
+            return hasLos;
         }
         else
         {
@@ -459,5 +483,16 @@ public class Map : MonoBehaviour, IGridMap
         }
 
         return true;
+    }
+
+    public bool IsOtherFactionOn(Unit unit, Vector3Int pos)
+    {
+        if (!IsUnitOn(pos))
+        {
+            return false;
+        }
+
+        var otherUnit = GetUnitAt(pos);
+        return unit.Faction != otherUnit.Faction;
     }
 }

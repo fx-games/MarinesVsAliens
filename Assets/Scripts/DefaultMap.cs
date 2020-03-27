@@ -26,7 +26,7 @@ namespace GridPathFinder.Map
             mRelativeNeighbors = new List<Point>() { new Point(1, 0), new Point(-1, 0), new Point(0, 1), new Point(0, -1), new Point(1, -1), new Point(-1, -1), new Point(-1, 1), new Point(1, 1) };
         }
 
-        public List<Point> GetNeighbors(Point smallestDistCell)
+        public List<Point> GetNeighbors(Unit currentUnit, Point smallestDistCell)
         {
             List<Point> result = new List<Point>();
             foreach (Point relativeNeighbor in mRelativeNeighbors)
