@@ -211,7 +211,23 @@ public class Game : MonoBehaviour
         validTargets.Clear();
         if (unit.HasRangedWeapon)
         {
-            validTargets = gameMap.GetFOV(unitPos, maxDistance);
+            var weaponRules = unit.RangedWeapon.Rules;
+            if (weaponRules.StraightLineOnly)
+            {
+                validTargets.UnionWith(gameMap.GetLine(unitPos, Map.Direction.North, maxDistance));
+                validTargets.UnionWith(gameMap.GetLine(unitPos, Map.Direction.South, maxDistance));
+                validTargets.UnionWith(gameMap.GetLine(unitPos, Map.Direction.East, maxDistance));
+                validTargets.UnionWith(gameMap.GetLine(unitPos, Map.Direction.West, maxDistance));
+                validTargets.UnionWith(gameMap.GetLine(unitPos, Map.Direction.NorthEast, maxDistance));
+                validTargets.UnionWith(gameMap.GetLine(unitPos, Map.Direction.NorthWest, maxDistance));
+                validTargets.UnionWith(gameMap.GetLine(unitPos, Map.Direction.SouthEast, maxDistance));
+                validTargets.UnionWith(gameMap.GetLine(unitPos, Map.Direction.SouthWest, maxDistance));   
+            }
+            else
+            {
+                validTargets = gameMap.GetFOV(unitPos, maxDistance);
+            }
+            
             validTargets.Remove(unitPos);
         }
         

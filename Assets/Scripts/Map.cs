@@ -130,9 +130,52 @@ public class Map : MonoBehaviour, IGridMap
         for (i = -radius; i <= radius; i++)
             for (j = -radius; j <= radius; j++)
                 if (i * i + j * j < radius * radius)
-                    RayCasting(position.x, position.y, position.x + i, position.y + j, true);
+                    LineCast(position.x, position.y, position.x + i, position.y + j, true);
     }
-    
+    public HashSet<Vector3Int> GetLine(Vector3Int unitPos, Direction rayDirection, int maxDistance)
+    {
+        HashSet<Vector3Int> linePositions = new HashSet<Vector3Int>();
+        var prevPos = unitPos;
+        Vector3Int rayDirVector = ToVector(rayDirection);
+        for (int i = 0; i < maxDistance; i++)
+        {
+            var nextPos = prevPos + rayDirVector;
+            if (!IsNeighborVisible(prevPos, nextPos))
+            {
+                return linePositions;
+            }
+
+            linePositions.Add(nextPos);
+            prevPos = nextPos;
+        }
+
+        return linePositions;
+    }
+
+    private Vector3Int ToVector(Direction direction)
+    {
+        switch (direction)
+        {
+            case Direction.North:
+                return Vector3Int.up;
+            case Direction.NorthWest:
+                return Vector3Int.up + Vector3Int.left;
+            case Direction.West:
+                return Vector3Int.left;
+            case Direction.SouthWest:
+                return Vector3Int.down + Vector3Int.left;
+            case Direction.South:
+                return Vector3Int.down;
+            case Direction.SouthEast:
+                return Vector3Int.down + Vector3Int.right;
+            case Direction.East:
+                return Vector3Int.right;
+            case Direction.NorthEast:
+                return Vector3Int.up + Vector3Int.right;
+        }
+        return Vector3Int.zero;
+    }
+
     public HashSet<Vector3Int> GetFOV(Vector3Int position, int radius)
     {
         var fieldOfView = new HashSet<Vector3Int>();
@@ -144,7 +187,7 @@ public class Map : MonoBehaviour, IGridMap
             {
                 if (i * i + j * j < radius * radius)
                 {
-                    if (RayCasting(position.x, position.y, position.x + i, position.y + j, true))
+                    if (LineCast(position.x, position.y, position.x + i, position.y + j, true))
                     {
                         fieldOfView.Add(new Vector3Int(position.x + i, position.y + j, 0));
                     }
@@ -154,7 +197,7 @@ public class Map : MonoBehaviour, IGridMap
         return fieldOfView;
     }
 
-    private bool RayCasting(int x0, int y0, int x1, int y1, bool removeFog = false)
+    private bool LineCast(int x0, int y0, int x1, int y1, bool removeFog = false)
     {
         int sx, sy, xnext, ynext, dx, dy, prevX, prevY;
         float dist;
@@ -473,7 +516,7 @@ public class Map : MonoBehaviour, IGridMap
         if (weapon.HasAreaOfEffect)
         {
             // affectedPos may be one of the aoe tiles
-            var hasLos = RayCasting(mapPos.x, mapPos.y, affectedPos.x, affectedPos.y);
+            var hasLos = LineCast(mapPos.x, mapPos.y, affectedPos.x, affectedPos.y);
             return hasLos;
         }
         else
@@ -495,4 +538,6 @@ public class Map : MonoBehaviour, IGridMap
         var otherUnit = GetUnitAt(pos);
         return unit.Faction != otherUnit.Faction;
     }
+
+    
 }
