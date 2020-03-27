@@ -1,12 +1,17 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using static Map;
+using static Mod;
+using static Mod.RuleFaction;
 
 public class Unit : MonoBehaviour
 {
     public enum UnitState { Idle, Moving }
 
+    public Weapon RangedWeapon { get; set; }
+    public Weapon MeleeWeapon { get; set; }
     public GameObject bloodSplatter;
     public int mobility = 4;
     public int visionRange = 20;
@@ -17,6 +22,30 @@ public class Unit : MonoBehaviour
     private int currentPathIndex;
     private List<Vector3Int> currentPath;
     public UnitState State { get; private set; } = UnitState.Idle;
+    public bool HasRangedWeapon => RangedWeapon != null;
+    public bool HasMeleeWeapon => MeleeWeapon != null;
+    public string WeaponDescription { get
+    {
+        string melee = "";
+        string ranged = "";
+        if (HasMeleeWeapon)
+        {
+            melee = MeleeWeapon.ToString();
+        }
+
+        if (HasRangedWeapon)
+        {
+            ranged = RangedWeapon.ToString();
+        }
+
+        if (HasMeleeWeapon && HasRangedWeapon)
+        {
+            return melee + "/" + ranged;
+        }
+
+        return melee + ranged;
+    } }
+
     private float lastMoveTime;
     public double moveDelay = 0.5f;
     private Mod mod;
@@ -165,8 +194,15 @@ public class Unit : MonoBehaviour
         gameMap.UpdateFOV(mapPos, visionRange);
     }
 
-    public void InflictDamage(int damage)
+    public void AttackedWith(int attackValue, bool isMelee)
     {
+        var defense = armor;
+        if (isMelee)
+        {
+            defense = MeleeWeapon.RollDamage();
+        }
+        Debug.Log("Defense: " + defense);
+        int damage = attackValue - defense;
         health -= damage;
     }
 
@@ -176,12 +212,52 @@ public class Unit : MonoBehaviour
         Destroy(gameObject);
     }
 
-    public void LoadRules(string unitType)
+    public void LoadRules(string unitType, RuleLoadout loadout)
     {
+        foreach (var weaponType in loadout.Weapons)
+        {
+            var weaponRules = mod.GetWeaponRule(weaponType);
+            if (weaponRules.IsMelee)
+            {
+                MeleeWeapon = new Weapon(weaponRules);
+            }
+            else
+            {
+                RangedWeapon = new Weapon(weaponRules);
+            }
+        }
+
         var rules = mod.GetUnitRule(unitType);
         mobility = rules.Movement;
         health = rules.Health;
         armor = rules.Armor;
+    }
+}
+
+public class Weapon
+{
+    private RuleWeapon weaponRules;
+
+    public Weapon(RuleWeapon rules)
+    {
+        weaponRules = rules;
+    }
+
+    public bool HasAreaOfEffect
+    {
+        get { return weaponRules.Radius > 0; }
+    }
+
+    public RuleWeapon Rules => weaponRules;
+
+    public int RollDamage()
+    {
+        return Random.Range(weaponRules.Damage[0], weaponRules.Damage[1]);
+    }
+
+    public override string ToString()
+    {
+        return weaponRules.Type;
     }
 }
 

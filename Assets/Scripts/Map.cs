@@ -3,14 +3,11 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
-using System.Xml;
 using GridPathFinder.Map;
 using Unity.Mathematics;
 using UnityEditor;
-using UnityEditor.U2D;
 using UnityEngine;
 using UnityEngine.Tilemaps;
-using UnityEngine.UI;
 using Color = UnityEngine.Color;
 using Random = UnityEngine.Random;
 
@@ -71,26 +68,6 @@ public class Map : MonoBehaviour, IGridMap
     private void Start()
     {
         
-    }
-
-    private void CreateBlankSprite()
-    {
-        Texture2D blankTex = new Texture2D(32, 32) {wrapMode = TextureWrapMode.Repeat};
-        var pixels = blankTex.GetPixels();
-        for(var i = 0; i < pixels.Length; ++i)
-        {
-            pixels[i] = new Color(1,1,1,0.5f);
-        }
-        blankTex.SetPixels(pixels);
-        blankTex.Apply();
-        var blankSprite = Sprite.Create(blankTex, new Rect(0, 0, 32, 32), new Vector2(0.5f, 0.5f), 32f);
-        
-        blanktilePrefab = new GameObject();
-        SpriteRenderer spriteRenderer = blanktilePrefab.AddComponent<SpriteRenderer>();
-        spriteRenderer.sortingLayerName = "Units";
-        spriteRenderer.sprite = blankSprite;
-        
-        PrefabUtility.SaveAsPrefabAsset(blanktilePrefab, "Assets/blanktile.prefab");
     }
 
     private void SetupWalls()
@@ -428,4 +405,62 @@ public class Map : MonoBehaviour, IGridMap
         return reachableNeighbors.ConvertAll(elem => new Point(elem.x, elem.y));
     }
 
+    public bool AreNeighbors(Vector3Int posOne, Vector3Int posTwo)
+    {
+        return posOne.x == posTwo.x && math.abs(posOne.y - posTwo.y) == 1
+               || posOne.y == posTwo.y && math.abs(posOne.x - posTwo.x) == 1;
+    }
+
+    public void RemoveUnit(Unit unit)
+    {
+        var pos = WorldToCell(unit.transform.position);
+        if (unitMap[pos.x, pos.y] == unit)
+        {
+            RemoveUnit(pos);
+        }
+    }
+
+    public List<Vector3Int> AreaOfEffect(Weapon weapon, Vector3Int mapPos)
+    {
+        var rules = weapon.Rules;
+        var radius = rules.Radius;
+        HashSet<Vector3Int> affectedTiles = new HashSet<Vector3Int>(){mapPos};
+        if (radius > 0)
+        {
+            for (int i = mapPos.x - radius; i <= mapPos.x + radius; i++)
+            {
+                for (int j = mapPos.y - radius; j <= mapPos.y + radius; j++)
+                {
+                    var nextPos = new Vector3Int(i, j, 0);
+                    var euclideanDistance = GetEuclideanDistance(mapPos, nextPos);
+                    if (math.floor(euclideanDistance) <= radius)
+                    {
+                        affectedTiles.Add(nextPos);
+                    }
+                }
+            }
+        }
+
+        return affectedTiles.ToList();
+    }
+    
+    private float GetEuclideanDistance(Vector3Int pointOne, Vector3Int pointTwo)
+    {
+        return (float) Math.Sqrt(Math.Pow((pointOne.x - pointTwo.x), 2) + Math.Pow(pointOne.y - pointTwo.y, 2));
+    }
+    public bool IsAffected(Unit attacker, Weapon weapon, Vector3Int mapPos, Vector3Int affectedPos)
+    {
+        if (weapon.HasAreaOfEffect)
+        {
+            // affectedPos may be one of the aoe tiles
+            return HasLOS(mapPos.x, mapPos.y, affectedPos.x, affectedPos.y);
+        }
+        else
+        {
+            // affectedPos is the tile the user clicked on
+            // since weapon preview should already have handled this, we are done here
+        }
+
+        return true;
+    }
 }

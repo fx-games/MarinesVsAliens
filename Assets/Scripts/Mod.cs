@@ -33,9 +33,9 @@ public class Mod : MonoBehaviour
         public string Type { get; set; }
         public int[] Color { get; set; }
 
-        public List<RuleLoadOut> LoadOut { get; set; }
+        public List<RuleLoadout> LoadOut { get; set; }
 
-        public class RuleLoadOut
+        public class RuleLoadout
         {
             public string Unit { get; set; }
             [DefaultValue(1)] public int Count { get; set; } = 1;
@@ -111,12 +111,12 @@ public class Mod : MonoBehaviour
         return unitRules[type];
     }
     
-    RuleFaction GetFactionRule(string type)
+    public RuleFaction GetFactionRule(string type)
     {
         return factionRules[type];
     }
     
-    RuleWeapon GetWeaponRule(string type)
+    public RuleWeapon GetWeaponRule(string type)
     {
         return weaponRules[type];
     }

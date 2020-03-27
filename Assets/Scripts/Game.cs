@@ -1,17 +1,14 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
 using System.Linq;
 using GridPathFinder;
 using Unity.Mathematics;
-using UnityEditor.Rendering;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
-using YamlDotNet.RepresentationModel;
 using static Mod;
+using static Mod.RuleFaction;
 using static Unit;
 using Color = UnityEngine.Color;
 using Random = UnityEngine.Random;
@@ -34,7 +31,7 @@ public class Game : MonoBehaviour
     public Text topLeftLabel;
     private Pathfinder pathfinder;
     private GameState gameState = GameState.Default;
-    private HashSet<Vector3Int> validTargets;
+    private HashSet<Vector3Int> validTargets = new HashSet<Vector3Int>();
     private Mod mod;
 
 
@@ -100,9 +97,7 @@ public class Game : MonoBehaviour
         }
         else if (gameMap.IsUnitOn(mapPos))
         {
-            selectedUnit = gameMap.GetUnitAt(mapPos);
-            ShowReachableTiles(mapPos, selectedUnit.mobility);
-            gameState = GameState.MoveTargetSelection;
+            UnitSelected(mapPos);
         }
         else
         {
@@ -112,6 +107,13 @@ public class Game : MonoBehaviour
             gameMap.RemoveAllHighlights(1);
         }
         UpdateLabel();
+    }
+
+    private void UnitSelected(Vector3Int mapPos)
+    {
+        selectedUnit = gameMap.GetUnitAt(mapPos);
+        ShowReachableTiles(mapPos, selectedUnit.mobility);
+        gameState = GameState.MoveTargetSelection;
     }
 
     private void OnMapRightClicked(Vector3Int mapPos)
@@ -138,38 +140,55 @@ public class Game : MonoBehaviour
 
     private void OnAttackTargetSelected(Vector3Int mapPos)
     {
-        if (validTargets.Contains(mapPos))
+        if (selectedUnit != null && validTargets.Contains(mapPos))
         {
-            CreateExplosion(mapPos);
-            if (gameMap.IsUnitOn(mapPos))
+            var isMelee = (gameMap.AreNeighbors(gameMap.WorldToCell(selectedUnit.transform.position),mapPos));
+            var weapon = isMelee ? selectedUnit.MeleeWeapon : selectedUnit.RangedWeapon;
+            foreach (var targetPos in gameMap.AreaOfEffect(weapon, mapPos))
             {
-                var hitUnit = gameMap.GetUnitAt(mapPos);
-                ResolveAttack(selectedUnit, hitUnit);
+                if (gameMap.IsAffected(selectedUnit, weapon, mapPos, targetPos))
+                {
+                    CreateExplosion(mapPos);
+                    if (gameMap.IsUnitOn(mapPos))
+                    {
+                        var hitUnit = gameMap.GetUnitAt(mapPos);
+                        ResolveAttack(selectedUnit, hitUnit);
+                    }
+                }
             }
         }
     }
 
     private void ResolveAttack(Unit attacker, Unit target)
     {
-        int attack = Random.Range(0, 4);
-        int armor = 2;
-        int damage = 0;
-        Debug.Log("Attack: " + attack);
-        if (attack > armor)
+        var isMelee = IsMelee(attacker, target);
+        
+        var weapon = attacker.RangedWeapon;
+        if (isMelee)
         {
-            damage = attack - armor;
+            weapon = attacker.MeleeWeapon;
         }
 
-        if (damage > 0)
+        int attack = weapon.RollDamage();
+        Debug.Log("Attack: " + attack);
+
+        if (attack > 0)
         {
-            target.InflictDamage(damage);
-            Debug.Log("Damage: " + damage);
+            target.AttackedWith(attack, isMelee);
             if (target.health <= 0)
             {
                 target.UnitDeath();
+                gameMap.RemoveUnit(target);
                 allUnits.Remove(target);
             }
         }
+    }
+
+    private bool IsMelee(Unit attacker, Unit target)
+    {
+        var attackpos = gameMap.WorldToCell(attacker.transform.position);
+        var targetpos = gameMap.WorldToCell(target.transform.position);
+        return gameMap.AreNeighbors(attackpos, targetpos);
     }
 
     private void CreateExplosion(Vector3Int mapPos)
@@ -183,25 +202,50 @@ public class Game : MonoBehaviour
         {
             gameMap.RemoveAllHighlights(0);
             gameMap.RemoveAllHighlights(1);
-            ShowRangedAttack(gameMap.WorldToCell(selectedUnit.transform.position), 20);
+            PreviewAttack(selectedUnit, gameMap.WorldToCell(selectedUnit.transform.position), 20);
             gameState = GameState.AttackTargetSelection;
         }
     }
 
-    private void ShowRangedAttack(Vector3Int mapPos, int maxDistance)
+    private void PreviewAttack(Unit unit, Vector3Int mapPos, int maxDistance)
     {
         gameMap.RemoveAllHighlights();
-        validTargets = gameMap.GetFOV(mapPos, maxDistance);
+        validTargets.Clear();
+        if (unit.HasRangedWeapon)
+        {
+            validTargets = gameMap.GetFOV(mapPos, maxDistance);
+            validTargets.Remove(mapPos);
+        }
         
-        validTargets.Remove(mapPos);
+        if (!unit.HasMeleeWeapon)
+        {
+            validTargets.Remove(mapPos + Vector3Int.right);
+            validTargets.Remove(mapPos + Vector3Int.up);
+            validTargets.Remove(mapPos + Vector3Int.down);
+            validTargets.Remove(mapPos + Vector3Int.left);
+        }
+        else
+        {
+            AddToValidTargets(mapPos + Vector3Int.right);
+            AddToValidTargets(mapPos + Vector3Int.up);
+            AddToValidTargets(mapPos + Vector3Int.down);
+            AddToValidTargets(mapPos + Vector3Int.left);
+        }
         validTargets.Remove(mapPos + Vector3Int.up + Vector3Int.right);
-        validTargets.Remove(mapPos + Vector3Int.up + Vector3Int.left);
-        validTargets.Remove(mapPos + Vector3Int.down + Vector3Int.right);
         validTargets.Remove(mapPos + Vector3Int.down + Vector3Int.left);
-        
+        validTargets.Remove(mapPos + Vector3Int.down + Vector3Int.right);
+        validTargets.Remove(mapPos + Vector3Int.up + Vector3Int.left);
         foreach (var tile in validTargets)
         {
             gameMap.HighlightTile(tile, new Color(0.6f, 0f, 0, 0.5f));
+        }
+    }
+
+    private void AddToValidTargets(Vector3Int pos)
+    {
+        if (gameMap.Contains(pos.x, pos.y))
+        {
+            validTargets.Add(pos);
         }
     }
 
@@ -243,7 +287,7 @@ public class Game : MonoBehaviour
     {
         if (selectedUnit != null)
         {
-            SetLabel(gameMap.CurrentCursorPosition + " - Sel.: " + selectedUnit.name);
+            SetLabel(gameMap.CurrentCursorPosition + " - Sel.: " + selectedUnit.name + "/" + selectedUnit.WeaponDescription);
         }
         else
         {
@@ -272,7 +316,7 @@ public class Game : MonoBehaviour
                     {
                         var spawnPosition = spawnPositions[spawnIndex];
                         string unitType = loadOut.Unit;
-                        SpawnUnit(spawnPosition, unitType, ruleFaction);
+                        SpawnUnit(spawnPosition, unitType, loadOut, ruleFaction);
                         spawnIndex++;
                     }
                 }
@@ -281,14 +325,14 @@ public class Game : MonoBehaviour
         
     }
 
-    private bool SpawnUnit(Vector3Int spawnPosition, string unitType, RuleFaction ruleFaction)
+    private bool SpawnUnit(Vector3Int spawnPosition, string unitType, RuleLoadout loadout, RuleFaction ruleFaction)
     {
         var unit = Instantiate(unitPrefab, gameMap.CellToWorld(spawnPosition), Quaternion.identity)
             .GetComponent<Unit>();
         if (gameMap.AddUnit(unit, spawnPosition))
         {
             unit.GetComponent<SpriteRenderer>().color = ColorFromArray(ruleFaction.Color);
-            unit.LoadRules(unitType);
+            unit.LoadRules(unitType, loadout);
             unit.FinishedMoving += UnitFinishedMoving;
             allUnits.Add(unit);
             gameMap.UpdateFOV(spawnPosition, unit.visionRange);
@@ -312,7 +356,7 @@ public class Game : MonoBehaviour
             for (int i = 0; i < loadOut.Count; i++)
             {
                 Vector3Int randomPosition = gameMap.RandomPosition;
-                while (!SpawnUnit(randomPosition, loadOut.Unit, ruleFaction))
+                while (!SpawnUnit(randomPosition, loadOut.Unit, loadOut, ruleFaction))
                 {
                     // wait for free spawn pos
                 }
