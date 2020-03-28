@@ -59,6 +59,7 @@ public class Unit : MonoBehaviour
     } }
 
     public event UnitEvent FinishedMoving;
+    public event UnitEvent StepCompleted;
     // Start is called before the first frame update
     void Awake()
     {
@@ -108,7 +109,6 @@ public class Unit : MonoBehaviour
     }    
     private void NextMove()
     {   
-        
         if (currentPathIndex < currentPath.Count)
         {
             var lastPos = gameMap.WorldToCell(transform.position);
@@ -184,6 +184,11 @@ public class Unit : MonoBehaviour
     {
         FinishedMoving?.Invoke(this, new UnitEventArgs{unit = this});
     }
+    
+    private void OnStepCompleted(Vector3Int oldPos)
+    {
+        StepCompleted?.Invoke(this, new UnitEventArgs{unit = this, previousPosition = oldPos});
+    }
 
     public void BeginMoving(List<Vector3Int> path)
     {
@@ -203,9 +208,10 @@ public class Unit : MonoBehaviour
 
     public void AnimateMovement(Vector3Int mapPos)
     {
+        var oldPos = gameMap.WorldToCell(transform.position);
         var cellToWorld = gameMap.CellToWorld(mapPos);
         transform.position = cellToWorld;
-        gameMap.UpdateFOV(mapPos, currentVisionRange);
+        OnStepCompleted(oldPos);
     }
 
     public void AttackedWith(int attackValue, bool isMelee)
@@ -302,6 +308,12 @@ public delegate void UnitEvent(object sender, UnitEventArgs args);
 public class UnitEventArgs
 {
     public Unit unit
+    {
+        get;
+        set;
+    }
+    
+    public Vector3Int previousPosition
     {
         get;
         set;

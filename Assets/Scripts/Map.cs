@@ -29,10 +29,7 @@ public class Map : MonoBehaviour, IGridMap
     }
     public GameObject selectionRect;
     public Tile floorTile;
-    public Tile northWall;
-    public Tile eastWall;
-    public Tile southWall;
-    public Tile westWall;
+    public Tile[] walls;  // ORDER: NESW
     public Tile[] verticalDoors;
     public Tile[] horizontalDoors;
 
@@ -103,21 +100,30 @@ public class Map : MonoBehaviour, IGridMap
             
         Vector3Int lowerRight= new Vector3Int(x1, y0, 0);
         Vector3Int upperRight = new Vector3Int(x1, y1, 0);
+        
         if (axis == Axis.Horizontal)
         {
-            layerMap["NorthWalls"].SetTile(lowerLeft, horizontalDoors[0]);
-            layerMap["NorthWalls"].SetTile(lowerRight, horizontalDoors[1]);
+            layerMap["NorthWalls"].SetTile(lowerLeft, null);
+            layerMap["NorthWalls"].SetTile(lowerRight, null);
+            layerMap["NorthDoors"].SetTile(lowerLeft, horizontalDoors[0]);
+            layerMap["NorthDoors"].SetTile(lowerRight, horizontalDoors[1]);
             
-            layerMap["SouthWalls"].SetTile(upperLeft, horizontalDoors[2]);
-            layerMap["SouthWalls"].SetTile(upperRight, horizontalDoors[3]);
+            layerMap["SouthWalls"].SetTile(upperLeft, null);
+            layerMap["SouthWalls"].SetTile(upperRight, null);
+            layerMap["SouthDoors"].SetTile(upperLeft, horizontalDoors[2]);
+            layerMap["SouthDoors"].SetTile(upperRight, horizontalDoors[3]);
         }
         else if (axis == Axis.Horizontal)
         {
-            layerMap["EastWalls"].SetTile(lowerLeft, horizontalDoors[0]);
-            layerMap["WestWalls"].SetTile(lowerRight, horizontalDoors[1]);
+            layerMap["EastWalls"].SetTile(lowerLeft, null);
+            layerMap["WestWalls"].SetTile(lowerRight, null);
+            layerMap["EastDoors"].SetTile(lowerLeft, horizontalDoors[0]);
+            layerMap["WestDoors"].SetTile(lowerRight, horizontalDoors[1]);
             
-            layerMap["EastWalls"].SetTile(upperLeft, horizontalDoors[2]);
-            layerMap["WestWalls"].SetTile(upperRight, horizontalDoors[3]);
+            layerMap["EastWalls"].SetTile(upperLeft, null);
+            layerMap["WestWalls"].SetTile(upperRight, null);
+            layerMap["EastDoors"].SetTile(upperLeft, horizontalDoors[2]);
+            layerMap["WestDoors"].SetTile(upperRight, horizontalDoors[3]);
         }
     }
 
@@ -378,7 +384,8 @@ public class Map : MonoBehaviour, IGridMap
     {
         return layerMap["FogOfWar"].HasTile(position);
     }
-    bool IsNeighborVisible(Vector3Int tileOne, Vector3Int tileTwo)
+    
+    private bool IsNeighborReachable(Vector3Int tileOne, Vector3Int tileTwo)
     {
         if (!Contains(tileOne.x, tileOne.y) || !Contains(tileTwo.x, tileTwo.y))
         {
@@ -397,14 +404,53 @@ public class Map : MonoBehaviour, IGridMap
         var vertTile = new Vector3Int(tileTwo.x + dx, tileTwo.y, 0);
         var horiTile = new Vector3Int(tileTwo.x, tileTwo.y + dy, 0);
 
-        var oneToVertBlocked = IsWallBetween(tileOne, vertTile);
-        var oneToHoriBlocked = IsWallBetween(tileOne, horiTile);
+        var oneToVertBlocked = IsWallBetween(tileOne, vertTile) || IsDoorBetween(tileOne, vertTile);
+        var oneToHoriBlocked = IsWallBetween(tileOne, horiTile) || IsDoorBetween(tileOne, horiTile);
+
+        var vertToTwoBlocked = IsWallBetween(vertTile, tileTwo) || IsDoorBetween(vertTile, tileTwo);
+        var horiToTwoBlocked = IsWallBetween(horiTile, tileTwo) || IsDoorBetween(horiTile, tileTwo);
 
         if (oneToHoriBlocked && oneToVertBlocked)
             return false;
 
-        var vertToTwoBlocked = IsWallBetween(vertTile, tileTwo);
-        var horiToTwoBlocked = IsWallBetween(horiTile, tileTwo);
+        if (oneToHoriBlocked && vertToTwoBlocked)
+            return false;
+
+        if (oneToVertBlocked && horiToTwoBlocked)
+            return false;
+
+        if (vertToTwoBlocked && horiToTwoBlocked)
+            return false;
+
+        return true;
+    }
+    bool IsNeighborVisible(Vector3Int tileOne, Vector3Int tileTwo)
+    {
+        if (!Contains(tileOne.x, tileOne.y) || !Contains(tileTwo.x, tileTwo.y))
+        {
+            return false;
+        }
+        if (tileOne.x == tileTwo.x || tileOne.y == tileTwo.y)
+        {
+            return !IsWallBetween(tileOne, tileTwo) && !IsDoorBetween(tileOne, tileTwo);
+        }
+
+        // handle diagonal cases
+
+        var dx = tileOne.x - tileTwo.x;
+        var dy = tileOne.y - tileTwo.y;
+        // one is to the top right of two
+        var vertTile = new Vector3Int(tileTwo.x + dx, tileTwo.y, 0);
+        var horiTile = new Vector3Int(tileTwo.x, tileTwo.y + dy, 0);
+
+        var oneToVertBlocked = IsWallBetween(tileOne, vertTile) || IsDoorBetween(tileOne, vertTile);
+        var oneToHoriBlocked = IsWallBetween(tileOne, horiTile) || IsDoorBetween(tileOne, horiTile);
+
+        var vertToTwoBlocked = IsWallBetween(vertTile, tileTwo) || IsDoorBetween(vertTile, tileTwo);
+        var horiToTwoBlocked = IsWallBetween(horiTile, tileTwo) || IsDoorBetween(horiTile, tileTwo);
+
+        if (oneToHoriBlocked && oneToVertBlocked)
+            return false;
 
         if (oneToHoriBlocked && vertToTwoBlocked)
             return false;
@@ -427,7 +473,7 @@ public class Map : MonoBehaviour, IGridMap
             {
                 // one is to the right of two
                 // two (east)  -> one (west)
-                return layerMap["EastWalls"].HasTile(tileTwo) 
+                return layerMap["EastWalls"].HasTile(tileTwo)
                        || layerMap["WestWalls"].HasTile(tileOne);
             }
             if (tileOne.x - tileTwo.x == -1)
@@ -453,6 +499,42 @@ public class Map : MonoBehaviour, IGridMap
         }
         return false;
     }
+    
+    public bool IsDoorBetween(Vector3Int tileOne, Vector3Int tileTwo)
+    {
+        if (tileOne.Equals(tileTwo)) return false;
+        if (tileOne.y == tileTwo.y)
+        {
+            if (tileOne.x - tileTwo.x == 1)
+            {
+                // one is to the right of two
+                // two (east)  -> one (west)
+                return layerMap["EastDoors"].HasTile(tileTwo)
+                       || layerMap["WestDoors"].HasTile(tileOne);
+            }
+            if (tileOne.x - tileTwo.x == -1)
+            {
+                return layerMap["EastDoors"].HasTile(tileOne) 
+                       || layerMap["WestDoors"].HasTile(tileTwo);
+            }
+        }
+        else if (tileOne.x == tileTwo.x)
+        {
+            if (tileOne.y - tileTwo.y == 1)
+            {
+                // one is on top of two
+                // two (north)  -> one (south)
+                return layerMap["NorthDoors"].HasTile(tileTwo)
+                       || layerMap["SouthDoors"].HasTile(tileOne);
+            }
+            if (tileOne.y - tileTwo.y == -1)
+            {
+                return layerMap["NorthDoors"].HasTile(tileOne)
+                       || layerMap["SouthDoors"].HasTile(tileTwo);
+            }
+        }
+        return false;
+    }
 
     void AddWall(Vector3Int tilePos, Direction direction)
     {
@@ -466,13 +548,13 @@ public class Map : MonoBehaviour, IGridMap
             {
                 // one is to the right of two
                 // two (east)  -> one (west)
-                layerMap["EastWalls"].SetTile(tileTwo, eastWall);
-                layerMap["WestWalls"].SetTile(tileOne, westWall);
+                layerMap["EastWalls"].SetTile(tileTwo, walls[1]);
+                layerMap["WestWalls"].SetTile(tileOne, walls[3]);
             }
             else if (tileOne.x - tileTwo.x == -1)
             {
-                layerMap["EastWalls"].SetTile(tileOne, eastWall);
-                layerMap["WestWalls"].SetTile(tileTwo, westWall);
+                layerMap["EastWalls"].SetTile(tileOne, walls[1]);
+                layerMap["WestWalls"].SetTile(tileTwo, walls[3]);
             }
         }
         else if (tileOne.x == tileTwo.x)
@@ -481,13 +563,13 @@ public class Map : MonoBehaviour, IGridMap
             {
                 // one is on top of two
                 // two (north)  -> one (south)
-                layerMap["NorthWalls"].SetTile(tileTwo, northWall);
-                layerMap["SouthWalls"].SetTile(tileOne, southWall);
+                layerMap["NorthWalls"].SetTile(tileTwo, walls[0]);
+                layerMap["SouthWalls"].SetTile(tileOne, walls[2]);
             }
             else if (tileOne.y - tileTwo.y == -1)
             {
-                layerMap["NorthWalls"].SetTile(tileOne, northWall);
-                layerMap["SouthWalls"].SetTile(tileTwo, southWall);
+                layerMap["NorthWalls"].SetTile(tileOne, walls[0]);
+                layerMap["SouthWalls"].SetTile(tileTwo, walls[2]);
             }
         }
     }
@@ -521,7 +603,7 @@ public class Map : MonoBehaviour, IGridMap
         }
 
         unitMap[mapPos.x, mapPos.y] = unit;
-        RemoveFog(mapPos);
+        //RemoveFog(mapPos);
         return true;
     }
     
@@ -535,9 +617,136 @@ public class Map : MonoBehaviour, IGridMap
 
     public bool MoveUnit(Unit unit, Vector3Int oldMapPos, Vector3Int newMapPos)
     {
-        if (!AddUnit(unit, newMapPos)) return false;
-        RemoveUnit(oldMapPos);
-        return true;
+        if (AddUnit(unit, newMapPos))
+        {
+            RemoveUnit(oldMapPos);
+            return true;
+        }
+
+        return false;
+    }
+
+    public void RemoveDoor(Unit unit, Vector3Int mapPos)
+    {
+        if (layerMap["NorthDoors"].HasTile(mapPos))
+        {
+            // door is above
+            RemoveDoorBetween(unit, mapPos, mapPos + Vector3Int.up);
+        }
+        else if (layerMap["SouthDoors"].HasTile(mapPos))
+        {
+            // door is below
+            RemoveDoorBetween(unit, mapPos, mapPos + Vector3Int.down);
+        }
+        else if (layerMap["EastDoors"].HasTile(mapPos))
+        {
+            // door is right
+            RemoveDoorBetween(unit, mapPos, mapPos + Vector3Int.right);
+        }
+        else if (layerMap["WestDoors"].HasTile(mapPos))
+        {
+            // door is left
+            RemoveDoorBetween(unit, mapPos, mapPos + Vector3Int.left);
+        }
+    }
+    public void RemoveDoorBetween(Unit unit, Vector3Int oldMapPos, Vector3Int newMapPos)
+    {
+        if (oldMapPos.y == newMapPos.y)
+        {
+            // moved horizontally, east/west doors
+            if (IsDoorBetween(oldMapPos + Vector3Int.up, newMapPos + Vector3Int.up))
+            {
+                // other pieces are upwards
+                if (oldMapPos.x < newMapPos.x)
+                {
+                    // moved right
+                    layerMap["EastDoors"].SetTile(oldMapPos, null);
+                    layerMap["EastDoors"].SetTile(oldMapPos + Vector3Int.up, null);
+                    
+                    layerMap["WestDoors"].SetTile(newMapPos, null);
+                    layerMap["WestDoors"].SetTile(newMapPos + Vector3Int.up, null);
+                }
+                else
+                {
+                    // moved left
+                    layerMap["WestDoors"].SetTile(oldMapPos, null);
+                    layerMap["WestDoors"].SetTile(oldMapPos + Vector3Int.up, null);
+                    
+                    layerMap["EastDoors"].SetTile(newMapPos, null);
+                    layerMap["EastDoors"].SetTile(newMapPos + Vector3Int.up, null);
+                }
+            }
+            else if (IsDoorBetween(oldMapPos + Vector3Int.down, newMapPos + Vector3Int.down))
+            {
+                // other pieces are below
+                if (oldMapPos.x < newMapPos.x)
+                {
+                    // moved right
+                    layerMap["EastDoors"].SetTile(oldMapPos, null);
+                    layerMap["EastDoors"].SetTile(oldMapPos + Vector3Int.down, null);
+                    
+                    layerMap["WestDoors"].SetTile(newMapPos, null);
+                    layerMap["WestDoors"].SetTile(newMapPos + Vector3Int.down, null);
+                }
+                else
+                {
+                    // moved left
+                    layerMap["WestDoors"].SetTile(oldMapPos, null);
+                    layerMap["WestDoors"].SetTile(oldMapPos + Vector3Int.down, null);
+                    
+                    layerMap["EastDoors"].SetTile(newMapPos, null);
+                    layerMap["EastDoors"].SetTile(newMapPos + Vector3Int.down, null);
+                }
+            }
+        }
+        else if (oldMapPos.x == newMapPos.x)
+        {
+            // moved vertically, north/south doors
+            if (IsDoorBetween(oldMapPos + Vector3Int.left, newMapPos + Vector3Int.left))
+            {
+                // other pieces are left
+                if (oldMapPos.y < newMapPos.y)
+                {
+                    // moved up
+                    layerMap["NorthDoors"].SetTile(oldMapPos, null);
+                    layerMap["NorthDoors"].SetTile(oldMapPos + Vector3Int.left, null);
+                    
+                    layerMap["SouthDoors"].SetTile(newMapPos, null);
+                    layerMap["SouthDoors"].SetTile(newMapPos + Vector3Int.left, null);
+                }
+                else
+                {
+                    // moved left
+                    layerMap["SouthDoors"].SetTile(oldMapPos, null);
+                    layerMap["SouthDoors"].SetTile(oldMapPos + Vector3Int.left, null);
+                    
+                    layerMap["NorthDoors"].SetTile(newMapPos, null);
+                    layerMap["NorthDoors"].SetTile(newMapPos + Vector3Int.left, null);
+                }
+            }
+            else if (IsDoorBetween(oldMapPos + Vector3Int.right, newMapPos + Vector3Int.right))
+            {
+                // other pieces are right
+                if (oldMapPos.y < newMapPos.y)
+                {
+                    // moved up
+                    layerMap["NorthDoors"].SetTile(oldMapPos, null);
+                    layerMap["NorthDoors"].SetTile(oldMapPos + Vector3Int.right, null);
+                    
+                    layerMap["SouthDoors"].SetTile(newMapPos, null);
+                    layerMap["SouthDoors"].SetTile(newMapPos + Vector3Int.right, null);
+                }
+                else
+                {
+                    // moved left
+                    layerMap["SouthDoors"].SetTile(oldMapPos, null);
+                    layerMap["SouthDoors"].SetTile(oldMapPos + Vector3Int.right, null);
+                    
+                    layerMap["NorthDoors"].SetTile(newMapPos, null);
+                    layerMap["NorthDoors"].SetTile(newMapPos + Vector3Int.right, null);
+                }
+            }
+        }
     }
 
     public bool IsWalkable(int x, int y)
@@ -572,7 +781,7 @@ public class Map : MonoBehaviour, IGridMap
         };
         foreach (var neighbor in neighbors)
         {
-            if (IsNeighborVisible(mapPos, neighbor) && Contains(neighbor.x, neighbor.y) && !IsOtherFactionOn(currentUnit, neighbor))
+            if (IsNeighborReachable(mapPos, neighbor) && Contains(neighbor.x, neighbor.y) && !IsOtherFactionOn(currentUnit, neighbor))
             {
                 reachableNeighbors.Add(neighbor);
             }
@@ -580,6 +789,8 @@ public class Map : MonoBehaviour, IGridMap
 
         return reachableNeighbors.ConvertAll(elem => new Point(elem.x, elem.y));
     }
+
+    
 
     public bool AreNeighbors(Vector3Int posOne, Vector3Int posTwo, bool includeDiagonals = false)
     {
@@ -665,6 +876,4 @@ public class Map : MonoBehaviour, IGridMap
         var otherUnit = GetUnitAt(pos);
         return unit.Faction != otherUnit.Faction;
     }
-
-    
 }

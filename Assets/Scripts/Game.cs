@@ -48,8 +48,8 @@ public class Game : MonoBehaviour
         factions = mod.GetFactions();
         SpawnUnits();
         
-        phaseFaction = 0;
-        GlobalFOVUpdate();
+        phaseFaction = -1;
+        PrepareNextTurn();
     }
 
     
@@ -132,6 +132,7 @@ public class Game : MonoBehaviour
             ShowReachableTiles(selectedUnit, selectedUnit.movesLeft);
             gameState = GameState.MoveTargetSelection;
         }
+        UpdateLabel();
     }
 
 
@@ -223,7 +224,27 @@ public class Game : MonoBehaviour
         Instantiate(explosionPrefab, gameMap.CellToWorld(mapPos), Quaternion.identity);
     }
 
+    public void OpenDoorButtonClicked()
+    {
+        if (selectedUnit != null)
+        {
+            OpenDoor(selectedUnit, selectedUnit.Cell);
+        }
+    }
+
+    private void OpenDoor(Unit unit, Vector3Int mapPos)
+    {
+        gameMap.RemoveDoor(unit, mapPos);
+        gameMap.UpdateFOV(unit.Cell, unit.currentVisionRange);
+        UpdateVisibleUnits();
+    }
+
     public void EndTurnButtonClicked()
+    {
+        PrepareNextTurn();
+    }
+
+    private void PrepareNextTurn()
     {
         ToDefaultState();
         phaseFaction++;
@@ -232,15 +253,31 @@ public class Game : MonoBehaviour
             phaseFaction = 0;
         }
 
+        bool firstUnitFound = false;
         foreach (var unit in allUnits)
         {
             if (unit.Faction == CurrentFaction)
             {
                 unit.PrepareNewTurn();
+                if (!firstUnitFound)
+                {
+                    firstUnitFound = true;
+                    UnitSelected(unit.Cell);
+                    CenterCameraOn(unit);
+                }
             }
         }
+
         GlobalFOVUpdate();
     }
+
+    private void CenterCameraOn(Unit unit)
+    {
+        var camPos = gameCamera.transform.position;
+        var unitPos = unit.transform.position;
+        gameCamera.transform.position = new Vector3(unitPos.x, unitPos.y, camPos.z);
+    }
+
     public void AttackButtonClicked()
     {
         if (selectedUnit != null && selectedUnit.State != UnitState.Moving && selectedUnit.canAttack)
@@ -422,6 +459,7 @@ public class Game : MonoBehaviour
             spriteRenderer.enabled = false; // spawn every unit invisible
             unit.LoadRules(unitType, ruleFaction, loadout);
             unit.FinishedMoving += UnitFinishedMoving;
+            unit.StepCompleted += UnitStepCompleted;
             allUnits.Add(unit);
             //gameMap.UpdateFOV(spawnPosition, unit.visionRange);
             return true;
@@ -430,6 +468,32 @@ public class Game : MonoBehaviour
         Destroy(unit.gameObject);
         Debug.LogWarning("Could not spawn unit at: " + spawnPosition);
         return false;
+    }
+
+    private void UnitStepCompleted(object sender, UnitEventArgs args)
+    {
+        var unit = args.unit;
+        var oldPos = args.previousPosition;
+        
+        var newPos = gameMap.WorldToCell(unit.transform.position);
+        
+        if (gameMap.IsDoorBetween(oldPos, newPos))
+        {
+            gameMap.RemoveDoorBetween(unit, oldPos, newPos);
+        }
+        gameMap.UpdateFOV(newPos, unit.currentVisionRange);
+        UpdateVisibleUnits();
+    }
+
+    private void UpdateVisibleUnits()
+    {
+        foreach (var unit in allUnits)
+        {
+            var unitPos = gameMap.WorldToCell(unit.transform.position);
+            var shouldBeVisible = unit.Faction == CurrentFaction
+                                  || !gameMap.IsInFog(unitPos);
+            unit.SetVisible(shouldBeVisible);
+        }
     }
 
     private Color ColorFromArray(int[] colorDefinition)
@@ -444,9 +508,11 @@ public class Game : MonoBehaviour
             for (int i = 0; i < loadOut.Count; i++)
             {
                 Vector3Int randomPosition = gameMap.RandomPosition;
-                while (!SpawnUnit(randomPosition, loadOut.Unit, loadOut, ruleFaction))
+                int tryCounter = 0;
+                while (!SpawnUnit(randomPosition, loadOut.Unit, loadOut, ruleFaction) && tryCounter < 5)
                 {
                     // wait for free spawn pos
+                    tryCounter++;
                 }
             }
         }
