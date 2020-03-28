@@ -33,6 +33,7 @@ public class Unit : MonoBehaviour
     private int currentPathIndex;
     private List<Vector3Int> currentPath;
     private SpriteRenderer spriteRenderer;
+    private SpriteRenderer markerRenderer;
     public UnitState State { get; private set; } = UnitState.Idle;
     public bool HasRangedWeapon => RangedWeapon != null;
     public bool HasMeleeWeapon => MeleeWeapon != null;
@@ -203,6 +204,7 @@ public class Unit : MonoBehaviour
         movesLeft -= steps;
         // TELEPORT INSTANTLY TO THE END OF THE PATH ON THE MAP - BECAUSE OF PATHFINDING OF OTHER UNITS
         gameMap.MoveUnit(this, oldMapPos, path.Last());
+        UpdateMarker();
     }
 
 
@@ -262,6 +264,7 @@ public class Unit : MonoBehaviour
             movesLeft = 0;    // can not move before AND after firing
         }
         canAttack = false;
+        UpdateMarker();
     }
 
     public void PrepareNewTurn()
@@ -281,7 +284,32 @@ public class Unit : MonoBehaviour
         var unitMarker = gameMap.GetUnitMarker();
         unitMarker.transform.position = transform.position;
         unitMarker.transform.SetParent(transform);
-        unitMarker.GetComponent<SpriteRenderer>().enabled = true;
+        markerRenderer = unitMarker.GetComponent<SpriteRenderer>();
+        markerRenderer.enabled = true;
+        UpdateMarker();
+    }
+
+    public void UpdateMarker()
+    {
+        if (markerRenderer != null && markerRenderer.transform.IsChildOf(transform))
+        {
+            if (movesLeft > 0 && canAttack)
+            {
+                markerRenderer.color = Color.green;
+            }
+            else if (movesLeft <= 0 && canAttack)
+            {
+                markerRenderer.color = Color.red;
+            }
+            else if (!canAttack && movesLeft > 0)
+            {
+                markerRenderer.color = Color.yellow;
+            }
+            else
+            {
+                markerRenderer.color = Color.gray;
+            }
+        }
     }
 }
 

@@ -373,7 +373,7 @@ public class Game : MonoBehaviour
         {
             if (!gameMap.IsUnitOn(reachablePos))
             {
-                gameMap.HighlightTile(reachablePos, new Color(0, 0.8f, 0, 0.5f));
+                gameMap.HighlightTile(reachablePos, new Color(0, 0.8f, 0, 0.2f));
             }
         }
     }
