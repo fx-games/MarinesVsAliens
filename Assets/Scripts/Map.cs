@@ -5,6 +5,7 @@ using System.Linq;
 using GridPathFinder.Map;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using static Mod;
 using Color = UnityEngine.Color;
 using Random = UnityEngine.Random;
 
@@ -40,38 +41,85 @@ public class Map : MonoBehaviour, IGridMap
     private List<GameObject>[] allHighlights = new List<GameObject>[4]{ new List<GameObject>(), new List<GameObject>(), new List<GameObject>(), new List<GameObject>()};
     public Vector3Int CurrentCursorPosition { get; private set; }
     private HashSet<Vector3Int> visibleTiles = new HashSet<Vector3Int>();
+    private Mod mod;
 
     // Start is called before the first frame update
     void Awake()
     {
-        //CreateBlankSprite();
+        mod = FindObjectOfType<Mod>();
         var mapLayers = GetComponentsInChildren<Tilemap>();
         foreach (var layer in mapLayers)
         {
-            layer.ClearAllTiles();
-            layer.size = new Vector3Int(12,12,1);
             layerMap[layer.name] = layer;
         }
-
-        var size = mapLayers.First().size;
-        Width = size.x;
-        Height = size.y;
-        
-        unitMap = new Unit[Width, Height];
 
         gameCamera = Camera.main;
         if (gameCamera == null)
         {
             throw new Exception("Game needs camera.");
         }
-        layerMap["Floors"].BoxFill(new Vector3Int(1,1,0), floorTile, 0,0,Width,Height);
-        layerMap["FogOfWar"].BoxFill(new Vector3Int(1,1,0), floorTile, 0,0,Width,Height);
-        SetupWalls();
     }
 
+    private void InitializeMap(int width, int height)
+    {
+        foreach (var kvp in layerMap)
+        {
+            var layer = kvp.Value;
+            layer.ClearAllTiles();
+            layer.size = new Vector3Int(width,height,1);
+        }
+
+        Width = width;
+        Height = height;
+        
+        unitMap = new Unit[Width, Height];
+        layerMap["Floors"].BoxFill(new Vector3Int(1,1,0), floorTile, 0,0,Width,Height);
+        layerMap["FogOfWar"].BoxFill(new Vector3Int(1,1,0), floorTile, 0,0,Width,Height);
+    }   
     private void Start()
     {
         
+    }
+
+    public void FromRules(RuleMap mapRules)
+    {
+        InitializeMap(mapRules.Size[0], mapRules.Size[1]);
+        foreach (var mapScriptCommand in mapRules.MapScript)
+        {
+            if (mapScriptCommand.Command.ToLower().Equals("placeblock"))
+            {
+                foreach (var blockPlacementPosition in mapScriptCommand.Rects)
+                {
+                    var blockName = mapScriptCommand.Blocks[Random.Range(0, mapScriptCommand.Blocks.Count - 1)];
+                    PlaceMapBlock(blockPlacementPosition, blockName);
+                } 
+            }
+        }
+    }
+
+    private void PlaceMapBlock(int[] offset, string blockName)
+    {
+        var block = mod.GetMapBlock(blockName);
+        foreach (var room in block.Rooms)
+        {
+            CreateRoom(room[0] + offset[0], room[1] + offset[1], room[2] + offset[0], room[3] + offset[1]);
+        }
+        foreach (var wall in block.HorizontalWalls)
+        {
+            CreateWalls(wall[0] + offset[0], wall[1] + offset[1], wall[2] + offset[0], wall[3] + offset[1], Axis.Horizontal);
+        }
+        foreach (var wall in block.VerticalWalls)
+        {
+            CreateWalls(wall[0] + offset[0], wall[1] + offset[1], wall[2] + offset[0], wall[3] + offset[1], Axis.Vertical);
+        }
+        foreach (var door in block.HorizontalDoors)
+        {
+            CreateDoor(door[0] + offset[0], door[1] + offset[1], door[2] + offset[0], door[3] + offset[1], Axis.Horizontal);
+        }
+        foreach (var door in block.VerticalDoors)
+        {
+            CreateDoor(door[0] + offset[0], door[1] + offset[1], door[2] + offset[0], door[3] + offset[1], Axis.Vertical);
+        }
     }
 
     private void SetupWalls()
@@ -751,7 +799,7 @@ public class Map : MonoBehaviour, IGridMap
 
     public bool IsWalkable(int x, int y)
     {
-        return true;
+        return layerMap["Floors"].HasTile(new Vector3Int(x,y,0));
     }
 
     public int Width { get; set; }
@@ -876,4 +924,6 @@ public class Map : MonoBehaviour, IGridMap
         var otherUnit = GetUnitAt(pos);
         return unit.Faction != otherUnit.Faction;
     }
+
+
 }

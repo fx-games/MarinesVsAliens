@@ -1,3 +1,33 @@
+maps:
+  - type: FIRST_MISSION
+    size: [12,12]
+    mapScript:
+      - command: placeBlock
+        blocks: [QUADRANT_ONE]
+        rects: 
+          - [0, 0]
+
+
+mapBlocks:
+  - type: QUADRANT_ONE
+    size: [12,12]
+    rooms:
+      - [0, 7, 4, 11]
+      - [2, 2, 6, 4]
+      - [7, 0, 11, 4]
+    horizontalWalls:
+      - [9, 9, 9, 10]
+      - [10, 7, 11, 8]
+    verticalWalls:
+      - [6, 5, 7, 9]
+      - [9, 8, 10, 9]
+    horizontalDoors:
+      - [1, 6, 2, 7]
+      - [4, 1, 5, 2]
+      - [9, 4, 10, 5]
+      - [7, 9, 8, 10]
+
+
 spawns:
   - faction: STR_BLUE_MARINES
     locations:

@@ -44,9 +44,13 @@ public class Game : MonoBehaviour
         {
             throw new Exception("Game needs camera.");
         }
-        pathfinder = new Pathfinder(gameMap, 1.0f, 1.2f);
+        
         factions = mod.GetFactions();
+        var firstMap = mod.GetMap(0);
+        gameMap.FromRules(firstMap);
         SpawnUnits();
+        
+        pathfinder = new Pathfinder(gameMap, 1.0f, 1.2f);
         
         phaseFaction = -1;
         PrepareNextTurn();
@@ -512,6 +516,7 @@ public class Game : MonoBehaviour
                 while (!SpawnUnit(randomPosition, loadOut.Unit, loadOut, ruleFaction) && tryCounter < 5)
                 {
                     // wait for free spawn pos
+                    randomPosition = gameMap.RandomPosition;
                     tryCounter++;
                 }
             }

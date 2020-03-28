@@ -16,9 +16,35 @@ public class Mod : MonoBehaviour
         public List<RuleFaction> Factions { get; set; }
         public List<RuleUnit> Units { get; set; }
         public List<RuleWeapon> Weapons { get; set; }
-
+        public List<RuleMapBlock> MapBlocks { get; set; }
+        public List<RuleMap> Maps { get; set; }
         public List<RuleSpawn> Spawns { get; set; }
 
+    }
+    
+    public class RuleMapBlock
+    {
+        public string Type { get; set; }
+        public int[] Size { get; set; } = {12,12};
+        public List<int[]> Rooms { get; set; } = new List<int[]>();
+        public List<int[]> HorizontalWalls { get; set; } = new List<int[]>();
+        public List<int[]> VerticalWalls { get; set; } = new List<int[]>();
+        public List<int[]> HorizontalDoors { get; set; } = new List<int[]>();
+        public List<int[]> VerticalDoors { get; set; } = new List<int[]>();
+    }
+    
+    public class RuleMap
+    {
+        public string Type { get; set; }
+        public int[] Size { get; set; } = {12,12};
+        public List<MapScriptCommand> MapScript { get; set; }
+    }
+    
+    public class MapScriptCommand
+    {
+        public string Command { get; set; }
+        public List<string> Blocks { get; set; } = new List<string>();
+        public List<int[]> Rects { get; set; } = new List<int[]>();
     }
     
     public class RuleSpawn
@@ -63,12 +89,15 @@ public class Mod : MonoBehaviour
     private Dictionary<string, RuleUnit> unitRules = new Dictionary<string, RuleUnit>();
     private Dictionary<string, RuleWeapon> weaponRules = new Dictionary<string, RuleWeapon>();
     private Dictionary<string, RuleSpawn> spawnRules = new Dictionary<string, RuleSpawn>();
+    private Dictionary<string, RuleMap> mapRules = new Dictionary<string, RuleMap>();
+    private Dictionary<string, RuleMapBlock> mapBlockRules = new Dictionary<string, RuleMapBlock>();
 
     // Start is called before the first frame update
     void Awake()
     {
         ReadRules();
     }
+
     string ReadTextFile(string filePath)
     {
         StreamReader streamReader = new StreamReader(filePath);
@@ -103,6 +132,18 @@ public class Mod : MonoBehaviour
         foreach (var ruleSpawn in rules.Spawns)
         {
             spawnRules[ruleSpawn.Faction] = ruleSpawn;
+        }
+        
+        
+        foreach (var ruleMap in rules.Maps)
+        {
+            mapRules[ruleMap.Type] = ruleMap;
+        }
+        
+        
+        foreach (var ruleMapBlock in rules.MapBlocks)
+        {
+            mapBlockRules[ruleMapBlock.Type] = ruleMapBlock;
         }
     }
 
@@ -140,5 +181,20 @@ public class Mod : MonoBehaviour
     void Update()
     {
         
+    }
+
+    public RuleMap GetMap(string mapName)
+    {
+        return mapRules[mapName];
+    }
+    
+    public RuleMapBlock GetMapBlock(string mapBlockName)
+    {
+        return mapBlockRules[mapBlockName];
+    }
+
+    public RuleMap GetMap(int index)
+    {
+        return mapRules.Values.ElementAt(index);
     }
 }
