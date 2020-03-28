@@ -86,7 +86,7 @@ public class Mod : MonoBehaviour
         var deserializer = deserializerBuilder.Build();
         var rules = deserializer.Deserialize<Rules>(input);
         
-        Debug.Log("Rules: " + rules.Factions.Count + "/" + rules.Units.Count + "/" + rules.Weapons.Count + "/" + rules.Spawns.Count);
+        //Debug.Log("Rules: " + rules.Factions.Count + "/" + rules.Units.Count + "/" + rules.Weapons.Count + "/" + rules.Spawns.Count);
         foreach (var ruleFaction in rules.Factions)
         {
             factionRules[ruleFaction.Type] = ruleFaction;

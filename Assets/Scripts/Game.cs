@@ -191,18 +191,24 @@ public class Game : MonoBehaviour
         }
 
         int attack = weapon.RollDamage();
-        Debug.Log("Attack: " + attack);
+        //Debug.Log("Attack: " + attack);
 
         if (attack > 0)
         {
             target.AttackedWith(attack, isMelee);
             if (target.currentHealth <= 0)
             {
-                target.UnitDeath();
-                gameMap.RemoveUnit(target);
-                allUnits.Remove(target);
+                UnitDies(target);
             }
         }
+    }
+
+    private void UnitDies(Unit unit)
+    {
+        unit.FinishedMoving -= UnitFinishedMoving;
+        unit.UnitDeath();
+        gameMap.RemoveUnit(unit);
+        allUnits.Remove(unit);
     }
 
     private bool IsMelee(Unit attacker, Unit target)
@@ -265,7 +271,7 @@ public class Game : MonoBehaviour
             }
             else
             {
-                validTargets = gameMap.GetFOV(unitPos, maxDistance);
+                validTargets = gameMap.GetFOV(unitPos, maxDistance, true);
             }
             
             validTargets.Remove(unitPos);

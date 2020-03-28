@@ -194,7 +194,7 @@ public class Unit : MonoBehaviour
         currentPath = path;
         State = UnitState.Moving;
         int steps = path.Count;
-        Debug.Log("Moving: " + steps);
+        //Debug.Log("Moving: " + steps);
         movesLeft -= steps;
         // TELEPORT INSTANTLY TO THE END OF THE PATH ON THE MAP - BECAUSE OF PATHFINDING OF OTHER UNITS
         gameMap.MoveUnit(this, oldMapPos, path.Last());
@@ -215,7 +215,7 @@ public class Unit : MonoBehaviour
         {
             defense = MeleeWeapon.RollDamage();
         }
-        Debug.Log("Defense: " + defense);
+        //Debug.Log("Defense: " + defense);
         int damage = attackValue - defense;
         currentHealth -= damage;
     }

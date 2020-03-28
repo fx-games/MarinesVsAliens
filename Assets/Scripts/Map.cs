@@ -199,7 +199,7 @@ public class Map : MonoBehaviour, IGridMap
         return Vector3Int.zero;
     }
 
-    public HashSet<Vector3Int> GetFOV(Vector3Int position, int radius)
+    public HashSet<Vector3Int> GetFOV(Vector3Int position, int radius, bool unitsAreBlocking = false)
     {
         var fieldOfView = new HashSet<Vector3Int>();
         radius++;
@@ -210,7 +210,7 @@ public class Map : MonoBehaviour, IGridMap
             {
                 if (i * i + j * j < radius * radius)
                 {
-                    if (LineCast(position.x, position.y, position.x + i, position.y + j, true))
+                    if (LineCast(position.x, position.y, position.x + i, position.y + j, true, unitsAreBlocking))
                     {
                         fieldOfView.Add(new Vector3Int(position.x + i, position.y + j, 0));
                     }
@@ -220,7 +220,7 @@ public class Map : MonoBehaviour, IGridMap
         return fieldOfView;
     }
 
-    private bool LineCast(int x0, int y0, int x1, int y1, bool removeFog = false)
+    private bool LineCast(int x0, int y0, int x1, int y1, bool removeFog = false, bool unitsAreBlocking = false)
     {
         int sx, sy, xnext, ynext, dx, dy, prevX, prevY;
         float dist;
@@ -240,9 +240,16 @@ public class Map : MonoBehaviour, IGridMap
 
         while (xnext != x1 || ynext != y1) //essentially casting a ray of length radius: (radius^3)
         {
-            if (!IsNeighborVisible(new Vector3Int(prevX, prevY, 0), new Vector3Int(xnext, ynext, 0)))
+            var previousTile = new Vector3Int(prevX, prevY, 0);
+            var nextTile = new Vector3Int(xnext, ynext, 0);
+            if (!IsNeighborVisible(previousTile, nextTile))
             {
                 //tag_memorised(xnext, ynext); // make a note of the wall
+                return false;
+            }
+
+            if (unitsAreBlocking && !(xnext == x0 && ynext == y0) && IsUnitOn(nextTile))
+            {
                 return false;
             }
 
@@ -276,7 +283,6 @@ public class Map : MonoBehaviour, IGridMap
     {
         layerMap["FogOfWar"].ClearAllTiles();
         layerMap["FogOfWar"].FloodFill(new Vector3Int(Width-1,Height-1,0), floorTile);
-        //layerMap["FogOfWar"].BoxFill(new Vector3Int(1,1,0), floorTile, 0,0,Width,Height);
     }
     
     private void RemoveFog(Vector3Int position)
@@ -298,6 +304,7 @@ public class Map : MonoBehaviour, IGridMap
         {
             return !IsWallBetween(tileOne, tileTwo);
         }
+
         // handle diagonal cases
 
         var dx = tileOne.x - tileTwo.x;
