@@ -1,5 +1,5 @@
 maps:
-  - type: FIRST_MISSION
+  - type: STR_FIRST_MISSION
     size: [12,12]
     mapScript:
       - command: placeBlock
@@ -142,3 +142,22 @@ weapons:
     damage: [0,6]
     straightLineOnly: true
     damageLineOfFire: true
+
+translations:
+  - lang: en-US
+    strings:
+      STR_FIRST_MISSION: Mission Dreadnought
+      STR_ALIENS: Hordes of Chaos
+      STR_BLUE_MARINES: Ultra Marines
+      STR_RED_MARINES: Blood Angels
+      STR_YELLOW_MARINES: Imperial Fist
+      STR_ORK: Ork
+      STR_GRINDLING: Grindling
+      STR_SPACE_MARINE: Space Marine
+      STR_MARINE_COMMANDER: Marine Commander
+      STR_PLASMA_GUN: Plasma Gun
+      STR_HEAVY_ASSAULT_CANNON: Assault Cannon
+      STR_ROCKET_LAUNCHER: Missile Launcher
+      STR_MARINE_MELEE: Melee
+      STR_RIFLE: Bolter
+      STR_CLAW_AND_SWORD: Powerfist & Sword

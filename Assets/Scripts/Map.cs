@@ -604,13 +604,13 @@ public class Map : MonoBehaviour, IGridMap
             {
                 // one is to the right of two
                 // two (east)  -> one (west)
-                layerMap["EastWalls"].SetTile(tileTwo, walls[1]);
-                layerMap["WestWalls"].SetTile(tileOne, walls[3]);
+                if (Contains(tileTwo.x, tileTwo.y)) layerMap["EastWalls"].SetTile(tileTwo, walls[1]);
+                if (Contains(tileOne.x, tileOne.y)) layerMap["WestWalls"].SetTile(tileOne, walls[3]);
             }
             else if (tileOne.x - tileTwo.x == -1)
             {
-                layerMap["EastWalls"].SetTile(tileOne, walls[1]);
-                layerMap["WestWalls"].SetTile(tileTwo, walls[3]);
+                if (Contains(tileOne.x, tileOne.y)) layerMap["EastWalls"].SetTile(tileOne, walls[1]);
+                if (Contains(tileTwo.x, tileTwo.y)) layerMap["WestWalls"].SetTile(tileTwo, walls[3]);
             }
         }
         else if (tileOne.x == tileTwo.x)
@@ -619,13 +619,13 @@ public class Map : MonoBehaviour, IGridMap
             {
                 // one is on top of two
                 // two (north)  -> one (south)
-                layerMap["NorthWalls"].SetTile(tileTwo, walls[0]);
-                layerMap["SouthWalls"].SetTile(tileOne, walls[2]);
+                if (Contains(tileTwo.x, tileTwo.y)) layerMap["NorthWalls"].SetTile(tileTwo, walls[0]);
+                if (Contains(tileOne.x, tileOne.y)) layerMap["SouthWalls"].SetTile(tileOne, walls[2]);
             }
             else if (tileOne.y - tileTwo.y == -1)
             {
-                layerMap["NorthWalls"].SetTile(tileOne, walls[0]);
-                layerMap["SouthWalls"].SetTile(tileTwo, walls[2]);
+                if (Contains(tileOne.x, tileOne.y)) layerMap["NorthWalls"].SetTile(tileOne, walls[0]);
+                if (Contains(tileTwo.x, tileTwo.y)) layerMap["SouthWalls"].SetTile(tileTwo, walls[2]);
             }
         }
     }

@@ -240,16 +240,16 @@ public class Unit : MonoBehaviour
             var weaponRules = mod.GetWeaponRule(weaponType);
             if (weaponRules.IsMelee)
             {
-                MeleeWeapon = new Weapon(weaponRules);
+                MeleeWeapon = new Weapon(mod, weaponRules);
             }
             else
             {
-                RangedWeapon = new Weapon(weaponRules);
+                RangedWeapon = new Weapon(mod, weaponRules);
             }
         }
 
         unitRules = mod.GetUnitRule(unitType);
-        name = unitType;
+        name = mod.Tr(unitType);
         currentArmor = unitRules.Armor;
         currentHealth = unitRules.Health;
         movesLeft = unitRules.Movement;
@@ -288,9 +288,11 @@ public class Unit : MonoBehaviour
 public class Weapon
 {
     private RuleWeapon weaponRules;
+    private Mod mod;
 
-    public Weapon(RuleWeapon rules)
+    public Weapon(Mod mod, RuleWeapon rules)
     {
+        this.mod = mod;
         weaponRules = rules;
     }
 
@@ -308,7 +310,7 @@ public class Weapon
 
     public override string ToString()
     {
-        return weaponRules.Type;
+        return mod.Tr(weaponRules.Type);
     }
     
 }

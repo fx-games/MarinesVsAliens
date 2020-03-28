@@ -70,6 +70,7 @@
     <Compile Include="Assets\Scripts\SimpleAnimation.cs" />
     <Compile Include="Assets\Scripts\Unit.cs" />
     <None Include="Assets\Packages\C5.2.5.3\lib\netstandard1.0\C5.xml" />
+    <None Include="Assets\Dadako\BitmapFonts\Pixel\_PixelCharLimits.txt" />
     <Reference Include="Unity.Timeline.Editor">
       <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.Timeline.Editor.dll</HintPath>
     </Reference>

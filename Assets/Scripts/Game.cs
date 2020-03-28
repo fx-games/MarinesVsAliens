@@ -20,6 +20,7 @@ public class Game : MonoBehaviour
         AttackTargetSelection
     }
 
+    public GameObject gridMapPrefab;
     public GameObject unitPrefab;
     public GameObject explosionPrefab;
     private List<Unit> allUnits = new List<Unit>();
@@ -34,6 +35,10 @@ public class Game : MonoBehaviour
     private List<RuleFaction> factions;
     private int phaseFaction;
 
+    private void Awake()
+    {
+        var gridMap = Instantiate(gridMapPrefab);
+    }
 
     void Start()
     {
@@ -418,7 +423,7 @@ public class Game : MonoBehaviour
     {
         if (selectedUnit != null)
         {
-            SetLabel(gameMap.CurrentCursorPosition + " - Sel.: " + selectedUnit.name + "/" + selectedUnit.WeaponDescription);
+            SetLabel(selectedUnit.name + "\n" + selectedUnit.WeaponDescription);
         }
         else
         {

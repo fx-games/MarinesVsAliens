@@ -19,7 +19,15 @@ public class Mod : MonoBehaviour
         public List<RuleMapBlock> MapBlocks { get; set; }
         public List<RuleMap> Maps { get; set; }
         public List<RuleSpawn> Spawns { get; set; }
+        
+        public List<Translation> Translations { get; set; }
 
+    }
+    
+    public class Translation
+    {
+        public string Lang { get; set; }
+        public Dictionary<string, string> Strings { get; set; }
     }
     
     public class RuleMapBlock
@@ -91,6 +99,7 @@ public class Mod : MonoBehaviour
     private Dictionary<string, RuleSpawn> spawnRules = new Dictionary<string, RuleSpawn>();
     private Dictionary<string, RuleMap> mapRules = new Dictionary<string, RuleMap>();
     private Dictionary<string, RuleMapBlock> mapBlockRules = new Dictionary<string, RuleMapBlock>();
+    private Dictionary<string, Translation> translations = new Dictionary<string, Translation>();
 
     // Start is called before the first frame update
     void Awake()
@@ -139,11 +148,13 @@ public class Mod : MonoBehaviour
         {
             mapRules[ruleMap.Type] = ruleMap;
         }
-        
-        
         foreach (var ruleMapBlock in rules.MapBlocks)
         {
             mapBlockRules[ruleMapBlock.Type] = ruleMapBlock;
+        }
+        foreach (var translation in rules.Translations)
+        {
+            translations[translation.Lang] = translation;
         }
     }
 
@@ -196,5 +207,12 @@ public class Mod : MonoBehaviour
     public RuleMap GetMap(int index)
     {
         return mapRules.Values.ElementAt(index);
+    }
+
+    public string Tr(string textKey)
+    {
+        return translations["en-US"].Strings.ContainsKey(textKey)
+            ? translations["en-US"].Strings[textKey]
+            : textKey;
     }
 }
