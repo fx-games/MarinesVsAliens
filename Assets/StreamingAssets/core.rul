@@ -8,11 +8,11 @@ spawns:
       - [1,2]
   - faction: STR_RED_MARINES
     locations:
-      - [15,15]
-      - [14,15]
-      - [15,14]
-      - [14,14]
-      - [14,13]
+      - [11,11]
+      - [10,11]
+      - [11,10]
+      - [10,10]
+      - [9,10]
   - faction: STR_ALIENS
     randomPlacement: true
 

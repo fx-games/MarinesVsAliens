@@ -22,8 +22,6 @@ public class Map : MonoBehaviour, IGridMap
         SouthWest,
     }
 
-    public const int MapWidth = 16;
-    public const int MapHeight = 16;
     public GameObject selectionRect;
     public Tile floorTile;
     public Tile northWall;
@@ -31,7 +29,7 @@ public class Map : MonoBehaviour, IGridMap
     public Tile southWall;
     public Tile westWall;
     private Dictionary<string, Tilemap> layerMap = new Dictionary<string, Tilemap>();
-    private Unit[,] unitMap = new Unit[MapWidth,MapHeight];
+    private Unit[,] unitMap;
     private Camera gameCamera;
     public GameObject blanktilePrefab;
     private List<GameObject>[] allHighlights = new List<GameObject>[4]{ new List<GameObject>(), new List<GameObject>(), new List<GameObject>(), new List<GameObject>()};
@@ -42,24 +40,27 @@ public class Map : MonoBehaviour, IGridMap
     void Awake()
     {
         //CreateBlankSprite();
-
         var mapLayers = GetComponentsInChildren<Tilemap>();
         foreach (var layer in mapLayers)
         {
-            layer.ClearAllTiles();
-            layer.size = new Vector3Int(Width,Height,1);
+            //layer.ClearAllTiles();
+            //layer.size = new Vector3Int(Width,Height,1);
             layerMap[layer.name] = layer;
         }
+
+        var size = mapLayers.First().size;
+        Width = size.x;
+        Height = size.y;
         
+        unitMap = new Unit[Width, Height];
+
         gameCamera = Camera.main;
         if (gameCamera == null)
         {
             throw new Exception("Game needs camera.");
         }
-        layerMap["Floors"].BoxFill(new Vector3Int(1,1,0), floorTile, 0,0,Width,Height);
+        //layerMap["Floors"].BoxFill(new Vector3Int(1,1,0), floorTile, 0,0,Width,Height);
         layerMap["FogOfWar"].BoxFill(new Vector3Int(1,1,0), floorTile, 0,0,Width,Height);
-
-        SetupWalls();
     }
 
     private void Start()
@@ -461,14 +462,9 @@ public class Map : MonoBehaviour, IGridMap
         return true;
     }
 
-    public int Width
-    {
-        get { return MapWidth; }
-    }
-    public int Height
-    {
-        get { return MapHeight; }
-    }
+    public int Width { get; set; }
+
+    public int Height { get; set; }
 
     public Vector3Int RandomPosition => new Vector3Int(Random.Range(0, Width -1), Random.Range(0, Height - 1), 0);
 
