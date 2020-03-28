@@ -22,12 +22,20 @@ public class Map : MonoBehaviour, IGridMap
         SouthWest,
     }
 
+    public enum Axis
+    {
+        Horizontal,
+        Vertical
+    }
     public GameObject selectionRect;
     public Tile floorTile;
     public Tile northWall;
     public Tile eastWall;
     public Tile southWall;
     public Tile westWall;
+    public Tile[] verticalDoors;
+    public Tile[] horizontalDoors;
+
     private Dictionary<string, Tilemap> layerMap = new Dictionary<string, Tilemap>();
     private Unit[,] unitMap;
     private Camera gameCamera;
@@ -43,8 +51,8 @@ public class Map : MonoBehaviour, IGridMap
         var mapLayers = GetComponentsInChildren<Tilemap>();
         foreach (var layer in mapLayers)
         {
-            //layer.ClearAllTiles();
-            //layer.size = new Vector3Int(Width,Height,1);
+            layer.ClearAllTiles();
+            layer.size = new Vector3Int(12,12,1);
             layerMap[layer.name] = layer;
         }
 
@@ -59,8 +67,9 @@ public class Map : MonoBehaviour, IGridMap
         {
             throw new Exception("Game needs camera.");
         }
-        //layerMap["Floors"].BoxFill(new Vector3Int(1,1,0), floorTile, 0,0,Width,Height);
+        layerMap["Floors"].BoxFill(new Vector3Int(1,1,0), floorTile, 0,0,Width,Height);
         layerMap["FogOfWar"].BoxFill(new Vector3Int(1,1,0), floorTile, 0,0,Width,Height);
+        SetupWalls();
     }
 
     private void Start()
@@ -70,16 +79,90 @@ public class Map : MonoBehaviour, IGridMap
 
     private void SetupWalls()
     {
-        AddWall(new Vector3Int(2,2,0), Direction.East);
-        AddWall(new Vector3Int(1,2,0), Direction.West);
-        AddWall(new Vector3Int(2,3,0), Direction.East);
-        AddWall(new Vector3Int(1,3,0), Direction.West);
-        AddWall(new Vector3Int(2,4,0), Direction.East);
-        AddWall(new Vector3Int(1,4,0), Direction.West);
-        AddWall(new Vector3Int(2,5,0), Direction.East);
-        AddWall(new Vector3Int(1,5,0), Direction.West);
-        AddWall(new Vector3Int(2,5,0), Direction.North);
-        AddWall(new Vector3Int(1,5,0), Direction.North);
+        CreateRoom(0, 7, 4, 11);
+        CreateDoor(1, 6, 2, 7, Axis.Horizontal);
+        
+        CreateRoom(2, 2, 6, 4);
+        CreateDoor(4, 1, 5, 2, Axis.Horizontal);
+        
+        CreateRoom(7, 0, 11, 4);
+        CreateDoor(9, 4, 10, 5, Axis.Horizontal);
+
+        CreateWalls(6, 5, 7, 9, Axis.Vertical);
+        CreateWalls(9, 8, 10, 9, Axis.Vertical);
+        CreateWalls(9, 9, 9, 10, Axis.Horizontal);
+        CreateWalls(10, 7, 11, 8, Axis.Horizontal);
+
+        CreateDoor(7, 9, 8, 10, Axis.Horizontal);
+    }
+
+    private void CreateDoor(int x0, int y0, int x1, int y1, Axis axis)
+    {
+        Vector3Int lowerLeft = new Vector3Int(x0, y0, 0);
+        Vector3Int upperLeft = new Vector3Int(x0, y1, 0);
+            
+        Vector3Int lowerRight= new Vector3Int(x1, y0, 0);
+        Vector3Int upperRight = new Vector3Int(x1, y1, 0);
+        if (axis == Axis.Horizontal)
+        {
+            layerMap["NorthWalls"].SetTile(lowerLeft, horizontalDoors[0]);
+            layerMap["NorthWalls"].SetTile(lowerRight, horizontalDoors[1]);
+            
+            layerMap["SouthWalls"].SetTile(upperLeft, horizontalDoors[2]);
+            layerMap["SouthWalls"].SetTile(upperRight, horizontalDoors[3]);
+        }
+        else if (axis == Axis.Horizontal)
+        {
+            layerMap["EastWalls"].SetTile(lowerLeft, horizontalDoors[0]);
+            layerMap["WestWalls"].SetTile(lowerRight, horizontalDoors[1]);
+            
+            layerMap["EastWalls"].SetTile(upperLeft, horizontalDoors[2]);
+            layerMap["WestWalls"].SetTile(upperRight, horizontalDoors[3]);
+        }
+    }
+
+    private void CreateRoom(int x0, int y0, int x1, int y1)
+    {
+        CreateWalls(x0, y0 - 1, x1, y0, Axis.Horizontal); // southern walls        
+        CreateWalls(x0, y1, x1, y1 + 1, Axis.Horizontal); // northern walls
+        CreateWalls(x0 - 1, y0, x0, y1, Axis.Vertical); // western walls
+        CreateWalls(x1, y0, x1 + 1, y1, Axis.Vertical); // eastern walls
+    }
+    
+    private void CreateWalls(int x0, int y0, int x1, int y1, Axis axis)
+    {
+        for (int x = x0; x <= x1; x++)
+        {
+            for (int y = y0; y <= y1; y++)
+            {
+                if (!Contains(x,y))
+                    continue;
+                var currentPos = new Vector3Int(x,y,0);
+                
+                if (axis == Axis.Horizontal)
+                {
+                    if (y == y0) // lower row
+                    {
+                        AddWall(currentPos, Direction.North);
+                    }
+                    else if (y == y1) // upper row
+                    {
+                        AddWall(currentPos, Direction.South);
+                    }
+                }
+                else if (axis == Axis.Vertical)
+                {
+                    if (x == x0) // left col
+                    {
+                        AddWall(currentPos, Direction.East);
+                    }
+                    else if (x == x1) // right col
+                    {
+                        AddWall(currentPos, Direction.West);
+                    }
+                }
+            }
+        }
     }
 
     // Update is called once per frame
