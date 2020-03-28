@@ -274,6 +274,15 @@ public class Unit : MonoBehaviour
     {
         spriteRenderer.enabled = isVisible;
     }
+    
+    
+    public void MarkAsSelected()
+    {
+        var unitMarker = gameMap.GetUnitMarker();
+        unitMarker.transform.position = transform.position;
+        unitMarker.transform.SetParent(transform);
+        unitMarker.GetComponent<SpriteRenderer>().enabled = true;
+    }
 }
 
 public class Weapon
@@ -301,6 +310,7 @@ public class Weapon
     {
         return weaponRules.Type;
     }
+    
 }
 
 public delegate void UnitEvent(object sender, UnitEventArgs args);

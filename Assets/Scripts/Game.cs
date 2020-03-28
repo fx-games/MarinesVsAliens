@@ -111,6 +111,7 @@ public class Game : MonoBehaviour
         else
         {
             selectedUnit = null;
+            gameMap.HideUnitMarker();
             ToDefaultState();
         }
         UpdateLabel();
@@ -131,6 +132,7 @@ public class Game : MonoBehaviour
     private void UnitSelected(Vector3Int mapPos)
     {
         selectedUnit = gameMap.GetUnitAt(mapPos);
+        selectedUnit.MarkAsSelected();
         if (selectedUnit.movesLeft > 0)
         {
             ShowReachableTiles(selectedUnit, selectedUnit.movesLeft);

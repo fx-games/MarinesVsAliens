@@ -28,7 +28,9 @@ public class Map : MonoBehaviour, IGridMap
         Horizontal,
         Vertical
     }
-    public GameObject selectionRect;
+    public GameObject selectionRectPrefab;
+    private GameObject selectionRect;
+    private GameObject unitSelectedMarker; 
     public Tile floorTile;
     public Tile[] walls;  // ORDER: NESW
     public Tile[] verticalDoors;
@@ -46,6 +48,12 @@ public class Map : MonoBehaviour, IGridMap
     // Start is called before the first frame update
     void Awake()
     {
+        selectionRect = Instantiate(selectionRectPrefab);
+        unitSelectedMarker = Instantiate(selectionRectPrefab);
+        var spriteRenderer = unitSelectedMarker.GetComponent<SpriteRenderer>();
+        spriteRenderer.color = Color.blue;
+        spriteRenderer.enabled = false;
+        
         mod = FindObjectOfType<Mod>();
         var mapLayers = GetComponentsInChildren<Tilemap>();
         foreach (var layer in mapLayers)
@@ -926,4 +934,13 @@ public class Map : MonoBehaviour, IGridMap
     }
 
 
+    public GameObject GetUnitMarker()
+    {
+        return unitSelectedMarker;
+    }
+    
+    public void HideUnitMarker()
+    {
+        unitSelectedMarker.GetComponent<SpriteRenderer>().enabled = false;
+    }
 }
