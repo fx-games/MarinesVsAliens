@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Serialization;
 using static Map;
 using static Mod;
 using static Mod.RuleFaction;
@@ -13,14 +14,25 @@ public class Unit : MonoBehaviour
     public Weapon RangedWeapon { get; set; }
     public Weapon MeleeWeapon { get; set; }
     public GameObject bloodSplatter;
-    public int mobility = 4;
-    public int visionRange = 2;
-    public int health = 1;
-    public int armor = 2;
+    public int movesLeft = 4;
+    public int currentVisionRange = 2;
+    public int currentHealth = 1;
+    public int currentArmor = 2;
+    public bool canAttack = true;
+
+    public RuleFaction Faction { get; set; }
+    
+    public Vector3Int Cell => gameMap.WorldToCell(transform.position);
+
+    private float lastMoveTime;
+    public double moveDelay = 0.5f;
+    private Mod mod;
+    private RuleUnit unitRules;
 
     private Map gameMap;
     private int currentPathIndex;
     private List<Vector3Int> currentPath;
+    private SpriteRenderer spriteRenderer;
     public UnitState State { get; private set; } = UnitState.Idle;
     public bool HasRangedWeapon => RangedWeapon != null;
     public bool HasMeleeWeapon => MeleeWeapon != null;
@@ -46,18 +58,13 @@ public class Unit : MonoBehaviour
         return melee + ranged;
     } }
 
-    public RuleFaction Faction { get; set; }
-
-    private float lastMoveTime;
-    public double moveDelay = 0.5f;
-    private Mod mod;
-    
     public event UnitEvent FinishedMoving;
     // Start is called before the first frame update
     void Awake()
     {
         gameMap = FindObjectOfType<Map>();
         mod = FindObjectOfType<Mod>();
+        spriteRenderer = GetComponent<SpriteRenderer>();
     }
 
     // Update is called once per frame
@@ -101,7 +108,7 @@ public class Unit : MonoBehaviour
     }    
     private void NextMove()
     {   
-        currentPathIndex++;
+        
         if (currentPathIndex < currentPath.Count)
         {
             var lastPos = gameMap.WorldToCell(transform.position);
@@ -110,6 +117,7 @@ public class Unit : MonoBehaviour
             lastMoveTime = Time.time;
             AnimateMovement(nextPos);
             UpdateDirection(lastPos, nextPos);
+            currentPathIndex++;
         }
         else
         {
@@ -179,11 +187,15 @@ public class Unit : MonoBehaviour
 
     public void BeginMoving(List<Vector3Int> path)
     {
+        if (State == UnitState.Moving) return;
         var oldMapPos = gameMap.WorldToCell(transform.position);
+        path.Remove(oldMapPos);
         currentPathIndex = 0;
         currentPath = path;
         State = UnitState.Moving;
-        lastMoveTime = Time.time;
+        int steps = path.Count;
+        Debug.Log("Moving: " + steps);
+        movesLeft -= steps;
         // TELEPORT INSTANTLY TO THE END OF THE PATH ON THE MAP - BECAUSE OF PATHFINDING OF OTHER UNITS
         gameMap.MoveUnit(this, oldMapPos, path.Last());
     }
@@ -193,19 +205,19 @@ public class Unit : MonoBehaviour
     {
         var cellToWorld = gameMap.CellToWorld(mapPos);
         transform.position = cellToWorld;
-        gameMap.UpdateFOV(mapPos, visionRange);
+        gameMap.UpdateFOV(mapPos, currentVisionRange);
     }
 
     public void AttackedWith(int attackValue, bool isMelee)
     {
-        var defense = armor;
+        var defense = currentArmor;
         if (isMelee)
         {
             defense = MeleeWeapon.RollDamage();
         }
         Debug.Log("Defense: " + defense);
         int damage = attackValue - defense;
-        health -= damage;
+        currentHealth -= damage;
     }
 
     public void UnitDeath()
@@ -230,10 +242,31 @@ public class Unit : MonoBehaviour
             }
         }
 
-        var rules = mod.GetUnitRule(unitType);
-        mobility = rules.Movement;
-        health = rules.Health;
-        armor = rules.Armor;
+        unitRules = mod.GetUnitRule(unitType);
+        name = unitType;
+        currentArmor = unitRules.Armor;
+        currentHealth = unitRules.Health;
+        movesLeft = unitRules.Movement;
+    }
+
+    public void HasAttacked()
+    {
+        if (movesLeft != unitRules.Movement)
+        {
+            movesLeft = 0;    // can not move before AND after firing
+        }
+        canAttack = false;
+    }
+
+    public void PrepareNewTurn()
+    {
+        movesLeft = unitRules.Movement;
+        canAttack = true;
+    }
+
+    public void SetVisible(bool isVisible)
+    {
+        spriteRenderer.enabled = isVisible;
     }
 }
 

@@ -274,8 +274,9 @@ public class Map : MonoBehaviour, IGridMap
 
     public void ResetFog()
     {
-        //layerMap["FogOfWar"].ClearAllTiles();
-        layerMap["FogOfWar"].BoxFill(new Vector3Int(1,1,0), floorTile, 0,0,Width,Height);
+        layerMap["FogOfWar"].ClearAllTiles();
+        layerMap["FogOfWar"].FloodFill(new Vector3Int(Width-1,Height-1,0), floorTile);
+        //layerMap["FogOfWar"].BoxFill(new Vector3Int(1,1,0), floorTile, 0,0,Width,Height);
     }
     
     private void RemoveFog(Vector3Int position)
@@ -283,6 +284,10 @@ public class Map : MonoBehaviour, IGridMap
         layerMap["FogOfWar"].SetTile(position, null);
     }
 
+    public bool IsInFog(Vector3Int position)
+    {
+        return layerMap["FogOfWar"].HasTile(position);
+    }
     bool IsNeighborVisible(Vector3Int tileOne, Vector3Int tileTwo)
     {
         if (!Contains(tileOne.x, tileOne.y) || !Contains(tileTwo.x, tileTwo.y))

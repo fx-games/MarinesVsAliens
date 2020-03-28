@@ -75,8 +75,6 @@ factions:
           - STR_MARINE_MELEE
           - STR_PLASMA_GUN
 
-
-
 units:
   - type: STR_SPACE_MARINE
     movement: 4

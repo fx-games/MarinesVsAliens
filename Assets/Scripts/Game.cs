@@ -31,6 +31,8 @@ public class Game : MonoBehaviour
     private GameState gameState = GameState.Default;
     private HashSet<Vector3Int> validTargets = new HashSet<Vector3Int>();
     private Mod mod;
+    private List<RuleFaction> factions;
+    private int phaseFaction;
 
 
     void Start()
@@ -43,7 +45,11 @@ public class Game : MonoBehaviour
             throw new Exception("Game needs camera.");
         }
         pathfinder = new Pathfinder(gameMap, 1.0f, 1.2f);
+        factions = mod.GetFactions();
         SpawnUnits();
+        
+        phaseFaction = 0;
+        GlobalFOVUpdate();
     }
 
     
@@ -59,12 +65,12 @@ public class Game : MonoBehaviour
                 if (Input.GetMouseButtonUp(0))
                 {
                     if (gameMap.Contains(mapPos.x, mapPos.y))
-                        OnMapClicked(mapPos);
+                        MapClicked(mapPos);
                 }
                 else if (Input.GetMouseButtonUp(1))
                 {
                     if (gameMap.Contains(mapPos.x, mapPos.y))
-                        OnMapRightClicked(mapPos);
+                        MapRightClicked(mapPos);
                 }
                 else if (selectedUnit != null && gameState == GameState.MoveTargetSelection)
                 {
@@ -87,56 +93,68 @@ public class Game : MonoBehaviour
         }
     }
 
-    private void OnMapClicked(Vector3Int mapPos)
+    private void MapClicked(Vector3Int mapPos)
     {
         if (gameState == GameState.AttackTargetSelection)
         {
-            OnAttackTargetSelected(mapPos);
+            AttackTargetSelected(mapPos);
         }
-        else if (gameMap.IsUnitOn(mapPos))
+        else if (gameMap.IsUnitOn(mapPos) && gameMap.GetUnitAt(mapPos).Faction == CurrentFaction)
         {
+            ToDefaultState();
             UnitSelected(mapPos);
         }
         else
         {
-            gameState = GameState.Default;
             selectedUnit = null;
-            gameMap.RemoveAllHighlights();
-            gameMap.RemoveAllHighlights(1);
+            ToDefaultState();
         }
         UpdateLabel();
+    }
+    
+    private void MapRightClicked(Vector3Int mapPos)
+    {
+        if (gameState == GameState.AttackTargetSelection)
+        {
+            ToDefaultState();
+        }
+        else if (gameState == GameState.MoveTargetSelection && !gameMap.IsUnitOn(mapPos) && selectedUnit != null)
+        {
+            ConfirmMovement(mapPos);
+        }
     }
 
     private void UnitSelected(Vector3Int mapPos)
     {
         selectedUnit = gameMap.GetUnitAt(mapPos);
-        ShowReachableTiles(selectedUnit, selectedUnit.mobility);
-        gameState = GameState.MoveTargetSelection;
+        if (selectedUnit.movesLeft > 0)
+        {
+            ShowReachableTiles(selectedUnit, selectedUnit.movesLeft);
+            gameState = GameState.MoveTargetSelection;
+        }
     }
 
-    private void OnMapRightClicked(Vector3Int mapPos)
+
+    private void ToDefaultState()
     {
-        if (gameState == GameState.AttackTargetSelection)
+        gameMap.RemoveAllHighlights();
+        gameMap.RemoveAllHighlights(1);
+        gameState = GameState.Default;
+    }
+
+    private void ConfirmMovement(Vector3Int mapPos)
+    {
+        var path = pathfinder.GetShortestPath(new Point(mapPos.x, mapPos.y)).ConvertAll(p => new Vector3Int(p.X, p.Y, 0));
+        if (path.Count > 0)
         {
             gameMap.RemoveAllHighlights();
             gameMap.RemoveAllHighlights(1);
-
+            selectedUnit.BeginMoving(path);
             gameState = GameState.Default;
-        }
-        else if (!gameMap.IsUnitOn(mapPos) && selectedUnit != null)
-        {
-            var path = pathfinder.GetShortestPath(new Point(mapPos.x, mapPos.y)).ConvertAll(p => new Vector3Int(p.X, p.Y, 0));
-            if (path.Count > 0)
-            {
-                gameMap.RemoveAllHighlights();
-                gameMap.RemoveAllHighlights(1);
-                selectedUnit.BeginMoving(path);
-                gameState = GameState.Default;
-            }
         }
     }
 
-    private void OnAttackTargetSelected(Vector3Int targetedPos)
+    private void AttackTargetSelected(Vector3Int targetedPos)
     {
         if (selectedUnit != null && validTargets.Contains(targetedPos))
         {
@@ -156,6 +174,9 @@ public class Game : MonoBehaviour
                     }
                 }
             }
+
+            selectedUnit.HasAttacked();
+            ToDefaultState();
         }
     }
 
@@ -175,7 +196,7 @@ public class Game : MonoBehaviour
         if (attack > 0)
         {
             target.AttackedWith(attack, isMelee);
-            if (target.health <= 0)
+            if (target.currentHealth <= 0)
             {
                 target.UnitDeath();
                 gameMap.RemoveUnit(target);
@@ -196,9 +217,27 @@ public class Game : MonoBehaviour
         Instantiate(explosionPrefab, gameMap.CellToWorld(mapPos), Quaternion.identity);
     }
 
+    public void EndTurnButtonClicked()
+    {
+        ToDefaultState();
+        phaseFaction++;
+        if (phaseFaction > factions.Count - 1)
+        {
+            phaseFaction = 0;
+        }
+
+        foreach (var unit in allUnits)
+        {
+            if (unit.Faction == CurrentFaction)
+            {
+                unit.PrepareNewTurn();
+            }
+        }
+        GlobalFOVUpdate();
+    }
     public void AttackButtonClicked()
     {
-        if (selectedUnit != null && selectedUnit.State != UnitState.Moving)
+        if (selectedUnit != null && selectedUnit.State != UnitState.Moving && selectedUnit.canAttack)
         {
             gameMap.RemoveAllHighlights(0);
             gameMap.RemoveAllHighlights(1);
@@ -268,10 +307,10 @@ public class Game : MonoBehaviour
     {
         var startPos = gameMap.WorldToCell(unit.transform.position);
         gameMap.RemoveAllHighlights();
-        pathfinder.MaxCost = maxDistance;
+        pathfinder.MaxCost = maxDistance + 1f;
         pathfinder.CurrentUnit = unit;
         
-        pathfinder.Dijkstra(new HashSet<Point>(){new Point(startPos.x, startPos.y)}, new HashSet<Point>());
+        pathfinder.Dijkstra(new HashSet<Point>{new Point(startPos.x, startPos.y)}, new HashSet<Point>());
         //pathfinder.PrintDistMap();
         
         var nodeList = pathfinder.ReachableList.ToList().ConvertAll(point => new Vector3Int(point.X, point.Y, 0));
@@ -289,6 +328,12 @@ public class Game : MonoBehaviour
     {
         //var unit = args.unit;
         GlobalFOVUpdate();
+        
+        if (selectedUnit == args.unit && selectedUnit.movesLeft > 0)
+        {
+            ShowReachableTiles(selectedUnit, selectedUnit.movesLeft);
+            gameState = GameState.MoveTargetSelection;
+        }
     }
 
     private void GlobalFOVUpdate()
@@ -296,9 +341,23 @@ public class Game : MonoBehaviour
         gameMap.ResetFog();
         foreach (var unit in allUnits)
         {
-            gameMap.UpdateFOV(gameMap.WorldToCell(unit.transform.position), unit.visionRange);
+            unit.SetVisible(false);
+            if (unit.Faction == CurrentFaction)
+            {
+                unit.SetVisible(true);
+                gameMap.UpdateFOV(gameMap.WorldToCell(unit.transform.position), unit.currentVisionRange);
+            }
+        }
+        foreach (var unit in allUnits)
+        {
+            if (unit.Faction != CurrentFaction && !gameMap.IsInFog(unit.Cell))
+            {
+                unit.SetVisible(true);
+            }
         }
     }
+
+    private RuleFaction CurrentFaction => factions[phaseFaction];
 
 
     public void SetLabel(string text)
@@ -320,8 +379,6 @@ public class Game : MonoBehaviour
 
     private void SpawnUnits()
     {
-        var factions = mod.GetFactions();
-
         foreach (var ruleFaction in factions)
         {
             var spawnRule = mod.GetSpawnRule(ruleFaction.Type);
@@ -354,11 +411,13 @@ public class Game : MonoBehaviour
             .GetComponent<Unit>();
         if (gameMap.AddUnit(unit, spawnPosition))
         {
-            unit.GetComponent<SpriteRenderer>().color = ColorFromArray(ruleFaction.Color);
+            var spriteRenderer = unit.GetComponent<SpriteRenderer>();
+            spriteRenderer.color = ColorFromArray(ruleFaction.Color);
+            spriteRenderer.enabled = false; // spawn every unit invisible
             unit.LoadRules(unitType, ruleFaction, loadout);
             unit.FinishedMoving += UnitFinishedMoving;
             allUnits.Add(unit);
-            gameMap.UpdateFOV(spawnPosition, unit.visionRange);
+            //gameMap.UpdateFOV(spawnPosition, unit.visionRange);
             return true;
         }
 
