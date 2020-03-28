@@ -247,7 +247,7 @@ public class Game : MonoBehaviour
         {
             gameMap.RemoveAllHighlights(0);
             gameMap.RemoveAllHighlights(1);
-            PreviewAttack(selectedUnit, gameMap.WorldToCell(selectedUnit.transform.position), 3);
+            PreviewAttack(selectedUnit, gameMap.WorldToCell(selectedUnit.transform.position), 10);
             gameState = GameState.AttackTargetSelection;
         }
     }

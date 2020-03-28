@@ -21,12 +21,12 @@ factions:
     color: [177, 52, 235, 1]
     loadOut:
       - unit: STR_GRINDLING
-        count: 5
+        count: 3
         weapons:
           - STR_MARINE_MELEE
           - STR_RIFLE
       - unit: STR_ORK
-        count: 5
+        count: 3
         weapons:
           - STR_MARINE_MELEE
           - STR_RIFLE
