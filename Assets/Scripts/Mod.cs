@@ -87,7 +87,7 @@ public class Mod : MonoBehaviour
     public class RuleWeapon
     {
         public string Type { get; set; }
-        public int[] Damage { get; set; }
+        public List<int[]> Damage { get; set; }
         [DefaultValue(0)] public int Radius { get; set; } = 0;
         [DefaultValue(false)] public bool IsMelee { get; set; } = false;
         [DefaultValue(false)] public bool StraightLineOnly { get; set; } = false;

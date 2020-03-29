@@ -216,18 +216,6 @@ public class Unit : MonoBehaviour
         OnStepCompleted(oldPos);
     }
 
-    public void AttackedWith(int attackValue, bool isMelee)
-    {
-        var defense = currentArmor;
-        if (isMelee)
-        {
-            defense = MeleeWeapon.RollDamage();
-        }
-        //Debug.Log("Defense: " + defense);
-        int damage = attackValue - defense;
-        currentHealth -= damage;
-    }
-
     public void UnitDeath()
     {
         Instantiate(bloodSplatter, transform.position, Quaternion.identity);
@@ -311,6 +299,23 @@ public class Unit : MonoBehaviour
             }
         }
     }
+
+    public int GetDefense(bool isMelee)
+    {
+        if (isMelee)
+        {
+            return MeleeWeapon.RollDamage().Sum();
+        }
+        else
+        {
+            return currentArmor;
+        }
+    }
+
+    public void DamageReceived(Unit source, Weapon weaponUsed, int damage)
+    {
+        currentHealth -= damage;
+    }
 }
 
 public class Weapon
@@ -331,11 +336,30 @@ public class Weapon
 
     public RuleWeapon Rules => weaponRules;
 
-    public int RollDamage()
+    public int[] RollDamage()
     {
-        return Random.Range(weaponRules.Damage[0], weaponRules.Damage[1]);
-    }
+        int[] results = new int[weaponRules.Damage.Count];
+        int diceCount = 0;
+        foreach (var damageRoll in weaponRules.Damage)
+        {
+            if (damageRoll.Length == 1)
+            {
+                results[diceCount] = damageRoll[0];
+            }
+            else if (damageRoll.Length == 2)
+            {
+                results[diceCount] = Random.Range(damageRoll[0], damageRoll[1] + 1);
+            }
+            else if (damageRoll.Length > 2)
+            {
+                results[diceCount] = damageRoll[Random.Range(0, damageRoll.Length)];
+            }
 
+            diceCount++;
+        }
+
+        return results;
+    }
     public override string ToString()
     {
         return mod.Tr(weaponRules.Type);

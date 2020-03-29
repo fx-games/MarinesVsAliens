@@ -125,21 +125,35 @@ units:
 
 weapons:
   - type: STR_CLAW_AND_SWORD
-    damage: [0,10]
+    damage:
+      - [1,2,0,0,0,0]
+      - [1,2,0,0,0,0]
+      - [1,2,3,0,0,0]
+      - [1,2,3,0,0,0]
     isMelee: true
   - type: STR_RIFLE
-    damage: [0,4]
+    damage:
+      - [1,2,0,0,0,0]
+      - [1,2,0,0,0,0]
   - type: STR_MARINE_MELEE
-    damage: [0,4]
+    damage:
+      - [1,2,0,0,0,0]
+      - [1,2,0,0,0,0]
     isMelee: true
   - type: STR_ROCKET_LAUNCHER
-    damage: [0,6]
+    damage:
+      - [1,2,3,0,0,0]
+      - [1,2,3,0,0,0]
     radius: 1
   - type: STR_HEAVY_ASSAULT_CANNON
-    damage: [0,6]
+    damage:
+      - [1,2,3,0,0,0]
+      - [1,2,3,0,0,0]
     damageDistribution: true
   - type: STR_PLASMA_GUN
-    damage: [0,6]
+    damage:
+      - [1,2,3,0,0,0]
+      - [1,2,3,0,0,0]
     straightLineOnly: true
     damageLineOfFire: true
 

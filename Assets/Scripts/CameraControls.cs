@@ -7,13 +7,9 @@ using UnityEngine.UI;
 public class CameraControls : MonoBehaviour
 {
     private Camera gameCamera;
-    
-    public float zoomSpeed = 0.1f;
-    public float smoothSpeed = 2.0f;
-    public float minOrtho = 1.0f;
-    public float targetOrtho;
-    public float maxOrtho = 20.0f;
-    private float currentZoom = 4.0f;
+    private Vector3 touchStart;
+    public float minZoom = 1.0f;
+    public float maxZoom = 20.0f;
     private void Awake()
     {
         gameCamera = Camera.main;
@@ -21,8 +17,6 @@ public class CameraControls : MonoBehaviour
         {
             throw new Exception("Game needs camera.");
         }
-
-        targetOrtho = gameCamera.orthographicSize;
     }
 
     // Start is called before the first frame update
@@ -34,9 +28,43 @@ public class CameraControls : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        KeyboardScrolling();
+        TouchScrollZoom();
+        // mousewheel zoom
+        Zoom(Input.GetAxis("Mouse ScrollWheel"));
+    }
+
+    private void TouchScrollZoom()
+    {
+        if (Input.GetMouseButtonDown(0))
+        {
+            touchStart = gameCamera.ScreenToWorldPoint(Input.mousePosition);
+        }
+
+        if (Input.touchCount == 2)
+        {
+            Touch touchZero = Input.GetTouch(0);
+            Touch touchOne = Input.GetTouch(1);
+            Vector2 touchZeroPrevPos = touchZero.position - touchZero.deltaPosition;
+            Vector2 touchOnePrevPos = touchOne.position - touchOne.deltaPosition;
+
+            float prevMagnitude = (touchZeroPrevPos - touchOnePrevPos).magnitude;
+            float currentMagnitude = (touchZero.position - touchOne.position).magnitude;
+
+            float difference = currentMagnitude - prevMagnitude;
+
+            Zoom(difference * 0.01f);
+        }
+        else if (Input.GetMouseButton(0))
+        {
+            Vector3 direction = touchStart - gameCamera.ScreenToWorldPoint(Input.mousePosition);
+            gameCamera.transform.position += direction;
+        }
+    }
+
+    private void KeyboardScrolling()
+    {
         Vector3Int movementVector = Vector3Int.zero;
-        
-        
         if (Input.GetKey(KeyCode.Q))
         {
             //gameCamera.fieldOfView += zoomSpeed;
@@ -45,7 +73,7 @@ public class CameraControls : MonoBehaviour
         {
             //gameCamera.fieldOfView += zoomSpeed;
         }
-        
+
         if (Input.GetKey(KeyCode.A))
         {
             movementVector += Vector3Int.left;
@@ -54,7 +82,7 @@ public class CameraControls : MonoBehaviour
         {
             movementVector += Vector3Int.right;
         }
-        
+
         if (Input.GetKey(KeyCode.W))
         {
             movementVector += Vector3Int.up;
@@ -68,8 +96,6 @@ public class CameraControls : MonoBehaviour
         {
             MoveCamera(movementVector);
         }
-        
-        //gameCamera.orthographicSize = targetOrtho;
     }
 
     private void MoveCamera(Vector3Int direction)
@@ -81,5 +107,24 @@ public class CameraControls : MonoBehaviour
         Vector3 nextPosition = gameCamera.transform.position  + movementVector;
         
         gameCamera.transform.position = Vector3.Lerp(gameCamera.transform.position, nextPosition, Time.deltaTime * moveSpeed);
+    }
+    
+    private IEnumerator LerpFromTo(Vector3 pos1, Vector3 pos2, float duration) {
+        for (float t=0f; t<duration; t += Time.deltaTime) {
+            transform.position = Vector3.Lerp(pos1, pos2, t / duration);
+            yield return 0;
+        }
+        transform.position = pos2;
+    }
+
+    public void SmoothTransition(Vector3 targetPos)
+    {
+        var realTargetPos = new Vector3(targetPos.x, targetPos.y, transform.position.z);
+        StartCoroutine(LerpFromTo(transform.position, realTargetPos, 0.3f));
+    }
+
+    void Zoom(float increment)
+    {
+        gameCamera.orthographicSize = Mathf.Clamp(gameCamera.orthographicSize - increment, minZoom, maxZoom);
     }
 }

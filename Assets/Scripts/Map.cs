@@ -98,7 +98,7 @@ public class Map : MonoBehaviour, IGridMap
             {
                 foreach (var blockPlacementPosition in mapScriptCommand.Rects)
                 {
-                    var blockName = mapScriptCommand.Blocks[Random.Range(0, mapScriptCommand.Blocks.Count - 1)];
+                    var blockName = mapScriptCommand.Blocks[Random.Range(0, mapScriptCommand.Blocks.Count)];
                     PlaceMapBlock(blockPlacementPosition, blockName);
                 } 
             }
@@ -814,7 +814,7 @@ public class Map : MonoBehaviour, IGridMap
 
     public int Height { get; set; }
 
-    public Vector3Int RandomPosition => new Vector3Int(Random.Range(0, Width -1), Random.Range(0, Height - 1), 0);
+    public Vector3Int RandomPosition => new Vector3Int(Random.Range(0, Width), Random.Range(0, Height), 0);
 
     public bool Contains(int x, int y)
     {

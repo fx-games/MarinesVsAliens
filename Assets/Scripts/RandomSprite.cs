@@ -13,7 +13,7 @@ public class RandomSprite : MonoBehaviour
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
         frameCount = frames.Length;
-        spriteRenderer.sprite = frames[Random.Range(0, frameCount-1)];
+        spriteRenderer.sprite = frames[Random.Range(0, frameCount)];
     }
 
 }

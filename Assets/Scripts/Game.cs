@@ -113,6 +113,10 @@ public class Game : MonoBehaviour
             ToDefaultState();
             UnitSelected(mapPos);
         }
+        else if (gameState == GameState.MoveTargetSelection && !gameMap.IsUnitOn(mapPos) && selectedUnit != null)
+        {
+            ConfirmMovement(mapPos);
+        }
         else
         {
             selectedUnit = null;
@@ -127,10 +131,6 @@ public class Game : MonoBehaviour
         if (gameState == GameState.AttackTargetSelection)
         {
             ToDefaultState();
-        }
-        else if (gameState == GameState.MoveTargetSelection && !gameMap.IsUnitOn(mapPos) && selectedUnit != null)
-        {
-            ConfirmMovement(mapPos);
         }
     }
 
@@ -174,6 +174,7 @@ public class Game : MonoBehaviour
             var isMelee = gameMap.AreNeighbors(unitPos,targetedPos);
             var weapon = isMelee ? selectedUnit.MeleeWeapon : selectedUnit.RangedWeapon;
             var areaOfEffect = gameMap.AreaOfEffect(unitPos, weapon, targetedPos);
+            int[] attackerDice = weapon.RollDamage();
             foreach (var aoePos in areaOfEffect)
             {
                 if (gameMap.AoEAllowed(selectedUnit, weapon, targetedPos, aoePos))
@@ -182,7 +183,7 @@ public class Game : MonoBehaviour
                     if (gameMap.IsUnitOn(aoePos))
                     {
                         var hitUnit = gameMap.GetUnitAt(aoePos);
-                        ResolveAttack(selectedUnit, hitUnit);
+                        ResolveAttack(attackerDice, unitPos,selectedUnit, targetedPos, aoePos, hitUnit);
                     }
                 }
             }
@@ -192,9 +193,10 @@ public class Game : MonoBehaviour
         }
     }
 
-    private void ResolveAttack(Unit attacker, Unit target)
+    private void ResolveAttack(int[] attackerDice, Vector3Int attackerPos, Unit attacker, Vector3Int targetPos, Vector3Int aoePos, Unit target)
     {
         var isMelee = IsMelee(attacker, target);
+        var isAoEPosition = targetPos != aoePos;
         
         var weapon = attacker.RangedWeapon;
         if (isMelee)
@@ -202,15 +204,43 @@ public class Game : MonoBehaviour
             weapon = attacker.MeleeWeapon;
         }
 
-        int attack = weapon.RollDamage();
+        var isExplosion = weapon.Rules.Radius > 0;
+
+        int attackerScore = attackerDice.Sum();
+
+        if (isExplosion && isAoEPosition)
+        {
+            attackerScore = attackerDice.Max();
+        }
         //Debug.Log("Attack: " + attack);
 
-        if (attack > 0)
+        if (attackerScore > 0)
         {
-            target.AttackedWith(attack, isMelee);
+            int defenderScore = target.GetDefense(isMelee);
+            //target.AttackedWith(attack, isMelee);
+            if (defenderScore >= attackerScore)
+            {
+                // no damage to target
+                if (isMelee && defenderScore > attackerScore)
+                {
+                    // damage to attacker
+                    int returnedMeleeDamage = defenderScore - attackerScore;
+                    attacker.DamageReceived(target, attacker.MeleeWeapon, returnedMeleeDamage);
+                }
+            }
+            else
+            {
+                // damage to target
+                int damage = attackerScore - defenderScore;
+                target.DamageReceived(attacker, weapon, damage);
+            }
             if (target.currentHealth <= 0)
             {
                 UnitDies(target);
+            }
+            if (attacker.currentHealth <= 0)
+            {
+                UnitDies(attacker);
             }
         }
     }
@@ -284,9 +314,8 @@ public class Game : MonoBehaviour
 
     private void CenterCameraOn(Unit unit)
     {
-        var camPos = gameCamera.transform.position;
         var unitPos = unit.transform.position;
-        gameCamera.transform.position = new Vector3(unitPos.x, unitPos.y, camPos.z);
+        gameCamera.GetComponent<CameraControls>().SmoothTransition(unitPos);
     }
 
     public void AttackButtonClicked()
