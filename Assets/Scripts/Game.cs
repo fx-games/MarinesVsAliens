@@ -36,6 +36,7 @@ public class Game : MonoBehaviour
     private List<RuleFaction> factions;
     private int phaseFaction;
     private CameraControls cameraController;
+    private Vector3Int lastCursorLocation;
 
     private void Awake()
     {
@@ -71,14 +72,14 @@ public class Game : MonoBehaviour
         if (!EventSystem.current.IsPointerOverGameObject())
         {
             Vector3 pos = gameCamera.ScreenToWorldPoint(Input.mousePosition);
-            var mapPos = gameMap.WorldToCell(pos);
-            if (gameMap.Contains(mapPos.x, mapPos.y))
+            var cursorLocation = gameMap.WorldToCell(pos);
+            if (gameMap.Contains(cursorLocation.x, cursorLocation.y))
             {
                 if (Input.GetMouseButtonDown(0))
                 {
-                    if (gameMap.Contains(mapPos.x, mapPos.y))
+                    if (gameMap.Contains(cursorLocation.x, cursorLocation.y))
                     {
-                        InputPressedOnMap(mapPos);
+                        InputPressedOnMap(cursorLocation);
                     }
                     else
                     {
@@ -87,26 +88,27 @@ public class Game : MonoBehaviour
                 }
                 else if (Input.GetMouseButtonUp(0))
                 {
-                    if (gameMap.Contains(mapPos.x, mapPos.y))
+                    if (gameMap.Contains(cursorLocation.x, cursorLocation.y))
                     {
-                        InputReleasedOnMap(mapPos);
+                        InputReleasedOnMap(cursorLocation);
                     }
                 }
                 else if (Input.GetMouseButtonDown(1))
                 {
-                    if (gameMap.Contains(mapPos.x, mapPos.y))
+                    if (gameMap.Contains(cursorLocation.x, cursorLocation.y))
                     {
-                        MapRightClicked(mapPos);
+                        MapRightClicked(cursorLocation);
                     }
                     else
                     {
                         DeselectAll();
                     }
                 }
-                else if (selectedUnit != null && gameState == GameState.MoveTargetSelection)
+                else if (selectedUnit != null && gameState == GameState.MoveTargetSelection && cursorLocation != lastCursorLocation)
                 {
-                    PreviewMovement(selectedUnit, mapPos);
+                    PreviewMovement(selectedUnit, cursorLocation);
                 }
+                lastCursorLocation = cursorLocation;
             }
         }
     }
@@ -162,9 +164,9 @@ public class Game : MonoBehaviour
             gameState = GameState.MovementSelectedPreConfirmation;
             gameMap.SetHighlightColor(new Color(0,0,0.7f,0.6f), 1);
         }
-        else if (gameState == GameState.MovementSelectedPreConfirmation 
-                && !gameMap.IsUnitOn(mapPos) 
-                && selectedUnit != null)
+        else if (selectedUnit != null
+                && gameState == GameState.MovementSelectedPreConfirmation 
+                && gameMap.CanBePlaced(selectedUnit, mapPos, false))
         {
             ConfirmMovement(mapPos);
         }
@@ -451,12 +453,21 @@ public class Game : MonoBehaviour
         //pathfinder.PrintDistMap();
         
         var nodeList = pathfinder.ReachableList.ToList().ConvertAll(point => new Vector3Int(point.X, point.Y, 0));
-        
+        HashSet<Vector3Int> reachable = new HashSet<Vector3Int>();
         foreach (var reachablePos in nodeList)
         {
-            if (!gameMap.IsUnitOn(reachablePos))
+            if (!gameMap.CanBePlaced(unit, reachablePos)) continue;    // make sure to only show positions where we could end movement
+            
+            foreach (var offset in unit.OccupiedTiles)
             {
-                gameMap.HighlightTile(reachablePos, new Color(0, 0.8f, 0, 0.2f));
+                reachable.Add(reachablePos + offset); // also highlight tiles for big units
+            }
+        }
+        foreach (var pos in reachable)
+        {
+            if (!gameMap.IsUnitOn(pos)) // never highlight tiles with units on it
+            {
+                gameMap.HighlightTile(pos, new Color(0, 0.8f, 0, 0.2f));
             }
         }
     }

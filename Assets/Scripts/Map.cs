@@ -663,28 +663,14 @@ public class Map : MonoBehaviour, IGridMap
 
     public bool AddUnit(Unit unit, Vector3Int mapPos)
     {
+        if (!CanBePlaced(unit, mapPos)) return false;
+        
         foreach (var offset in unit.OccupiedTiles)
         {
             var offsetPos = mapPos + offset;
-
-            foreach (var secondOffset in unit.OccupiedTiles)
-            {
-                var offsetPosTwo = mapPos + secondOffset;
-                if (IsWallBetween(offsetPos, offsetPosTwo) || IsDoorBetween(offsetPos, offsetPosTwo))
-                {
-                    return false;
-                }
-            }
-
-            if (!Contains(offsetPos.x, offsetPos.y) || IsUnitOn(offsetPos))
-            {
-                return false;
-            }
-
             unitMap[offsetPos.x, offsetPos.y] = unit;
         }
-        
-        //RemoveFog(mapPos);
+
         return true;
     }
     
@@ -862,17 +848,24 @@ public class Map : MonoBehaviour, IGridMap
     {
         Vector3Int mapPos = new Vector3Int(position.X, position.Y, 0);
         List<Vector3Int> reachableNeighbors = new List<Vector3Int>();
+        
         List<Vector3Int> neighbors = new List<Vector3Int>()
         {
             mapPos + Vector3Int.up,
             mapPos + Vector3Int.right,
             mapPos + Vector3Int.down,
             mapPos + Vector3Int.left,
-            mapPos + Vector3Int.up + Vector3Int.right,
-            mapPos + Vector3Int.up + Vector3Int.left,
-            mapPos + Vector3Int.down + Vector3Int.right,
-            mapPos + Vector3Int.down + Vector3Int.left
         };
+        if (currentUnit.Rules.CanMoveDiagonally)
+        {
+            neighbors.AddRange(new []
+            {
+                mapPos + Vector3Int.up + Vector3Int.right,
+                mapPos + Vector3Int.up + Vector3Int.left,
+                mapPos + Vector3Int.down + Vector3Int.right,
+                mapPos + Vector3Int.down + Vector3Int.left
+            });
+        }
         foreach (var neighbor in neighbors)
         {
             bool allOccupiedTilesCanMove = true;
@@ -1024,5 +1017,36 @@ public class Map : MonoBehaviour, IGridMap
             }
         }
         return thereIsADoor;
+    }
+
+    public bool CanBePlaced(Unit unit, Vector3Int mapPos, bool doorsAreBlocking = true)
+    {
+        foreach (var offset in unit.OccupiedTiles)
+        {
+            var offsetPos = mapPos + offset;
+            if (!Contains(offsetPos.x, offsetPos.y) || IsOtherUnitOn(unit, offsetPos))
+            {
+                return false;
+            }
+            foreach (var secondOffset in unit.OccupiedTiles)
+            {
+                var offsetPosTwo = mapPos + secondOffset;
+                if (IsWallBetween(offsetPos, offsetPosTwo) || (doorsAreBlocking && IsDoorBetween(offsetPos, offsetPosTwo)))
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    public bool IsOtherUnitOn(Unit unit, Vector3Int mapPos)
+    {
+        if (!IsUnitOn(mapPos))
+        {
+            return false;
+        }
+
+        return GetUnitAt(mapPos) != unit;
     }
 }

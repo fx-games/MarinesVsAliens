@@ -83,6 +83,7 @@ public class Mod : MonoBehaviour
         [DefaultValue(1)] public int Health { get; set; } = 1;
         [DefaultValue(0)] public int Armor { get; set; } = 0;
         public List<int[]> OccupiedTiles { get; set; } = new List<int[]> {new []{0,0}};
+        public bool CanMoveDiagonally { get; set; } = true;
     }
     
     public class RuleWeapon
