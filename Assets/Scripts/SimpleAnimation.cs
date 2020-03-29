@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.Serialization;
 
 public class SimpleAnimation : MonoBehaviour
 {
@@ -6,9 +7,9 @@ public class SimpleAnimation : MonoBehaviour
     public bool DestroyOnFinish = true;
     private int currentFrame = 0;
     private int frameCount;
-    public int delayFrames = 4;
+    private float delay = 0.1f;
     private SpriteRenderer spriteRenderer;
-    private int lastAnimFrame = 0;
+    private float lastAnimTime = 0;
 
     // Start is called before the first frame update
     void Start()
@@ -21,13 +22,13 @@ public class SimpleAnimation : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (Time.frameCount - lastAnimFrame > delayFrames)
+        if (Time.time - lastAnimTime > delay)
         {
             currentFrame++;
             if (currentFrame < frameCount)
             {
                 spriteRenderer.sprite = frames[currentFrame];
-                lastAnimFrame = Time.frameCount;
+                lastAnimTime = Time.time;
             }
             else if (DestroyOnFinish)
             {

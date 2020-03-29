@@ -10,6 +10,8 @@ public class CameraControls : MonoBehaviour
     private Vector3 touchStart;
     public float minZoom = 1.0f;
     public float maxZoom = 20.0f;
+    private float touchStartTime;
+
     private void Awake()
     {
         gameCamera = Camera.main;
@@ -39,6 +41,7 @@ public class CameraControls : MonoBehaviour
         if (Input.GetMouseButtonDown(0))
         {
             touchStart = gameCamera.ScreenToWorldPoint(Input.mousePosition);
+            touchStartTime = Time.time;
         }
 
         if (Input.touchCount == 2)
@@ -54,13 +57,27 @@ public class CameraControls : MonoBehaviour
             float difference = currentMagnitude - prevMagnitude;
 
             Zoom(difference * 0.01f);
+            ActiveTouchCameraMovement = true;
         }
         else if (Input.GetMouseButton(0))
         {
             Vector3 direction = touchStart - gameCamera.ScreenToWorldPoint(Input.mousePosition);
-            gameCamera.transform.position += direction;
+            float touchTime = Time.time - touchStartTime;
+            
+            if (touchTime > 0.2f)
+            {
+                gameCamera.transform.position += direction;
+                ActiveTouchCameraMovement = true;
+            }
+        }
+
+        if (Input.GetMouseButtonUp(0))
+        {
+            ActiveTouchCameraMovement = false;
         }
     }
+
+    public bool ActiveTouchCameraMovement { get; private set; }
 
     private void KeyboardScrolling()
     {

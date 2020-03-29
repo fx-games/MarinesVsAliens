@@ -17,7 +17,8 @@ public class Game : MonoBehaviour
     {
         Default,
         MoveTargetSelection,
-        AttackTargetSelection
+        AttackTargetSelection,
+        MovementSelectedPreConfirmation
     }
 
     public GameObject gridMapPrefab;
@@ -34,6 +35,7 @@ public class Game : MonoBehaviour
     private Mod mod;
     private List<RuleFaction> factions;
     private int phaseFaction;
+    private CameraControls cameraController;
 
     private void Awake()
     {
@@ -45,6 +47,7 @@ public class Game : MonoBehaviour
         gameMap = FindObjectOfType<Map>();
         mod = GetComponent<Mod>();
         gameCamera = Camera.main;
+        cameraController = gameCamera.GetComponent<CameraControls>();
         if (gameCamera == null)
         {
             throw new Exception("Game needs camera.");
@@ -71,15 +74,34 @@ public class Game : MonoBehaviour
             var mapPos = gameMap.WorldToCell(pos);
             if (gameMap.Contains(mapPos.x, mapPos.y))
             {
-                if (Input.GetMouseButtonUp(0))
+                if (Input.GetMouseButtonDown(0))
                 {
                     if (gameMap.Contains(mapPos.x, mapPos.y))
-                        MapClicked(mapPos);
+                    {
+                        InputPressedOnMap(mapPos);
+                    }
+                    else
+                    {
+                        DeselectAll();
+                    }
                 }
-                else if (Input.GetMouseButtonUp(1))
+                else if (Input.GetMouseButtonUp(0))
                 {
                     if (gameMap.Contains(mapPos.x, mapPos.y))
+                    {
+                        InputReleasedOnMap(mapPos);
+                    }
+                }
+                else if (Input.GetMouseButtonDown(1))
+                {
+                    if (gameMap.Contains(mapPos.x, mapPos.y))
+                    {
                         MapRightClicked(mapPos);
+                    }
+                    else
+                    {
+                        DeselectAll();
+                    }
                 }
                 else if (selectedUnit != null && gameState == GameState.MoveTargetSelection)
                 {
@@ -89,21 +111,41 @@ public class Game : MonoBehaviour
         }
     }
 
+    private void DeselectAll()
+    {
+        selectedUnit = null;
+        gameMap.HideUnitMarker();
+        ToDefaultState();
+    }
+
     private void PreviewMovement(Unit unit, Vector3Int targetPos)
     {
         gameMap.RemoveAllHighlights(1);
         var path = pathfinder.GetShortestPath(new Point(targetPos.x, targetPos.y)).ConvertAll(p => new Vector3Int(p.X, p.Y, 0));
+        HashSet<Vector3Int> previewTiles = new HashSet<Vector3Int>();
+            
         if (path.Count > 0)
         {
             foreach (var pathPos in path)
             {
-                gameMap.HighlightTile(pathPos, new Color(0,0,0.7f,0.6f), 1);
+                foreach (var offset in unit.OccupiedTiles)
+                {
+                    previewTiles.Add(pathPos + offset);
+                }
+            }
+
+            foreach (var tile in previewTiles)
+            {
+                gameMap.HighlightTile(tile, new Color(0.4f,0.3f,0.7f,0.6f), 1);
             }
         }
     }
 
-    private void MapClicked(Vector3Int mapPos)
+    private void InputReleasedOnMap(Vector3Int mapPos)
     {
+        if (cameraController.ActiveTouchCameraMovement)
+            return;
+        
         if (gameState == GameState.AttackTargetSelection)
         {
             AttackTargetSelected(mapPos);
@@ -113,17 +155,29 @@ public class Game : MonoBehaviour
             ToDefaultState();
             UnitSelected(mapPos);
         }
-        else if (gameState == GameState.MoveTargetSelection && !gameMap.IsUnitOn(mapPos) && selectedUnit != null)
+        else if (gameState == GameState.MoveTargetSelection 
+                 && !gameMap.IsUnitOn(mapPos) 
+                 && selectedUnit != null)
+        {
+            gameState = GameState.MovementSelectedPreConfirmation;
+            gameMap.SetHighlightColor(new Color(0,0,0.7f,0.6f), 1);
+        }
+        else if (gameState == GameState.MovementSelectedPreConfirmation 
+                && !gameMap.IsUnitOn(mapPos) 
+                && selectedUnit != null)
         {
             ConfirmMovement(mapPos);
         }
         else
         {
-            selectedUnit = null;
-            gameMap.HideUnitMarker();
-            ToDefaultState();
+            DeselectAll();
         }
         UpdateLabel();
+    }
+
+    private void InputPressedOnMap(Vector3Int mapPos)
+    {
+        
     }
     
     private void MapRightClicked(Vector3Int mapPos)
@@ -492,15 +546,17 @@ public class Game : MonoBehaviour
     {
         var unit = Instantiate(unitPrefab, gameMap.CellToWorld(spawnPosition), Quaternion.identity)
             .GetComponent<Unit>();
+        unit.LoadRules(unitType, ruleFaction, loadout);
         if (gameMap.AddUnit(unit, spawnPosition))
         {
-            var spriteRenderer = unit.GetComponent<SpriteRenderer>();
+            var spriteRenderer = unit.GetComponentInChildren<SpriteRenderer>();
             spriteRenderer.color = ColorFromArray(ruleFaction.Color);
             spriteRenderer.enabled = false; // spawn every unit invisible
-            unit.LoadRules(unitType, ruleFaction, loadout);
+            
             unit.FinishedMoving += UnitFinishedMoving;
             unit.StepCompleted += UnitStepCompleted;
             allUnits.Add(unit);
+            
             //gameMap.UpdateFOV(spawnPosition, unit.visionRange);
             return true;
         }
@@ -516,11 +572,16 @@ public class Game : MonoBehaviour
         var oldPos = args.previousPosition;
         
         var newPos = gameMap.WorldToCell(unit.transform.position);
-        
+
         if (gameMap.IsDoorBetween(oldPos, newPos))
         {
             gameMap.RemoveDoorBetween(unit, oldPos, newPos);
         }
+        if (unit.OccupiedTiles.Count > 1)
+        {
+            gameMap.IsStandingOnDoor(unit, true);
+        }
+        
         gameMap.UpdateFOV(newPos, unit.currentVisionRange);
         UpdateVisibleUnits();
     }

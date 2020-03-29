@@ -19,7 +19,6 @@ public class Unit : MonoBehaviour
     public int currentHealth = 1;
     public int currentArmor = 2;
     public bool canAttack = true;
-
     public RuleFaction Faction { get; set; }
     
     public Vector3Int Cell => gameMap.WorldToCell(transform.position);
@@ -59,6 +58,9 @@ public class Unit : MonoBehaviour
         return melee + ranged;
     } }
 
+    public RuleUnit Rules => unitRules;
+    public List<Vector3Int> OccupiedTiles { get; set; }
+
     public event UnitEvent FinishedMoving;
     public event UnitEvent StepCompleted;
     // Start is called before the first frame update
@@ -66,7 +68,7 @@ public class Unit : MonoBehaviour
     {
         gameMap = FindObjectOfType<Map>();
         mod = FindObjectOfType<Mod>();
-        spriteRenderer = GetComponent<SpriteRenderer>();
+        spriteRenderer = GetComponentInChildren<SpriteRenderer>();
     }
 
     // Update is called once per frame
@@ -83,28 +85,28 @@ public class Unit : MonoBehaviour
         switch (direction)
         {
             case Direction.North:
-                transform.eulerAngles = new Vector3(transform.eulerAngles.x, transform.eulerAngles.y, 0f);
+                spriteRenderer.transform.eulerAngles = new Vector3(spriteRenderer.transform.eulerAngles.x, spriteRenderer.transform.eulerAngles.y, 0f);
                 break;
             case Direction.NorthWest:
-                transform.eulerAngles = new Vector3(transform.eulerAngles.x, transform.eulerAngles.y, 45f);
+                spriteRenderer.transform.eulerAngles = new Vector3(spriteRenderer.transform.eulerAngles.x, spriteRenderer.transform.eulerAngles.y, 45f);
                 break;
             case Direction.West:
-                transform.eulerAngles = new Vector3(transform.eulerAngles.x, transform.eulerAngles.y, 90f);
+                spriteRenderer.transform.eulerAngles = new Vector3(spriteRenderer.transform.eulerAngles.x, spriteRenderer.transform.eulerAngles.y, 90f);
                 break;
             case Direction.SouthWest:
-                transform.eulerAngles = new Vector3(transform.eulerAngles.x, transform.eulerAngles.y, 135f);
+                spriteRenderer.transform.eulerAngles = new Vector3(spriteRenderer.transform.eulerAngles.x, spriteRenderer.transform.eulerAngles.y, 135f);
                 break;
             case Direction.South:
-                transform.eulerAngles = new Vector3(transform.eulerAngles.x, transform.eulerAngles.y, 180f);
+                spriteRenderer.transform.eulerAngles = new Vector3(spriteRenderer.transform.eulerAngles.x, spriteRenderer.transform.eulerAngles.y, 180f);
                 break;
             case Direction.SouthEast:
-                transform.eulerAngles = new Vector3(transform.eulerAngles.x, transform.eulerAngles.y, 225f);
+                spriteRenderer.transform.eulerAngles = new Vector3(spriteRenderer.transform.eulerAngles.x, spriteRenderer.transform.eulerAngles.y, 225f);
                 break;
             case Direction.East:
-                transform.eulerAngles = new Vector3(transform.eulerAngles.x, transform.eulerAngles.y, 270f);
+                spriteRenderer.transform.eulerAngles = new Vector3(spriteRenderer.transform.eulerAngles.x, spriteRenderer.transform.eulerAngles.y, 270f);
                 break;
             case Direction.NorthEast:
-                transform.eulerAngles = new Vector3(transform.eulerAngles.x, transform.eulerAngles.y, 315f);
+                spriteRenderer.transform.eulerAngles = new Vector3(spriteRenderer.transform.eulerAngles.x, spriteRenderer.transform.eulerAngles.y, 315f);
                 break;
         }
     }    
@@ -211,9 +213,14 @@ public class Unit : MonoBehaviour
     public void AnimateMovement(Vector3Int mapPos)
     {
         var oldPos = gameMap.WorldToCell(transform.position);
+        RepositionUnitInWorld(mapPos);
+        OnStepCompleted(oldPos);
+    }
+
+    private void RepositionUnitInWorld(Vector3Int mapPos)
+    {
         var cellToWorld = gameMap.CellToWorld(mapPos);
         transform.position = cellToWorld;
-        OnStepCompleted(oldPos);
     }
 
     public void UnitDeath()
@@ -243,6 +250,27 @@ public class Unit : MonoBehaviour
         currentArmor = unitRules.Armor;
         currentHealth = unitRules.Health;
         movesLeft = unitRules.Movement;
+
+        OccupiedTiles = unitRules.OccupiedTiles.ConvertAll(elem => new Vector3Int(elem[0], elem[1], 0));
+
+        OffsetSprite();
+    }
+
+    private void OffsetSprite()
+    {
+        if (OccupiedTiles.Count == 1)
+            return;
+        
+        int maxX = OccupiedTiles.Max(offset => offset.x);
+        int minX = OccupiedTiles.Min(offset => offset.x);
+            
+        int maxY = OccupiedTiles.Max(offset => offset.y);
+        int minY = OccupiedTiles.Min(offset => offset.y);
+
+        float centerX = (minX + maxX) * 0.5f;
+        float centerY = (minY + maxY) * 0.5f;
+        
+        spriteRenderer.transform.localPosition = new Vector3(centerX, centerY, 0f);
     }
 
     public void HasAttacked()
@@ -270,11 +298,36 @@ public class Unit : MonoBehaviour
     public void MarkAsSelected()
     {
         var unitMarker = gameMap.GetUnitMarker();
-        unitMarker.transform.position = transform.position;
-        unitMarker.transform.SetParent(transform);
+        
         markerRenderer = unitMarker.GetComponent<SpriteRenderer>();
         markerRenderer.enabled = true;
+        SetMarkerSize(unitMarker);
         UpdateMarker();
+    }
+
+    private void SetMarkerSize(GameObject unitMarker)
+    {
+        if (OccupiedTiles.Count == 1)
+        {
+            unitMarker.transform.position = transform.position;
+            unitMarker.transform.SetParent(transform);
+            unitMarker.transform.localScale = new Vector3(1, 1, 1);
+            return;
+        }
+        
+        int maxX = OccupiedTiles.Max(offset => offset.x);
+        int minX = OccupiedTiles.Min(offset => offset.x);
+            
+        int maxY = OccupiedTiles.Max(offset => offset.y);
+        int minY = OccupiedTiles.Min(offset => offset.y);
+
+        int sizeX = (maxX+1) - minX;
+        int sizeY = (maxY+1) - minY;
+
+        unitMarker.transform.localScale = new Vector3(sizeX, sizeY, 1);
+        
+        unitMarker.transform.position = spriteRenderer.transform.position;
+        unitMarker.transform.SetParent(transform);
     }
 
     public void UpdateMarker()

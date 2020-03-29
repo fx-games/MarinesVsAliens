@@ -151,7 +151,7 @@ namespace GridPathFinder
                         output += "*";
                     else if (mGoalNodes.Contains(point))
                         output +=("!");
-                    else if (mNodeMap[y, x] == null || !mMap.IsWalkable(x, y))
+                    else if (mNodeMap[y, x] == null)
                         output +=("#");
                     else if (float.IsPositiveInfinity(mNodeMap[y, x].TentativeDistance))
                         output +=(".");

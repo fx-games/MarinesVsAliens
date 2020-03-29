@@ -60,6 +60,10 @@ factions:
         weapons:
           - STR_MARINE_MELEE
           - STR_RIFLE
+      - unit: STR_DREADNOUGHT
+        count: 1
+        weapons:
+          - STR_ROCKET_LAUNCHER
   - type: STR_BLUE_MARINES
     color: [57,135,203,1]
     loadOut:
@@ -122,6 +126,11 @@ units:
     movement: 6
     health: 1
     armor: 1
+  - type: STR_DREADNOUGHT
+    movement: 4
+    health: 3
+    armor: 4
+    occupiedTiles: [[0,0],[0,1],[1,0],[1,1]]
 
 weapons:
   - type: STR_CLAW_AND_SWORD

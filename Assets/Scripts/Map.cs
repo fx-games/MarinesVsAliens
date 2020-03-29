@@ -243,6 +243,15 @@ public class Map : MonoBehaviour, IGridMap
     {
         return layerMap["Floors"].WorldToCell(pos);
     }
+    
+    
+    public void SetHighlightColor(Color color, int layer = 0)
+    {
+        foreach (var highlight in allHighlights[layer])
+        {
+            highlight.GetComponent<SpriteRenderer>().color = color;
+        }
+    }
 
     public void HighlightTile(Vector3Int mapPos, Color color, int layer = 0)
     {
@@ -256,6 +265,7 @@ public class Map : MonoBehaviour, IGridMap
         {
             Destroy(highlight);
         }
+        allHighlights[layer].Clear();
     }
 
     public Unit GetUnitAt(Vector3Int mapPos)
@@ -653,12 +663,27 @@ public class Map : MonoBehaviour, IGridMap
 
     public bool AddUnit(Unit unit, Vector3Int mapPos)
     {
-        if (IsUnitOn(mapPos))
+        foreach (var offset in unit.OccupiedTiles)
         {
-            return false;
-        }
+            var offsetPos = mapPos + offset;
 
-        unitMap[mapPos.x, mapPos.y] = unit;
+            foreach (var secondOffset in unit.OccupiedTiles)
+            {
+                var offsetPosTwo = mapPos + secondOffset;
+                if (IsWallBetween(offsetPos, offsetPosTwo) || IsDoorBetween(offsetPos, offsetPosTwo))
+                {
+                    return false;
+                }
+            }
+
+            if (!Contains(offsetPos.x, offsetPos.y) || IsUnitOn(offsetPos))
+            {
+                return false;
+            }
+
+            unitMap[offsetPos.x, offsetPos.y] = unit;
+        }
+        
         //RemoveFog(mapPos);
         return true;
     }
@@ -667,7 +692,15 @@ public class Map : MonoBehaviour, IGridMap
     {
         if (IsUnitOn(mapPos))
         {
-            unitMap[mapPos.x, mapPos.y] = null;
+            var unit = GetUnitAt(mapPos);
+            foreach (var offset in unit.OccupiedTiles)
+            {
+                var offsetPos = mapPos + offset;
+                if (IsUnitOn(offsetPos))
+                {
+                    unitMap[offsetPos.x, offsetPos.y] = null;
+                }
+            }
         }
     }
 
@@ -684,25 +717,30 @@ public class Map : MonoBehaviour, IGridMap
 
     public void RemoveDoor(Unit unit, Vector3Int mapPos)
     {
-        if (layerMap["NorthDoors"].HasTile(mapPos))
+        foreach (var offset in unit.OccupiedTiles)
         {
-            // door is above
-            RemoveDoorBetween(unit, mapPos, mapPos + Vector3Int.up);
-        }
-        else if (layerMap["SouthDoors"].HasTile(mapPos))
-        {
-            // door is below
-            RemoveDoorBetween(unit, mapPos, mapPos + Vector3Int.down);
-        }
-        else if (layerMap["EastDoors"].HasTile(mapPos))
-        {
-            // door is right
-            RemoveDoorBetween(unit, mapPos, mapPos + Vector3Int.right);
-        }
-        else if (layerMap["WestDoors"].HasTile(mapPos))
-        {
-            // door is left
-            RemoveDoorBetween(unit, mapPos, mapPos + Vector3Int.left);
+            var offsetPos = mapPos + offset;
+            
+            if (layerMap["NorthDoors"].HasTile(offsetPos))
+            {
+                // door is above
+                RemoveDoorBetween(unit, offsetPos, offsetPos + Vector3Int.up);
+            }
+            else if (layerMap["SouthDoors"].HasTile(offsetPos))
+            {
+                // door is below
+                RemoveDoorBetween(unit, offsetPos, offsetPos + Vector3Int.down);
+            }
+            else if (layerMap["EastDoors"].HasTile(offsetPos))
+            {
+                // door is right
+                RemoveDoorBetween(unit, offsetPos, offsetPos + Vector3Int.right);
+            }
+            else if (layerMap["WestDoors"].HasTile(offsetPos))
+            {
+                // door is left
+                RemoveDoorBetween(unit, offsetPos, offsetPos + Vector3Int.left);
+            }
         }
     }
     public void RemoveDoorBetween(Unit unit, Vector3Int oldMapPos, Vector3Int newMapPos)
@@ -805,7 +843,7 @@ public class Map : MonoBehaviour, IGridMap
         }
     }
 
-    public bool IsWalkable(int x, int y)
+    public bool IsWalkable(Unit unit, int x, int y)
     {
         return layerMap["Floors"].HasTile(new Vector3Int(x,y,0));
     }
@@ -837,7 +875,28 @@ public class Map : MonoBehaviour, IGridMap
         };
         foreach (var neighbor in neighbors)
         {
-            if (IsNeighborReachable(mapPos, neighbor) && Contains(neighbor.x, neighbor.y) && !IsOtherFactionOn(currentUnit, neighbor))
+            bool allOccupiedTilesCanMove = true;
+            foreach (var offset in currentUnit.OccupiedTiles) // handles large units
+            {
+                foreach (var secondOffset in currentUnit.OccupiedTiles)
+                {
+                    if (IsWallBetween(neighbor + offset, neighbor + secondOffset))
+                    {
+                        allOccupiedTilesCanMove = false;
+                        break;
+                    }
+                }
+                if (!allOccupiedTilesCanMove ||
+                    !IsNeighborReachable(mapPos + offset, neighbor + offset) ||
+                    !Contains(neighbor.x + +offset.x, neighbor.y + +offset.y) ||
+                    IsOtherFactionOn(currentUnit, neighbor + offset))
+                {
+                    allOccupiedTilesCanMove = false;
+                    break;
+                }
+            }
+
+            if (allOccupiedTilesCanMove)
             {
                 reachableNeighbors.Add(neighbor);
             }
@@ -942,5 +1001,28 @@ public class Map : MonoBehaviour, IGridMap
     public void HideUnitMarker()
     {
         unitSelectedMarker.GetComponent<SpriteRenderer>().enabled = false;
+    }
+
+    public bool IsStandingOnDoor(Unit unit, bool removeDoor = false)
+    {
+        bool thereIsADoor = false;
+        foreach (var offsetOne in unit.OccupiedTiles)
+        {
+            var tileOne = unit.Cell + offsetOne;
+            foreach (var offsetTwo in unit.OccupiedTiles)
+            {
+                var tileTwo = unit.Cell + offsetTwo;
+                if (IsDoorBetween(tileOne, tileTwo))
+                {
+                    if (removeDoor)
+                    {
+                        RemoveDoorBetween(unit, tileOne, tileTwo);
+                    }
+
+                    thereIsADoor = true;
+                }
+            }
+        }
+        return thereIsADoor;
     }
 }
