@@ -26,7 +26,6 @@ namespace DefaultNamespace
         bool Contains(int x, int y);
         bool AreNeighbors(Vector3Int posOne, Vector3Int posTwo, bool includeDiagonals = false);
         List<Vector3Int> AreaOfEffect(Vector3Int unitPos, Weapon weapon, Vector3Int mapPos);
-        float GetEuclideanDistance(Vector3Int pointOne, Vector3Int pointTwo);
         bool IsOtherFactionOn(IPlayerUnit unit, Vector3Int pos);
         bool CanBePlaced(IPlayerUnit unit, Vector3Int mapPos, bool doorsAreBlocking = true);
         bool IsOtherUnitOn(IPlayerUnit unit, Vector3Int mapPos);

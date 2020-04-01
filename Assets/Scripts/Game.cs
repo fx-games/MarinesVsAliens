@@ -556,7 +556,7 @@ public class Game : MonoBehaviour
         }
         
     }
-
+    
     private bool SpawnUnit(Vector3Int spawnPosition, string unitType, RuleLoadout loadout, RuleFaction ruleFaction)
     {
         var unit = Instantiate(unitPrefab, _map.CellToWorld(spawnPosition), Quaternion.identity)

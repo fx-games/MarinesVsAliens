@@ -68,10 +68,12 @@
     <Compile Include="Assets\Scripts\AI\SubsumptionBehavior.cs" />
     <Compile Include="Assets\Scripts\AI\SubsumptionScheduler.cs" />
     <Compile Include="Assets\Scripts\CameraControls.cs" />
+    <Compile Include="Assets\Scripts\DungeonGenerator.cs" />
     <Compile Include="Assets\Scripts\FloorTile.cs" />
     <Compile Include="Assets\Scripts\Game.cs" />
     <Compile Include="Assets\Scripts\IGridMap.cs" />
     <Compile Include="Assets\Scripts\Map.cs" />
+    <Compile Include="Assets\Scripts\MapFromScript.cs" />
     <Compile Include="Assets\Scripts\Mod.cs" />
     <Compile Include="Assets\Scripts\Pathfinder.cs" />
     <Compile Include="Assets\Scripts\PlayerInterface.cs" />
