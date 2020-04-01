@@ -2,14 +2,18 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using DefaultNamespace;
 using GridPathFinder.Map;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.Tilemaps;
+using static Map;
 using static Mod;
 using Color = UnityEngine.Color;
 using Random = UnityEngine.Random;
 
-public class Map : MonoBehaviour, IGridMap
+
+public class Map : MonoBehaviour, IGridMap, IPlayerMap
 {
     public enum Direction
     {
@@ -21,8 +25,11 @@ public class Map : MonoBehaviour, IGridMap
         SouthEast,
         NorthWest,
         SouthWest,
+        None       
     }
 
+    public Direction[] Cardinal => new[] {Direction.East, Direction.West, Direction.North, Direction.South};
+    
     public enum Axis
     {
         Horizontal,
@@ -31,19 +38,22 @@ public class Map : MonoBehaviour, IGridMap
     public GameObject selectionRectPrefab;
     private GameObject selectionRect;
     private GameObject unitSelectedMarker; 
-    public Tile floorTile;
+    public Tile[] floorTiles;
     public Tile[] walls;  // ORDER: NESW
-    public Tile[] verticalDoors;
-    public Tile[] horizontalDoors;
+    public Tile[] doors;
 
-    private Dictionary<string, Tilemap> layerMap = new Dictionary<string, Tilemap>();
-    private Unit[,] unitMap;
+    protected Dictionary<string, Tilemap> layerMap = new Dictionary<string, Tilemap>();
+    protected Unit[,] unitMap;
     private Camera gameCamera;
     public GameObject blanktilePrefab;
     private List<GameObject>[] allHighlights = new List<GameObject>[4]{ new List<GameObject>(), new List<GameObject>(), new List<GameObject>(), new List<GameObject>()};
     public Vector3Int CurrentCursorPosition { get; private set; }
     private HashSet<Vector3Int> visibleTiles = new HashSet<Vector3Int>();
     private Mod mod;
+    private int genCurrentRegion = -1;
+    private Dictionary<Vector3Int, int> genRegions = new Dictionary<Vector3Int, int>();
+    private int extraConnectorChance = 5;
+    private List<RectInt> genRooms;
 
     // Start is called before the first frame update
     void Awake()
@@ -68,8 +78,300 @@ public class Map : MonoBehaviour, IGridMap
         }
     }
 
-    private void InitializeMap(int width, int height)
+    private void Generator(int width, int height)
     {
+        if (width % 2 == 0 || height % 2 == 0)
+        {
+            throw new ArgumentException("Size must be odd.");
+        }
+        InitializeMap(width, height);
+        
+        // fill all with walls, we carve in the following steps
+        layerMap["Walls"].BoxFill(new Vector3Int(1, 1, 0), walls[0], 0, 0, Width, Height);
+        
+        int roomTries = 200;
+        genRooms = new List<RectInt>();
+        
+        for (int i = 0; i < roomTries; i++)
+        {
+            RectInt room = TryCreateRandomRoom();
+            if (room.size != Vector2Int.zero)
+            {
+                genRooms.Add(room);
+            }
+        }
+        
+        for (var y = 1; y < height; y += 2) {
+            for (var x = 1; x < width; x += 2) {
+                if (!IsWallAt(x,y)) continue;
+                GrowMaze(new Vector3Int(x, y, 0));
+            }
+        }
+
+        ConnectRegions();
+        RemoveDeadEnds();
+        
+        foreach (var room in genRooms)
+        {
+            DecorateRoom(room);
+        }
+    }
+
+    private void DecorateRoom(RectInt room)
+    {
+        
+    }
+
+    private void RemoveDeadEnds()
+    {
+        var done = false;
+
+        while (!done)
+        {
+            done = true;
+            foreach (var pos in RectToList(1, 1, Width - 1, Height - 1))
+            {
+                if (IsWallAt(pos)) continue;
+
+                var exits = 0;
+
+                foreach (var neighborDirection in Cardinal)
+                {
+                    if (!IsWallAt(GetNeighbour(pos, neighborDirection))) exits++;
+                }
+                
+                if (exits != 1) continue;
+
+                done = false;
+                
+                AddWall(pos);
+                if (IsDoorAt(pos))
+                {
+                    RemoveDoor(pos);
+                }
+            }
+        }
+    }
+
+    private void RemoveDoor(Vector3Int pos)
+    {
+        layerMap["Doors"].SetTile(pos, null);
+    }
+
+    private void ConnectRegions()
+    {
+        Dictionary<Vector3Int, HashSet<int>> connectorRegions = new Dictionary<Vector3Int, HashSet<int>>();
+        foreach (var pos in RectToList(1,1,Width - 1, Height - 1))
+        {
+            if (!IsWallAt(pos)) continue;
+            
+            HashSet<int> regions = new HashSet<int>();
+
+            foreach (var neighborDirection in Cardinal)
+            {
+                var lookupPos = pos + neighborDirection.ToVector();
+                if (genRegions.ContainsKey(lookupPos))
+                {
+                    int region = genRegions[lookupPos];
+                    if (region != -1) regions.Add(region);
+                }
+            }
+            
+            if (regions.Count < 2) continue;
+
+            connectorRegions[pos] = regions;
+        }
+
+        List<Vector3Int> connectors = new List<Vector3Int>(connectorRegions.Keys);
+
+        var merged = new int[genCurrentRegion+1];
+        var openRegions = new HashSet<int>();
+
+        for (int i = 0; i <= genCurrentRegion; i++)
+        {
+            merged[i] = i;
+            openRegions.Add(i);
+        }
+
+        while (openRegions.Count > 1)
+        {
+            var randomIndex = Random.Range(0, connectors.Count);
+            Vector3Int connector = connectors.ElementAt(randomIndex);
+            AddJunction(connector);
+            var regions = connectorRegions[connector].Select(elem => merged[elem]);
+            var dest = regions.First();
+            var sources = regions.Skip(1).ToList();
+            
+            for (var i = 0; i <= genCurrentRegion; i++) {
+                if (sources.Contains(merged[i])) {
+                    merged[i] = dest;
+                }
+            }
+
+            openRegions.RemoveWhere(item => sources.Contains(item));
+            connectors.RemoveAll(pos =>
+            {
+                if (AreNeighbors(connector, pos, true)) return true;
+                
+                if ((connector - pos).magnitude < 2) return true;
+
+                var conRegions = new HashSet<int>(connectorRegions[pos].Select(region => merged[region]));
+                if (conRegions.Count > 1) return false;
+
+                if (Random.Range(1, extraConnectorChance + 1) == 1)
+                {
+                    //AddJunction(pos);
+                }
+
+                return true;
+            });
+        }
+    }
+
+    private void AddJunction(Vector3Int connector)
+    {
+        layerMap["Floors"].SetTile(connector, floorTiles[0]);
+        layerMap["Walls"].SetTile(connector, null);
+        CreateDoor(connector.x, connector.y);
+    }
+
+    private void GrowMaze(Vector3Int start)
+    {
+        List<Vector3Int> cells = new List<Vector3Int>();
+        Direction lastDirection = Direction.North;
+
+        genCurrentRegion++;
+        
+        CarveMaze(start);
+        
+        cells.Add(start);
+
+        while (cells.Count > 0)
+        {
+            var cell = cells.Last();
+            var unmadeCells = new List<Direction>();
+            
+            foreach (var neighborDirection in Cardinal)
+            {
+                
+                if (CanCarve(cell, neighborDirection))
+                {
+                    unmadeCells.Add(neighborDirection);
+                }
+            }
+
+            if (unmadeCells.Count > 0)
+            {
+                int windingPercent = 23;
+                Direction direction;
+                if (unmadeCells.Contains(lastDirection) && Random.Range(0, 100) > windingPercent)
+                {
+                    direction = lastDirection;
+                }
+                else
+                {
+                    direction = unmadeCells[Random.Range(0, unmadeCells.Count)];
+                }
+
+                var firstCarvePos = GetNeighbour(cell, direction);
+                var secondCarvePos = GetNeighbour(firstCarvePos, direction);
+
+                RemoveWallAt(firstCarvePos);
+                RemoveWallAt(secondCarvePos);
+                
+                cells.Add(secondCarvePos);
+
+                lastDirection = direction;
+            }
+            else
+            {
+                cells.RemoveAt(cells.Count - 1);
+
+                lastDirection = Direction.None;
+            }
+        }
+    }
+
+    private bool CanCarve(Vector3Int cell, Direction direction)
+    {
+        var endPos = cell + direction.ToVector() * 3;
+        if (!Contains(endPos.x, endPos.y)) return false;
+
+        return IsWallAt(cell + direction.ToVector() * 2);
+    }
+
+    private void CarveMaze(Vector3Int pos)
+    {
+        layerMap["Floors"].SetTile(pos, floorTiles[0]);
+        RemoveWallAt(pos);
+    }
+
+    private RectInt TryCreateRandomRoom() // by removing walls, do not create rooms where we already carved
+    {
+        RectInt room = new RectInt(0,0,0,0);
+        var lowerLeft = RandomPosition;
+        
+        if (lowerLeft.x % 2 == 0) lowerLeft.x = Random.value > 0.5 ? lowerLeft.x + 1 : lowerLeft.x - 1;
+        if (lowerLeft.y % 2 == 0) lowerLeft.y = Random.value > 0.5 ? lowerLeft.y + 1 : lowerLeft.y - 1;
+
+        
+        var width = Random.Range(3, 5);
+        var height = Random.Range(3, 5);
+
+        height = height % 2 == 0 ? height + 1 : height;
+        width = width % 2 == 0 ? width + 1 : width;
+
+        int x = Random.Range(0, (int) (Math.Truncate((Width - width) / 2d))) * 2 + 1;
+        int y = Random.Range(0, (int) (Math.Truncate((Height - height) / 2d))) * 2 + 1;
+        
+        room.x = lowerLeft.x;
+        room.y = lowerLeft.y;
+        room.SetMinMax(new Vector2Int(lowerLeft.x,lowerLeft.y), new Vector2Int(lowerLeft.x + width, lowerLeft.y + height));
+        
+        if (room.xMin <= 0 || room.xMax >= Width - 1 || room.yMin <= 0 || room.yMax >= Height - 1)
+            return new RectInt(0,0,0,0);
+        
+        foreach (var existingRoom in genRooms)
+        {
+            if (existingRoom.Overlaps(room))
+            {
+                return new RectInt(0,0,0,0);
+            }
+        }
+        
+        genCurrentRegion++;
+        
+        CarveOut(room);
+
+        return room;
+    }
+
+    private void CarveOut(RectInt room)
+    {
+        foreach (var pos in room.allPositionsWithin)
+        {
+            var roomTile = new Vector3Int(pos.x, pos.y, 0);
+            RemoveWallAt(roomTile);   
+        }
+    }
+
+    private void RemoveWallAt(Vector3Int pos)
+    {
+        layerMap["Walls"].SetTile(pos, null);
+        TileData tiledata = new TileData();
+        var tile = (FloorTile) layerMap["Floors"].GetTile(pos);
+        tile.tileColor = IntToColor(genCurrentRegion);
+        genRegions[pos] = genCurrentRegion;
+    }
+
+    private Color IntToColor(int regionIndex)
+    {
+        return ColorsAsList().ElementAt(regionIndex);
+    }
+
+    protected virtual void InitializeMap(int width, int height)
+    {
+        
         foreach (var kvp in layerMap)
         {
             var layer = kvp.Value;
@@ -79,10 +381,9 @@ public class Map : MonoBehaviour, IGridMap
 
         Width = width;
         Height = height;
-        
         unitMap = new Unit[Width, Height];
-        layerMap["Floors"].BoxFill(new Vector3Int(1,1,0), floorTile, 0,0,Width,Height);
-        layerMap["FogOfWar"].BoxFill(new Vector3Int(1,1,0), floorTile, 0,0,Width,Height);
+        layerMap["Floors"].BoxFill(new Vector3Int(1, 1, 0), floorTiles[0], 0, 0, Width, Height);
+        layerMap["FogOfWar"].BoxFill(new Vector3Int(1, 1, 0), floorTiles[0], 0, 0, Width, Height);
     }   
     private void Start()
     {
@@ -91,7 +392,9 @@ public class Map : MonoBehaviour, IGridMap
 
     public void FromRules(RuleMap mapRules)
     {
-        InitializeMap(mapRules.Size[0], mapRules.Size[1]);
+        Generator(25,25);
+        //InitializeMap(mapRules.Size[0], mapRules.Size[1]);
+        /*
         foreach (var mapScriptCommand in mapRules.MapScript)
         {
             if (mapScriptCommand.Command.ToLower().Equals("placeblock"))
@@ -103,6 +406,8 @@ public class Map : MonoBehaviour, IGridMap
                 } 
             }
         }
+        */
+        
     }
 
     private void PlaceMapBlock(int[] offset, string blockName)
@@ -114,115 +419,49 @@ public class Map : MonoBehaviour, IGridMap
         }
         foreach (var wall in block.HorizontalWalls)
         {
-            CreateWalls(wall[0] + offset[0], wall[1] + offset[1], wall[2] + offset[0], wall[3] + offset[1], Axis.Horizontal);
+            CreateWalls(wall[0] + offset[0], wall[1] + offset[1], wall[2] + offset[0], wall[3] + offset[1]);
         }
         foreach (var wall in block.VerticalWalls)
         {
-            CreateWalls(wall[0] + offset[0], wall[1] + offset[1], wall[2] + offset[0], wall[3] + offset[1], Axis.Vertical);
+            CreateWalls(wall[0] + offset[0], wall[1] + offset[1], wall[2] + offset[0], wall[3] + offset[1]);
         }
         foreach (var door in block.HorizontalDoors)
         {
-            CreateDoor(door[0] + offset[0], door[1] + offset[1], door[2] + offset[0], door[3] + offset[1], Axis.Horizontal);
+            CreateDoor(door[0] + offset[0], door[1] + offset[1]);
         }
         foreach (var door in block.VerticalDoors)
         {
-            CreateDoor(door[0] + offset[0], door[1] + offset[1], door[2] + offset[0], door[3] + offset[1], Axis.Vertical);
+            CreateDoor(door[0] + offset[0], door[1] + offset[1]);
         }
     }
 
-    private void SetupWalls()
+    private void CreateDoor(int x, int y)
     {
-        CreateRoom(0, 7, 4, 11);
-        CreateDoor(1, 6, 2, 7, Axis.Horizontal);
-        
-        CreateRoom(2, 2, 6, 4);
-        CreateDoor(4, 1, 5, 2, Axis.Horizontal);
-        
-        CreateRoom(7, 0, 11, 4);
-        CreateDoor(9, 4, 10, 5, Axis.Horizontal);
-
-        CreateWalls(6, 5, 7, 9, Axis.Vertical);
-        CreateWalls(9, 8, 10, 9, Axis.Vertical);
-        CreateWalls(9, 9, 9, 10, Axis.Horizontal);
-        CreateWalls(10, 7, 11, 8, Axis.Horizontal);
-
-        CreateDoor(7, 9, 8, 10, Axis.Horizontal);
-    }
-
-    private void CreateDoor(int x0, int y0, int x1, int y1, Axis axis)
-    {
-        Vector3Int lowerLeft = new Vector3Int(x0, y0, 0);
-        Vector3Int upperLeft = new Vector3Int(x0, y1, 0);
-            
-        Vector3Int lowerRight= new Vector3Int(x1, y0, 0);
-        Vector3Int upperRight = new Vector3Int(x1, y1, 0);
-        
-        if (axis == Axis.Horizontal)
-        {
-            layerMap["NorthWalls"].SetTile(lowerLeft, null);
-            layerMap["NorthWalls"].SetTile(lowerRight, null);
-            layerMap["NorthDoors"].SetTile(lowerLeft, horizontalDoors[0]);
-            layerMap["NorthDoors"].SetTile(lowerRight, horizontalDoors[1]);
-            
-            layerMap["SouthWalls"].SetTile(upperLeft, null);
-            layerMap["SouthWalls"].SetTile(upperRight, null);
-            layerMap["SouthDoors"].SetTile(upperLeft, horizontalDoors[2]);
-            layerMap["SouthDoors"].SetTile(upperRight, horizontalDoors[3]);
-        }
-        else if (axis == Axis.Horizontal)
-        {
-            layerMap["EastWalls"].SetTile(lowerLeft, null);
-            layerMap["WestWalls"].SetTile(lowerRight, null);
-            layerMap["EastDoors"].SetTile(lowerLeft, horizontalDoors[0]);
-            layerMap["WestDoors"].SetTile(lowerRight, horizontalDoors[1]);
-            
-            layerMap["EastWalls"].SetTile(upperLeft, null);
-            layerMap["WestWalls"].SetTile(upperRight, null);
-            layerMap["EastDoors"].SetTile(upperLeft, horizontalDoors[2]);
-            layerMap["WestDoors"].SetTile(upperRight, horizontalDoors[3]);
-        }
+        layerMap["Doors"].SetTile(new Vector3Int(x,y,0), doors[0]);
     }
 
     private void CreateRoom(int x0, int y0, int x1, int y1)
     {
-        CreateWalls(x0, y0 - 1, x1, y0, Axis.Horizontal); // southern walls        
-        CreateWalls(x0, y1, x1, y1 + 1, Axis.Horizontal); // northern walls
-        CreateWalls(x0 - 1, y0, x0, y1, Axis.Vertical); // western walls
-        CreateWalls(x1, y0, x1 + 1, y1, Axis.Vertical); // eastern walls
+        CreateWalls(x0, y0 - 1, x1, y0); // southern walls        
+        CreateWalls(x0, y1, x1, y1 + 1); // northern walls
+        CreateWalls(x0 - 1, y0, x0, y1); // western walls
+        CreateWalls(x1, y0, x1 + 1, y1); // eastern walls
     }
-    
-    private void CreateWalls(int x0, int y0, int x1, int y1, Axis axis)
+
+    protected virtual void CreateWalls(int x0, int y0, int x1, int y1)
     {
-        for (int x = x0; x <= x1; x++)
+        for (int xCount = x0; xCount <= x1; xCount++)
         {
-            for (int y = y0; y <= y1; y++)
+            for (int yCount = y0; yCount <= y1; yCount++)
             {
+                int x = xCount;
+                int y = yCount;
+                
                 if (!Contains(x,y))
                     continue;
                 var currentPos = new Vector3Int(x,y,0);
-                
-                if (axis == Axis.Horizontal)
-                {
-                    if (y == y0) // lower row
-                    {
-                        AddWall(currentPos, Direction.North);
-                    }
-                    else if (y == y1) // upper row
-                    {
-                        AddWall(currentPos, Direction.South);
-                    }
-                }
-                else if (axis == Axis.Vertical)
-                {
-                    if (x == x0) // left col
-                    {
-                        AddWall(currentPos, Direction.East);
-                    }
-                    else if (x == x1) // right col
-                    {
-                        AddWall(currentPos, Direction.West);
-                    }
-                }
+
+                AddWall(currentPos);
             }
         }
     }
@@ -268,7 +507,7 @@ public class Map : MonoBehaviour, IGridMap
         allHighlights[layer].Clear();
     }
 
-    public Unit GetUnitAt(Vector3Int mapPos)
+    public IPlayerUnit GetUnitAt(Vector3Int mapPos)
     {
         return unitMap[mapPos.x, mapPos.y];
     }
@@ -292,7 +531,7 @@ public class Map : MonoBehaviour, IGridMap
     {
         HashSet<Vector3Int> linePositions = new HashSet<Vector3Int>();
         var prevPos = unitPos;
-        Vector3Int rayDirVector = ToVector(rayDirection);
+        Vector3Int rayDirVector = rayDirection.ToVector();
         for (int i = 0; i < maxDistance; i++)
         {
             var nextPos = prevPos + rayDirVector;
@@ -331,29 +570,7 @@ public class Map : MonoBehaviour, IGridMap
         return linePositions;
     }
 
-    private Vector3Int ToVector(Direction direction)
-    {
-        switch (direction)
-        {
-            case Direction.North:
-                return Vector3Int.up;
-            case Direction.NorthWest:
-                return Vector3Int.up + Vector3Int.left;
-            case Direction.West:
-                return Vector3Int.left;
-            case Direction.SouthWest:
-                return Vector3Int.down + Vector3Int.left;
-            case Direction.South:
-                return Vector3Int.down;
-            case Direction.SouthEast:
-                return Vector3Int.down + Vector3Int.right;
-            case Direction.East:
-                return Vector3Int.right;
-            case Direction.NorthEast:
-                return Vector3Int.up + Vector3Int.right;
-        }
-        return Vector3Int.zero;
-    }
+
 
     public HashSet<Vector3Int> GetFOV(Vector3Int position, int radius, bool unitsAreBlocking = false)
     {
@@ -435,212 +652,75 @@ public class Map : MonoBehaviour, IGridMap
         return true;
     }
 
-    public void ResetFog()
+    public virtual void ResetFog()
     {
         layerMap["FogOfWar"].ClearAllTiles();
-        layerMap["FogOfWar"].FloodFill(new Vector3Int(Width-1,Height-1,0), floorTile);
+        layerMap["FogOfWar"].FloodFill(new Vector3Int(Width-1,Height-1,0), floorTiles[0]);
     }
     
-    private void RemoveFog(Vector3Int position)
+    protected virtual void RemoveFog(Vector3Int position)
     {
         layerMap["FogOfWar"].SetTile(position, null);
     }
 
-    public bool IsInFog(Vector3Int position)
+    public virtual bool IsInFog(Vector3Int position)
     {
         return layerMap["FogOfWar"].HasTile(position);
     }
-    
-    private bool IsNeighborReachable(Vector3Int tileOne, Vector3Int tileTwo)
+
+    public bool IsNeighborReachable(IPlayerUnit unit, Vector3Int oldPos, Vector3Int newPos)
     {
-        if (!Contains(tileOne.x, tileOne.y) || !Contains(tileTwo.x, tileTwo.y))
-        {
-            return false;
-        }
-        if (tileOne.x == tileTwo.x || tileOne.y == tileTwo.y)
-        {
-            return !IsWallBetween(tileOne, tileTwo);
-        }
-
         // handle diagonal cases
+        if (oldPos.x != newPos.x && oldPos.y != newPos.y)
+        {
+            var dx = oldPos.x - newPos.x;
+            var dy = oldPos.y - newPos.y;
+            // one is to the top right of two
+            var vertTile = new Vector3Int(newPos.x + dx, newPos.y, 0);
+            var horiTile = new Vector3Int(newPos.x, newPos.y + dy, 0);
 
-        var dx = tileOne.x - tileTwo.x;
-        var dy = tileOne.y - tileTwo.y;
-        // one is to the top right of two
-        var vertTile = new Vector3Int(tileTwo.x + dx, tileTwo.y, 0);
-        var horiTile = new Vector3Int(tileTwo.x, tileTwo.y + dy, 0);
-
-        var oneToVertBlocked = IsWallBetween(tileOne, vertTile) || IsDoorBetween(tileOne, vertTile);
-        var oneToHoriBlocked = IsWallBetween(tileOne, horiTile) || IsDoorBetween(tileOne, horiTile);
-
-        var vertToTwoBlocked = IsWallBetween(vertTile, tileTwo) || IsDoorBetween(vertTile, tileTwo);
-        var horiToTwoBlocked = IsWallBetween(horiTile, tileTwo) || IsDoorBetween(horiTile, tileTwo);
-
-        if (oneToHoriBlocked && oneToVertBlocked)
-            return false;
-
-        if (oneToHoriBlocked && vertToTwoBlocked)
-            return false;
-
-        if (oneToVertBlocked && horiToTwoBlocked)
-            return false;
-
-        if (vertToTwoBlocked && horiToTwoBlocked)
-            return false;
-
-        return true;
+            if (IsWallAt(vertTile) || IsWallAt(horiTile)) // no diagonal walking around and through walls
+            {
+                return false;
+            }
+        }
+        
+        return CanBePlaced(unit, newPos, false);
     }
-    bool IsNeighborVisible(Vector3Int tileOne, Vector3Int tileTwo)
+
+    public bool IsNeighborVisible(Vector3Int oldPos, Vector3Int newPos)
     {
-        if (!Contains(tileOne.x, tileOne.y) || !Contains(tileTwo.x, tileTwo.y))
+        if (!Contains(oldPos.x, oldPos.y) || !Contains(newPos.x, newPos.y))
         {
             return false;
         }
-        if (tileOne.x == tileTwo.x || tileOne.y == tileTwo.y)
+        if (IsWallAt(oldPos) || IsWallAt(newPos))
         {
-            return !IsWallBetween(tileOne, tileTwo) && !IsDoorBetween(tileOne, tileTwo);
+            return false;
         }
 
-        // handle diagonal cases
+        if (oldPos.x != newPos.x && oldPos.y != newPos.y)
+        {
+            var dx = oldPos.x - newPos.x;
+            var dy = oldPos.y - newPos.y;
+            // one is to the top right of two
+            var vertTile = new Vector3Int(newPos.x + dx, newPos.y, 0);
+            var horiTile = new Vector3Int(newPos.x, newPos.y + dy, 0);
 
-        var dx = tileOne.x - tileTwo.x;
-        var dy = tileOne.y - tileTwo.y;
-        // one is to the top right of two
-        var vertTile = new Vector3Int(tileTwo.x + dx, tileTwo.y, 0);
-        var horiTile = new Vector3Int(tileTwo.x, tileTwo.y + dy, 0);
-
-        var oneToVertBlocked = IsWallBetween(tileOne, vertTile) || IsDoorBetween(tileOne, vertTile);
-        var oneToHoriBlocked = IsWallBetween(tileOne, horiTile) || IsDoorBetween(tileOne, horiTile);
-
-        var vertToTwoBlocked = IsWallBetween(vertTile, tileTwo) || IsDoorBetween(vertTile, tileTwo);
-        var horiToTwoBlocked = IsWallBetween(horiTile, tileTwo) || IsDoorBetween(horiTile, tileTwo);
-
-        if (oneToHoriBlocked && oneToVertBlocked)
-            return false;
-
-        if (oneToHoriBlocked && vertToTwoBlocked)
-            return false;
-
-        if (oneToVertBlocked && horiToTwoBlocked)
-            return false;
-
-        if (vertToTwoBlocked && horiToTwoBlocked)
-            return false;
-
+            if (IsWallAt(vertTile) || IsWallAt(horiTile)) // no diagonal looking around and through walls
+            {
+                return false;
+            }
+        }
         return true;
     }
 
-    public bool IsWallBetween(Vector3Int tileOne, Vector3Int tileTwo)
+    protected virtual void AddWall(Vector3Int pos, int wallIndex = 0)
     {
-        if (tileOne.Equals(tileTwo)) return false;
-        if (tileOne.y == tileTwo.y)
-        {
-            if (tileOne.x - tileTwo.x == 1)
-            {
-                // one is to the right of two
-                // two (east)  -> one (west)
-                return layerMap["EastWalls"].HasTile(tileTwo)
-                       || layerMap["WestWalls"].HasTile(tileOne);
-            }
-            if (tileOne.x - tileTwo.x == -1)
-            {
-                return layerMap["EastWalls"].HasTile(tileOne) 
-                       || layerMap["WestWalls"].HasTile(tileTwo);
-            }
-        }
-        else if (tileOne.x == tileTwo.x)
-        {
-            if (tileOne.y - tileTwo.y == 1)
-            {
-                // one is on top of two
-                // two (north)  -> one (south)
-                return layerMap["NorthWalls"].HasTile(tileTwo)
-                       || layerMap["SouthWalls"].HasTile(tileOne);
-            }
-            if (tileOne.y - tileTwo.y == -1)
-            {
-                return layerMap["NorthWalls"].HasTile(tileOne)
-                       || layerMap["SouthWalls"].HasTile(tileTwo);
-            }
-        }
-        return false;
-    }
-    
-    public bool IsDoorBetween(Vector3Int tileOne, Vector3Int tileTwo)
-    {
-        if (tileOne.Equals(tileTwo)) return false;
-        if (tileOne.y == tileTwo.y)
-        {
-            if (tileOne.x - tileTwo.x == 1)
-            {
-                // one is to the right of two
-                // two (east)  -> one (west)
-                return layerMap["EastDoors"].HasTile(tileTwo)
-                       || layerMap["WestDoors"].HasTile(tileOne);
-            }
-            if (tileOne.x - tileTwo.x == -1)
-            {
-                return layerMap["EastDoors"].HasTile(tileOne) 
-                       || layerMap["WestDoors"].HasTile(tileTwo);
-            }
-        }
-        else if (tileOne.x == tileTwo.x)
-        {
-            if (tileOne.y - tileTwo.y == 1)
-            {
-                // one is on top of two
-                // two (north)  -> one (south)
-                return layerMap["NorthDoors"].HasTile(tileTwo)
-                       || layerMap["SouthDoors"].HasTile(tileOne);
-            }
-            if (tileOne.y - tileTwo.y == -1)
-            {
-                return layerMap["NorthDoors"].HasTile(tileOne)
-                       || layerMap["SouthDoors"].HasTile(tileTwo);
-            }
-        }
-        return false;
+        if (Contains(pos.x, pos.y)) layerMap["Walls"].SetTile(pos, walls[wallIndex]);
     }
 
-    void AddWall(Vector3Int tilePos, Direction direction)
-    {
-        AddWall(tilePos, GetNeighbour(tilePos, direction));
-    }
-    void AddWall(Vector3Int tileOne, Vector3Int tileTwo)
-    {
-        if (tileOne.y == tileTwo.y)
-        {
-            if (tileOne.x - tileTwo.x == 1)
-            {
-                // one is to the right of two
-                // two (east)  -> one (west)
-                if (Contains(tileTwo.x, tileTwo.y)) layerMap["EastWalls"].SetTile(tileTwo, walls[1]);
-                if (Contains(tileOne.x, tileOne.y)) layerMap["WestWalls"].SetTile(tileOne, walls[3]);
-            }
-            else if (tileOne.x - tileTwo.x == -1)
-            {
-                if (Contains(tileOne.x, tileOne.y)) layerMap["EastWalls"].SetTile(tileOne, walls[1]);
-                if (Contains(tileTwo.x, tileTwo.y)) layerMap["WestWalls"].SetTile(tileTwo, walls[3]);
-            }
-        }
-        else if (tileOne.x == tileTwo.x)
-        {
-            if (tileOne.y - tileTwo.y == 1)
-            {
-                // one is on top of two
-                // two (north)  -> one (south)
-                if (Contains(tileTwo.x, tileTwo.y)) layerMap["NorthWalls"].SetTile(tileTwo, walls[0]);
-                if (Contains(tileOne.x, tileOne.y)) layerMap["SouthWalls"].SetTile(tileOne, walls[2]);
-            }
-            else if (tileOne.y - tileTwo.y == -1)
-            {
-                if (Contains(tileOne.x, tileOne.y)) layerMap["NorthWalls"].SetTile(tileOne, walls[0]);
-                if (Contains(tileTwo.x, tileTwo.y)) layerMap["SouthWalls"].SetTile(tileTwo, walls[2]);
-            }
-        }
-    }
-
-    Vector3Int GetNeighbour(Vector3Int position, Direction direction)
+    public virtual Vector3Int GetNeighbour(Vector3Int position, Direction direction)
     {
         switch (direction)
         {
@@ -707,129 +787,30 @@ public class Map : MonoBehaviour, IGridMap
         {
             var offsetPos = mapPos + offset;
             
-            if (layerMap["NorthDoors"].HasTile(offsetPos))
+            if (IsDoorAt(offsetPos))
             {
                 // door is above
-                RemoveDoorBetween(unit, offsetPos, offsetPos + Vector3Int.up);
-            }
-            else if (layerMap["SouthDoors"].HasTile(offsetPos))
-            {
-                // door is below
-                RemoveDoorBetween(unit, offsetPos, offsetPos + Vector3Int.down);
-            }
-            else if (layerMap["EastDoors"].HasTile(offsetPos))
-            {
-                // door is right
-                RemoveDoorBetween(unit, offsetPos, offsetPos + Vector3Int.right);
-            }
-            else if (layerMap["WestDoors"].HasTile(offsetPos))
-            {
-                // door is left
-                RemoveDoorBetween(unit, offsetPos, offsetPos + Vector3Int.left);
-            }
-        }
-    }
-    public void RemoveDoorBetween(Unit unit, Vector3Int oldMapPos, Vector3Int newMapPos)
-    {
-        if (oldMapPos.y == newMapPos.y)
-        {
-            // moved horizontally, east/west doors
-            if (IsDoorBetween(oldMapPos + Vector3Int.up, newMapPos + Vector3Int.up))
-            {
-                // other pieces are upwards
-                if (oldMapPos.x < newMapPos.x)
-                {
-                    // moved right
-                    layerMap["EastDoors"].SetTile(oldMapPos, null);
-                    layerMap["EastDoors"].SetTile(oldMapPos + Vector3Int.up, null);
-                    
-                    layerMap["WestDoors"].SetTile(newMapPos, null);
-                    layerMap["WestDoors"].SetTile(newMapPos + Vector3Int.up, null);
-                }
-                else
-                {
-                    // moved left
-                    layerMap["WestDoors"].SetTile(oldMapPos, null);
-                    layerMap["WestDoors"].SetTile(oldMapPos + Vector3Int.up, null);
-                    
-                    layerMap["EastDoors"].SetTile(newMapPos, null);
-                    layerMap["EastDoors"].SetTile(newMapPos + Vector3Int.up, null);
-                }
-            }
-            else if (IsDoorBetween(oldMapPos + Vector3Int.down, newMapPos + Vector3Int.down))
-            {
-                // other pieces are below
-                if (oldMapPos.x < newMapPos.x)
-                {
-                    // moved right
-                    layerMap["EastDoors"].SetTile(oldMapPos, null);
-                    layerMap["EastDoors"].SetTile(oldMapPos + Vector3Int.down, null);
-                    
-                    layerMap["WestDoors"].SetTile(newMapPos, null);
-                    layerMap["WestDoors"].SetTile(newMapPos + Vector3Int.down, null);
-                }
-                else
-                {
-                    // moved left
-                    layerMap["WestDoors"].SetTile(oldMapPos, null);
-                    layerMap["WestDoors"].SetTile(oldMapPos + Vector3Int.down, null);
-                    
-                    layerMap["EastDoors"].SetTile(newMapPos, null);
-                    layerMap["EastDoors"].SetTile(newMapPos + Vector3Int.down, null);
-                }
-            }
-        }
-        else if (oldMapPos.x == newMapPos.x)
-        {
-            // moved vertically, north/south doors
-            if (IsDoorBetween(oldMapPos + Vector3Int.left, newMapPos + Vector3Int.left))
-            {
-                // other pieces are left
-                if (oldMapPos.y < newMapPos.y)
-                {
-                    // moved up
-                    layerMap["NorthDoors"].SetTile(oldMapPos, null);
-                    layerMap["NorthDoors"].SetTile(oldMapPos + Vector3Int.left, null);
-                    
-                    layerMap["SouthDoors"].SetTile(newMapPos, null);
-                    layerMap["SouthDoors"].SetTile(newMapPos + Vector3Int.left, null);
-                }
-                else
-                {
-                    // moved left
-                    layerMap["SouthDoors"].SetTile(oldMapPos, null);
-                    layerMap["SouthDoors"].SetTile(oldMapPos + Vector3Int.left, null);
-                    
-                    layerMap["NorthDoors"].SetTile(newMapPos, null);
-                    layerMap["NorthDoors"].SetTile(newMapPos + Vector3Int.left, null);
-                }
-            }
-            else if (IsDoorBetween(oldMapPos + Vector3Int.right, newMapPos + Vector3Int.right))
-            {
-                // other pieces are right
-                if (oldMapPos.y < newMapPos.y)
-                {
-                    // moved up
-                    layerMap["NorthDoors"].SetTile(oldMapPos, null);
-                    layerMap["NorthDoors"].SetTile(oldMapPos + Vector3Int.right, null);
-                    
-                    layerMap["SouthDoors"].SetTile(newMapPos, null);
-                    layerMap["SouthDoors"].SetTile(newMapPos + Vector3Int.right, null);
-                }
-                else
-                {
-                    // moved left
-                    layerMap["SouthDoors"].SetTile(oldMapPos, null);
-                    layerMap["SouthDoors"].SetTile(oldMapPos + Vector3Int.right, null);
-                    
-                    layerMap["NorthDoors"].SetTile(newMapPos, null);
-                    layerMap["NorthDoors"].SetTile(newMapPos + Vector3Int.right, null);
-                }
+                layerMap["Doors"].SetTile(offsetPos, null);
             }
         }
     }
 
-    public bool IsWalkable(Unit unit, int x, int y)
+    private bool IsDoorAt(Vector3Int offsetPos)
+    {
+        return layerMap["Doors"].HasTile(offsetPos);
+    }
+
+    private bool IsWallAt(int x, int y)
+    {
+        return IsWallAt(new Vector3Int(x,y,0));
+    }
+
+    private bool IsWallAt(Vector3Int pos)
+    {
+        return layerMap["Walls"].HasTile(pos);
+    }
+
+    private bool IsFloorAt(int x, int y)
     {
         return layerMap["Floors"].HasTile(new Vector3Int(x,y,0));
     }
@@ -840,7 +821,7 @@ public class Map : MonoBehaviour, IGridMap
 
     public Vector3Int RandomPosition => new Vector3Int(Random.Range(0, Width), Random.Range(0, Height), 0);
 
-    public bool Contains(int x, int y)
+    public virtual bool Contains(int x, int y)
     {
         return (x >= 0 && y >= 0) && (x < Width && y < Height);
     }
@@ -849,6 +830,20 @@ public class Map : MonoBehaviour, IGridMap
         Vector3Int mapPos = new Vector3Int(position.X, position.Y, 0);
         List<Vector3Int> reachableNeighbors = new List<Vector3Int>();
         
+        var neighbors = GetAllNeighborsForUnit(currentUnit, mapPos);
+        foreach (var neighbor in neighbors)
+        {
+            if (CanBePlaced(currentUnit, neighbor) && IsNeighborReachable(currentUnit, mapPos, neighbor))
+            {
+                reachableNeighbors.Add(neighbor);
+            }
+        }
+
+        return reachableNeighbors.ConvertAll(elem => new Point(elem.x, elem.y));
+    }
+
+    private static List<Vector3Int> GetAllNeighborsForUnit(Unit currentUnit, Vector3Int mapPos)
+    {
         List<Vector3Int> neighbors = new List<Vector3Int>()
         {
             mapPos + Vector3Int.up,
@@ -858,7 +853,7 @@ public class Map : MonoBehaviour, IGridMap
         };
         if (currentUnit.Rules.CanMoveDiagonally)
         {
-            neighbors.AddRange(new []
+            neighbors.AddRange(new[]
             {
                 mapPos + Vector3Int.up + Vector3Int.right,
                 mapPos + Vector3Int.up + Vector3Int.left,
@@ -866,39 +861,30 @@ public class Map : MonoBehaviour, IGridMap
                 mapPos + Vector3Int.down + Vector3Int.left
             });
         }
-        foreach (var neighbor in neighbors)
+
+        return neighbors;
+    }
+    
+    private static List<Vector3Int> GetAllNeighbors(Vector3Int mapPos)
+    {
+        List<Vector3Int> neighbors = new List<Vector3Int>()
         {
-            bool allOccupiedTilesCanMove = true;
-            foreach (var offset in currentUnit.OccupiedTiles) // handles large units
-            {
-                foreach (var secondOffset in currentUnit.OccupiedTiles)
-                {
-                    if (IsWallBetween(neighbor + offset, neighbor + secondOffset))
-                    {
-                        allOccupiedTilesCanMove = false;
-                        break;
-                    }
-                }
-                if (!allOccupiedTilesCanMove ||
-                    !IsNeighborReachable(mapPos + offset, neighbor + offset) ||
-                    !Contains(neighbor.x + +offset.x, neighbor.y + +offset.y) ||
-                    IsOtherFactionOn(currentUnit, neighbor + offset))
-                {
-                    allOccupiedTilesCanMove = false;
-                    break;
-                }
-            }
+            mapPos + Vector3Int.up,
+            mapPos + Vector3Int.right,
+            mapPos + Vector3Int.down,
+            mapPos + Vector3Int.left,
+        };
+        neighbors.AddRange(new[]
+        {
+            mapPos + Vector3Int.up + Vector3Int.right,
+            mapPos + Vector3Int.up + Vector3Int.left,
+            mapPos + Vector3Int.down + Vector3Int.right,
+            mapPos + Vector3Int.down + Vector3Int.left
+        });
 
-            if (allOccupiedTilesCanMove)
-            {
-                reachableNeighbors.Add(neighbor);
-            }
-        }
-
-        return reachableNeighbors.ConvertAll(elem => new Point(elem.x, elem.y));
+        return neighbors;
     }
 
-    
 
     public bool AreNeighbors(Vector3Int posOne, Vector3Int posTwo, bool includeDiagonals = false)
     {
@@ -951,11 +937,27 @@ public class Map : MonoBehaviour, IGridMap
 
         return affectedTiles.ToList();
     }
-    
-    private float GetEuclideanDistance(Vector3Int pointOne, Vector3Int pointTwo)
+
+    public float GetEuclideanDistance(Vector3Int pointOne, Vector3Int pointTwo)
     {
         return (float) Math.Sqrt(Math.Pow((pointOne.x - pointTwo.x), 2) + Math.Pow(pointOne.y - pointTwo.y, 2));
     }
+
+    public bool IsOtherFactionOn(IPlayerUnit unit, Vector3Int pos)
+    {
+        return IsOtherFactionOn((Unit) unit, pos);
+    }
+
+    public bool CanBePlaced(IPlayerUnit unit, Vector3Int mapPos, bool doorsAreBlocking = true)
+    {
+        return CanBePlaced((Unit) unit, mapPos, doorsAreBlocking);
+    }
+
+    public bool IsOtherUnitOn(IPlayerUnit unit, Vector3Int mapPos)
+    {
+        return IsOtherUnitOn((Unit) unit, mapPos);
+    }
+
     public bool AoEAllowed(Unit attacker, Weapon weapon, Vector3Int mapPos, Vector3Int affectedPos)
     {
         if (mapPos == affectedPos) return true;
@@ -996,24 +998,20 @@ public class Map : MonoBehaviour, IGridMap
         unitSelectedMarker.GetComponent<SpriteRenderer>().enabled = false;
     }
 
-    public bool IsStandingOnDoor(Unit unit, bool removeDoor = false)
+    public bool IsStandingOnDoor(Unit unit, bool openDoor = false)
     {
         bool thereIsADoor = false;
         foreach (var offsetOne in unit.OccupiedTiles)
         {
             var tileOne = unit.Cell + offsetOne;
-            foreach (var offsetTwo in unit.OccupiedTiles)
+            if (IsDoorAt(tileOne))
             {
-                var tileTwo = unit.Cell + offsetTwo;
-                if (IsDoorBetween(tileOne, tileTwo))
+                if (openDoor)
                 {
-                    if (removeDoor)
-                    {
-                        RemoveDoorBetween(unit, tileOne, tileTwo);
-                    }
-
-                    thereIsADoor = true;
+                    RemoveDoor(unit, tileOne);
                 }
+
+                thereIsADoor = true;
             }
         }
         return thereIsADoor;
@@ -1024,17 +1022,12 @@ public class Map : MonoBehaviour, IGridMap
         foreach (var offset in unit.OccupiedTiles)
         {
             var offsetPos = mapPos + offset;
-            if (!Contains(offsetPos.x, offsetPos.y) || IsOtherUnitOn(unit, offsetPos))
+            if (!Contains(offsetPos.x, offsetPos.y) 
+                || IsOtherUnitOn(unit, offsetPos)
+                || IsWallAt(offsetPos.x,offsetPos.y)
+                || IsDoorAt(offsetPos))
             {
                 return false;
-            }
-            foreach (var secondOffset in unit.OccupiedTiles)
-            {
-                var offsetPosTwo = mapPos + secondOffset;
-                if (IsWallBetween(offsetPos, offsetPosTwo) || (doorsAreBlocking && IsDoorBetween(offsetPos, offsetPosTwo)))
-                {
-                    return false;
-                }
             }
         }
         return true;
@@ -1048,5 +1041,93 @@ public class Map : MonoBehaviour, IGridMap
         }
 
         return GetUnitAt(mapPos) != unit;
+    }
+    
+    public static IEnumerable<Vector3Int> RectToList(int x, int y, int width, int height) {
+        for (int xIndex = 0; xIndex < width; xIndex++)
+        {
+            for (int yIndex = 0; yIndex < height; yIndex++)
+            {
+                yield return new Vector3Int(x + xIndex, y + yIndex, 0);
+            }
+        }
+    }
+    
+    public static IEnumerable<Color> ColorsAsList() {
+        for (int zIndex = 0; zIndex < 255; zIndex += 10)
+        {
+            for (int xIndex = 0; xIndex < 255; xIndex += 10)
+            {
+                for (int yIndex = 0; yIndex < 255; yIndex += 10)
+                {
+                    yield return new Color(xIndex/255f,yIndex/255f, zIndex/255f);
+                }
+            }
+        }
+    }
+}
+
+
+public static class DirectionExtension
+{
+    public static Vector3Int ToVector(this Direction direction)
+    {
+        switch (direction)
+        {
+            case Direction.North:
+                return Vector3Int.up;
+            case Direction.NorthWest:
+                return Vector3Int.up + Vector3Int.left;
+            case Direction.West:
+                return Vector3Int.left;
+            case Direction.SouthWest:
+                return Vector3Int.down + Vector3Int.left;
+            case Direction.South:
+                return Vector3Int.down;
+            case Direction.SouthEast:
+                return Vector3Int.down + Vector3Int.right;
+            case Direction.East:
+                return Vector3Int.right;
+            case Direction.NorthEast:
+                return Vector3Int.up + Vector3Int.right;
+        }
+        return Vector3Int.zero;
+    }
+
+}
+
+public static class Vector3IntExtension
+{
+    
+    
+    public static Direction ToDirection(this Vector3Int v)
+    {
+        if (v == Vector3Int.up) return Direction.North;
+        if (v == Vector3Int.down) return Direction.South;
+        if (v == Vector3Int.right) return Direction.East;
+        if (v == Vector3Int.left) return Direction.West;
+        
+        if (v == Vector3Int.up + Vector3Int.right) return Direction.NorthEast;
+        if (v == Vector3Int.down + Vector3Int.right) return Direction.SouthEast;
+        if (v == Vector3Int.left + Vector3Int.up) return Direction.NorthWest;
+        if (v == Vector3Int.left + Vector3Int.down) return Direction.SouthWest;
+        
+        return Direction.None;
+    }
+}
+
+public static class Vector2Extension
+{
+
+    public static Vector2 Rotate(this Vector2 v, float degrees)
+    {
+        float sin = Mathf.Sin(degrees * Mathf.Deg2Rad);
+        float cos = Mathf.Cos(degrees * Mathf.Deg2Rad);
+
+        float tx = v.x;
+        float ty = v.y;
+        v.x = (cos * tx) - (sin * ty);
+        v.y = (sin * tx) + (cos * ty);
+        return v;
     }
 }

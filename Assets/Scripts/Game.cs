@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using DefaultNamespace;
 using GridPathFinder;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -25,7 +26,7 @@ public class Game : MonoBehaviour
     public GameObject unitPrefab;
     public GameObject explosionPrefab;
     private List<Unit> allUnits = new List<Unit>();
-    private Map gameMap;
+    private Map _map;
     public Unit selectedUnit;
     private Camera gameCamera;
     public Text topLeftLabel;
@@ -45,7 +46,7 @@ public class Game : MonoBehaviour
 
     void Start()
     {
-        gameMap = FindObjectOfType<Map>();
+        _map = FindObjectOfType<Map>();
         mod = GetComponent<Mod>();
         gameCamera = Camera.main;
         cameraController = gameCamera.GetComponent<CameraControls>();
@@ -56,10 +57,10 @@ public class Game : MonoBehaviour
         
         factions = mod.GetFactions();
         var firstMap = mod.GetMap(0);
-        gameMap.FromRules(firstMap);
+        _map.FromRules(firstMap);
         SpawnUnits();
         
-        pathfinder = new Pathfinder(gameMap, 1.0f, 1.2f);
+        pathfinder = new Pathfinder(_map, 1.0f, 1.2f);
         
         phaseFaction = -1;
         PrepareNextTurn();
@@ -72,12 +73,12 @@ public class Game : MonoBehaviour
         if (!EventSystem.current.IsPointerOverGameObject())
         {
             Vector3 pos = gameCamera.ScreenToWorldPoint(Input.mousePosition);
-            var cursorLocation = gameMap.WorldToCell(pos);
-            if (gameMap.Contains(cursorLocation.x, cursorLocation.y))
+            var cursorLocation = _map.WorldToCell(pos);
+            if (_map.Contains(cursorLocation.x, cursorLocation.y))
             {
                 if (Input.GetMouseButtonDown(0))
                 {
-                    if (gameMap.Contains(cursorLocation.x, cursorLocation.y))
+                    if (_map.Contains(cursorLocation.x, cursorLocation.y))
                     {
                         InputPressedOnMap(cursorLocation);
                     }
@@ -88,14 +89,14 @@ public class Game : MonoBehaviour
                 }
                 else if (Input.GetMouseButtonUp(0))
                 {
-                    if (gameMap.Contains(cursorLocation.x, cursorLocation.y))
+                    if (_map.Contains(cursorLocation.x, cursorLocation.y))
                     {
                         InputReleasedOnMap(cursorLocation);
                     }
                 }
                 else if (Input.GetMouseButtonDown(1))
                 {
-                    if (gameMap.Contains(cursorLocation.x, cursorLocation.y))
+                    if (_map.Contains(cursorLocation.x, cursorLocation.y))
                     {
                         MapRightClicked(cursorLocation);
                     }
@@ -116,13 +117,13 @@ public class Game : MonoBehaviour
     private void DeselectAll()
     {
         selectedUnit = null;
-        gameMap.HideUnitMarker();
+        _map.HideUnitMarker();
         ToDefaultState();
     }
 
     private void PreviewMovement(Unit unit, Vector3Int targetPos)
     {
-        gameMap.RemoveAllHighlights(1);
+        _map.RemoveAllHighlights(1);
         var path = pathfinder.GetShortestPath(new Point(targetPos.x, targetPos.y)).ConvertAll(p => new Vector3Int(p.X, p.Y, 0));
         HashSet<Vector3Int> previewTiles = new HashSet<Vector3Int>();
             
@@ -138,7 +139,7 @@ public class Game : MonoBehaviour
 
             foreach (var tile in previewTiles)
             {
-                gameMap.HighlightTile(tile, new Color(0.4f,0.3f,0.7f,0.6f), 1);
+                _map.HighlightTile(tile, new Color(0.4f,0.3f,0.7f,0.6f), 1);
             }
         }
     }
@@ -148,27 +149,26 @@ public class Game : MonoBehaviour
         if (cameraController.ActiveTouchCameraMovement)
             return;
         
-        if (gameState == GameState.AttackTargetSelection)
+        if (selectedUnit != null && gameState == GameState.AttackTargetSelection)
         {
-            AttackTargetSelected(mapPos);
+            TryAttackWithUnit(selectedUnit, mapPos);
         }
-        else if (gameMap.IsUnitOn(mapPos) && gameMap.GetUnitAt(mapPos).Faction == CurrentFaction)
+        else if (_map.IsUnitOn(mapPos) && _map.GetUnitAt(mapPos).Faction == CurrentFaction)
         {
             ToDefaultState();
             UnitSelected(mapPos);
         }
         else if (gameState == GameState.MoveTargetSelection 
-                 && !gameMap.IsUnitOn(mapPos) 
+                 && !_map.IsUnitOn(mapPos) 
                  && selectedUnit != null)
         {
             gameState = GameState.MovementSelectedPreConfirmation;
-            gameMap.SetHighlightColor(new Color(0,0,0.7f,0.6f), 1);
+            _map.SetHighlightColor(new Color(0,0,0.7f,0.6f), 1);
         }
         else if (selectedUnit != null
-                && gameState == GameState.MovementSelectedPreConfirmation 
-                && gameMap.CanBePlaced(selectedUnit, mapPos, false))
+                && gameState == GameState.MovementSelectedPreConfirmation)
         {
-            ConfirmMovement(mapPos);
+            TryMoveWithUnit(selectedUnit, mapPos);
         }
         else
         {
@@ -192,11 +192,11 @@ public class Game : MonoBehaviour
 
     private void UnitSelected(Vector3Int mapPos)
     {
-        selectedUnit = gameMap.GetUnitAt(mapPos);
+        selectedUnit = (Unit)_map.GetUnitAt(mapPos);
         selectedUnit.MarkAsSelected();
-        if (selectedUnit.movesLeft > 0)
+        if (selectedUnit.MovesLeft > 0)
         {
-            ShowReachableTiles(selectedUnit, selectedUnit.movesLeft);
+            ShowReachableTiles(selectedUnit, selectedUnit.MovesLeft);
             gameState = GameState.MoveTargetSelection;
         }
         UpdateLabel();
@@ -205,48 +205,52 @@ public class Game : MonoBehaviour
 
     private void ToDefaultState()
     {
-        gameMap.RemoveAllHighlights();
-        gameMap.RemoveAllHighlights(1);
+        _map.RemoveAllHighlights();
+        _map.RemoveAllHighlights(1);
         gameState = GameState.Default;
     }
 
-    private void ConfirmMovement(Vector3Int mapPos)
+    private bool TryMoveWithUnit(IPlayerUnit playerUnit, Vector3Int mapPos)
     {
+        var unit = (Unit) playerUnit;
+        if (unit == null || !_map.CanBePlaced(unit, mapPos, false))
+            return false;
+        
         var path = pathfinder.GetShortestPath(new Point(mapPos.x, mapPos.y)).ConvertAll(p => new Vector3Int(p.X, p.Y, 0));
-        if (path.Count > 0)
-        {
-            gameMap.RemoveAllHighlights();
-            gameMap.RemoveAllHighlights(1);
-            selectedUnit.BeginMoving(path);
-            gameState = GameState.Default;
-        }
+        
+        if (path.Count <= 0) return false;
+        
+        _map.RemoveAllHighlights();
+        _map.RemoveAllHighlights(1);
+        unit.BeginMoving(path);
+        gameState = GameState.Default;
+        return true;
     }
 
-    private void AttackTargetSelected(Vector3Int targetedPos)
+    private bool TryAttackWithUnit(IPlayerUnit playerUnit, Vector3Int targetedPos)
     {
-        if (selectedUnit != null && validTargets.Contains(targetedPos))
+        var unit = (Unit) playerUnit;
+        if (unit == null || !validTargets.Contains(targetedPos)) return false;
+        var unitPos = unit.Cell;
+        var isMelee = _map.AreNeighbors(unitPos,targetedPos);
+        var weapon = isMelee ? unit.MeleeWeapon : unit.RangedWeapon;
+        var areaOfEffect = _map.AreaOfEffect(unitPos, weapon, targetedPos);
+        int[] attackerDice = weapon.RollDamage();
+        foreach (var aoePos in areaOfEffect)
         {
-            var unitPos = gameMap.WorldToCell(selectedUnit.transform.position);
-            var isMelee = gameMap.AreNeighbors(unitPos,targetedPos);
-            var weapon = isMelee ? selectedUnit.MeleeWeapon : selectedUnit.RangedWeapon;
-            var areaOfEffect = gameMap.AreaOfEffect(unitPos, weapon, targetedPos);
-            int[] attackerDice = weapon.RollDamage();
-            foreach (var aoePos in areaOfEffect)
-            {
-                if (gameMap.AoEAllowed(selectedUnit, weapon, targetedPos, aoePos))
-                {
-                    CreateExplosion(aoePos);
-                    if (gameMap.IsUnitOn(aoePos))
-                    {
-                        var hitUnit = gameMap.GetUnitAt(aoePos);
-                        ResolveAttack(attackerDice, unitPos,selectedUnit, targetedPos, aoePos, hitUnit);
-                    }
-                }
-            }
-
-            selectedUnit.HasAttacked();
-            ToDefaultState();
+            if (!_map.AoEAllowed(unit, weapon, targetedPos, aoePos)) continue;
+            
+            CreateExplosion(aoePos);
+            
+            if (!_map.IsUnitOn(aoePos)) continue;
+            
+            var hitUnit = _map.GetUnitAt(aoePos);
+            ResolveAttack(attackerDice, unitPos,unit, targetedPos, aoePos, (Unit)hitUnit);
         }
+
+        unit.HasAttacked();
+        ToDefaultState();
+        return true;
     }
 
     private void ResolveAttack(int[] attackerDice, Vector3Int attackerPos, Unit attacker, Vector3Int targetPos, Vector3Int aoePos, Unit target)
@@ -290,11 +294,11 @@ public class Game : MonoBehaviour
                 int damage = attackerScore - defenderScore;
                 target.DamageReceived(attacker, weapon, damage);
             }
-            if (target.currentHealth <= 0)
+            if (target.CurrentHealth <= 0)
             {
                 UnitDies(target);
             }
-            if (attacker.currentHealth <= 0)
+            if (attacker.CurrentHealth <= 0)
             {
                 UnitDies(attacker);
             }
@@ -305,20 +309,20 @@ public class Game : MonoBehaviour
     {
         unit.FinishedMoving -= UnitFinishedMoving;
         unit.UnitDeath();
-        gameMap.RemoveUnit(unit);
+        _map.RemoveUnit(unit);
         allUnits.Remove(unit);
     }
 
     private bool IsMelee(Unit attacker, Unit target)
     {
-        var attackpos = gameMap.WorldToCell(attacker.transform.position);
-        var targetpos = gameMap.WorldToCell(target.transform.position);
-        return gameMap.AreNeighbors(attackpos, targetpos);
+        var attackpos = _map.WorldToCell(attacker.transform.position);
+        var targetpos = _map.WorldToCell(target.transform.position);
+        return _map.AreNeighbors(attackpos, targetpos);
     }
 
     private void CreateExplosion(Vector3Int mapPos)
     {
-        Instantiate(explosionPrefab, gameMap.CellToWorld(mapPos), Quaternion.identity);
+        Instantiate(explosionPrefab, _map.CellToWorld(mapPos), Quaternion.identity);
     }
 
     public void OpenDoorButtonClicked()
@@ -331,8 +335,8 @@ public class Game : MonoBehaviour
 
     private void OpenDoor(Unit unit, Vector3Int mapPos)
     {
-        gameMap.RemoveDoor(unit, mapPos);
-        gameMap.UpdateFOV(unit.Cell, unit.currentVisionRange);
+        _map.RemoveDoor(unit, mapPos);
+        _map.UpdateFOV(unit.Cell, unit.CurrentVisionRange);
         UpdateVisibleUnits();
     }
 
@@ -376,11 +380,11 @@ public class Game : MonoBehaviour
 
     public void AttackButtonClicked()
     {
-        if (selectedUnit != null && selectedUnit.State != UnitState.Moving && selectedUnit.canAttack)
+        if (selectedUnit != null && selectedUnit.State != UnitState.Moving && selectedUnit.CanAttack)
         {
-            gameMap.RemoveAllHighlights(0);
-            gameMap.RemoveAllHighlights(1);
-            PreviewAttack(selectedUnit, gameMap.WorldToCell(selectedUnit.transform.position), 10);
+            _map.RemoveAllHighlights(0);
+            _map.RemoveAllHighlights(1);
+            PreviewAttack(selectedUnit, _map.WorldToCell(selectedUnit.transform.position), 10);
             gameState = GameState.AttackTargetSelection;
         }
     }
@@ -393,18 +397,18 @@ public class Game : MonoBehaviour
             var weaponRules = unit.RangedWeapon.Rules;
             if (weaponRules.StraightLineOnly)
             {
-                validTargets.UnionWith(gameMap.GetStraightLine(unitPos, Map.Direction.North, maxDistance));
-                validTargets.UnionWith(gameMap.GetStraightLine(unitPos, Map.Direction.South, maxDistance));
-                validTargets.UnionWith(gameMap.GetStraightLine(unitPos, Map.Direction.East, maxDistance));
-                validTargets.UnionWith(gameMap.GetStraightLine(unitPos, Map.Direction.West, maxDistance));
-                validTargets.UnionWith(gameMap.GetStraightLine(unitPos, Map.Direction.NorthEast, maxDistance));
-                validTargets.UnionWith(gameMap.GetStraightLine(unitPos, Map.Direction.NorthWest, maxDistance));
-                validTargets.UnionWith(gameMap.GetStraightLine(unitPos, Map.Direction.SouthEast, maxDistance));
-                validTargets.UnionWith(gameMap.GetStraightLine(unitPos, Map.Direction.SouthWest, maxDistance));   
+                validTargets.UnionWith(_map.GetStraightLine(unitPos, Map.Direction.North, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(unitPos, Map.Direction.South, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(unitPos, Map.Direction.East, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(unitPos, Map.Direction.West, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(unitPos, Map.Direction.NorthEast, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(unitPos, Map.Direction.NorthWest, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(unitPos, Map.Direction.SouthEast, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(unitPos, Map.Direction.SouthWest, maxDistance));   
             }
             else
             {
-                validTargets = gameMap.GetFOV(unitPos, maxDistance, true);
+                validTargets = _map.GetFOV(unitPos, maxDistance, true);
             }
             
             validTargets.Remove(unitPos);
@@ -430,13 +434,13 @@ public class Game : MonoBehaviour
         validTargets.Remove(unitPos + Vector3Int.up + Vector3Int.left);
         foreach (var tile in validTargets)
         {
-            gameMap.HighlightTile(tile, new Color(0.6f, 0f, 0, 0.5f));
+            _map.HighlightTile(tile, new Color(0.6f, 0f, 0, 0.5f));
         }
     }
 
     private void AddToValidMeleeTargets(Unit unit, Vector3Int unitPos, Vector3Int pos)
     {
-        if (gameMap.Contains(pos.x, pos.y) && !gameMap.IsWallBetween(unitPos, pos) && gameMap.IsUnitOn(pos))
+        if (_map.Contains(pos.x, pos.y) && _map.IsUnitOn(pos))
         {
             validTargets.Add(pos);
         }
@@ -444,8 +448,8 @@ public class Game : MonoBehaviour
 
     private void ShowReachableTiles(Unit unit, int maxDistance)
     {
-        var startPos = gameMap.WorldToCell(unit.transform.position);
-        gameMap.RemoveAllHighlights();
+        var startPos = _map.WorldToCell(unit.transform.position);
+        _map.RemoveAllHighlights();
         pathfinder.MaxCost = maxDistance + 1f;
         pathfinder.CurrentUnit = unit;
         
@@ -456,7 +460,7 @@ public class Game : MonoBehaviour
         HashSet<Vector3Int> reachable = new HashSet<Vector3Int>();
         foreach (var reachablePos in nodeList)
         {
-            if (!gameMap.CanBePlaced(unit, reachablePos)) continue;    // make sure to only show positions where we could end movement
+            if (!_map.CanBePlaced(unit, reachablePos)) continue;    // make sure to only show positions where we could end movement
             
             foreach (var offset in unit.OccupiedTiles)
             {
@@ -465,9 +469,9 @@ public class Game : MonoBehaviour
         }
         foreach (var pos in reachable)
         {
-            if (!gameMap.IsUnitOn(pos)) // never highlight tiles with units on it
+            if (!_map.IsUnitOn(pos)) // never highlight tiles with units on it
             {
-                gameMap.HighlightTile(pos, new Color(0, 0.8f, 0, 0.2f));
+                _map.HighlightTile(pos, new Color(0, 0.8f, 0, 0.2f));
             }
         }
     }
@@ -477,28 +481,28 @@ public class Game : MonoBehaviour
         //var unit = args.unit;
         GlobalFOVUpdate();
         
-        if (selectedUnit == args.unit && selectedUnit.movesLeft > 0)
+        if (selectedUnit == args.unit && selectedUnit.MovesLeft > 0)
         {
-            ShowReachableTiles(selectedUnit, selectedUnit.movesLeft);
+            ShowReachableTiles(selectedUnit, selectedUnit.MovesLeft);
             gameState = GameState.MoveTargetSelection;
         }
     }
 
     private void GlobalFOVUpdate()
     {
-        gameMap.ResetFog();
+        _map.ResetFog();
         foreach (var unit in allUnits)
         {
             unit.SetVisible(false);
             if (unit.Faction == CurrentFaction)
             {
                 unit.SetVisible(true);
-                gameMap.UpdateFOV(gameMap.WorldToCell(unit.transform.position), unit.currentVisionRange);
+                _map.UpdateFOV(_map.WorldToCell(unit.transform.position), unit.CurrentVisionRange);
             }
         }
         foreach (var unit in allUnits)
         {
-            if (unit.Faction != CurrentFaction && !gameMap.IsInFog(unit.Cell))
+            if (unit.Faction != CurrentFaction && !_map.IsInFog(unit.Cell))
             {
                 unit.SetVisible(true);
             }
@@ -521,7 +525,7 @@ public class Game : MonoBehaviour
         }
         else
         {
-            SetLabel(gameMap.CurrentCursorPosition.ToString());
+            SetLabel(_map.CurrentCursorPosition.ToString());
         }
     }
 
@@ -555,13 +559,13 @@ public class Game : MonoBehaviour
 
     private bool SpawnUnit(Vector3Int spawnPosition, string unitType, RuleLoadout loadout, RuleFaction ruleFaction)
     {
-        var unit = Instantiate(unitPrefab, gameMap.CellToWorld(spawnPosition), Quaternion.identity)
+        var unit = Instantiate(unitPrefab, _map.CellToWorld(spawnPosition), Quaternion.identity)
             .GetComponent<Unit>();
         unit.LoadRules(unitType, ruleFaction, loadout);
-        if (gameMap.AddUnit(unit, spawnPosition))
+        if (_map.AddUnit(unit, spawnPosition))
         {
             var spriteRenderer = unit.GetComponentInChildren<SpriteRenderer>();
-            spriteRenderer.color = ColorFromArray(ruleFaction.Color);
+            //spriteRenderer.color = ColorFromArray(ruleFaction.Color);
             spriteRenderer.enabled = false; // spawn every unit invisible
             
             unit.FinishedMoving += UnitFinishedMoving;
@@ -582,18 +586,11 @@ public class Game : MonoBehaviour
         var unit = args.unit;
         var oldPos = args.previousPosition;
         
-        var newPos = gameMap.WorldToCell(unit.transform.position);
+        var newPos = _map.WorldToCell(unit.transform.position);
 
-        if (gameMap.IsDoorBetween(oldPos, newPos))
-        {
-            gameMap.RemoveDoorBetween(unit, oldPos, newPos);
-        }
-        if (unit.OccupiedTiles.Count > 1)
-        {
-            gameMap.IsStandingOnDoor(unit, true);
-        }
+        _map.IsStandingOnDoor(unit, true);
         
-        gameMap.UpdateFOV(newPos, unit.currentVisionRange);
+        _map.UpdateFOV(newPos, unit.CurrentVisionRange);
         UpdateVisibleUnits();
     }
 
@@ -601,9 +598,9 @@ public class Game : MonoBehaviour
     {
         foreach (var unit in allUnits)
         {
-            var unitPos = gameMap.WorldToCell(unit.transform.position);
+            var unitPos = _map.WorldToCell(unit.transform.position);
             var shouldBeVisible = unit.Faction == CurrentFaction
-                                  || !gameMap.IsInFog(unitPos);
+                                  || !_map.IsInFog(unitPos);
             unit.SetVisible(shouldBeVisible);
         }
     }
@@ -619,12 +616,12 @@ public class Game : MonoBehaviour
         {
             for (int i = 0; i < loadOut.Count; i++)
             {
-                Vector3Int randomPosition = gameMap.RandomPosition;
+                Vector3Int randomPosition = _map.RandomPosition;
                 int tryCounter = 0;
                 while (!SpawnUnit(randomPosition, loadOut.Unit, loadOut, ruleFaction) && tryCounter < 5)
                 {
                     // wait for free spawn pos
-                    randomPosition = gameMap.RandomPosition;
+                    randomPosition = _map.RandomPosition;
                     tryCounter++;
                 }
             }

@@ -70,9 +70,9 @@ SpriteRenderer:
   m_SortingLayerID: 2079868369
   m_SortingLayer: 2
   m_SortingOrder: 0
-  m_Sprite: {fileID: -4390124077346443278, guid: 246889a0ec9a3451391e1ec434fcd134,
+  m_Sprite: {fileID: -7801199871535558032, guid: ab3cb6d4caafa46808f2d173069831a1,
     type: 3}
-  m_Color: {r: 0.9528302, g: 0.93586165, b: 0.15730685, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -128,9 +128,3 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   bloodSplatter: {fileID: 5972786585338085383, guid: 18b98604ca4274cdcbb7ea9a3dfce325,
     type: 3}
-  movesLeft: 4
-  currentVisionRange: 10
-  currentHealth: 1
-  currentArmor: 2
-  canAttack: 1
-  moveDelay: 0.5

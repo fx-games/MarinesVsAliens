@@ -1,34 +1,36 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using DefaultNamespace;
 using UnityEngine;
 using UnityEngine.Serialization;
 using static Map;
 using static Mod;
 using static Mod.RuleFaction;
 
-public class Unit : MonoBehaviour
+
+public class Unit : MonoBehaviour, IPlayerUnit
 {
     public enum UnitState { Idle, Moving }
 
-    public Weapon RangedWeapon { get; set; }
-    public Weapon MeleeWeapon { get; set; }
+    public Weapon RangedWeapon { get; private set; }
+    public Weapon MeleeWeapon { get; private set; }
     public GameObject bloodSplatter;
-    public int movesLeft = 4;
-    public int currentVisionRange = 2;
-    public int currentHealth = 1;
-    public int currentArmor = 2;
-    public bool canAttack = true;
+    public int MovesLeft { get; private set; } = 4;
+    public int CurrentVisionRange { get; } = 2;
+    public int CurrentHealth { get; private set; } = 1;
+    private int currentArmor = 2;
+    public bool CanAttack { get; private set; } = true;
     public RuleFaction Faction { get; set; }
     
-    public Vector3Int Cell => gameMap.WorldToCell(transform.position);
+    public Vector3Int Cell => _gamePlayerMap.WorldToCell(transform.position);
 
     private float lastMoveTime;
-    public double moveDelay = 0.5f;
+    private double moveDelay = 0.5f;
     private Mod mod;
     private RuleUnit unitRules;
 
-    private Map gameMap;
+    private Map _gamePlayerMap;
     private int currentPathIndex;
     private List<Vector3Int> currentPath;
     private SpriteRenderer spriteRenderer;
@@ -66,7 +68,7 @@ public class Unit : MonoBehaviour
     // Start is called before the first frame update
     void Awake()
     {
-        gameMap = FindObjectOfType<Map>();
+        _gamePlayerMap = FindObjectOfType<Map>();
         mod = FindObjectOfType<Mod>();
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
     }
@@ -84,29 +86,17 @@ public class Unit : MonoBehaviour
     {
         switch (direction)
         {
+            case Direction.East:
+            case Direction.NorthEast:
+            case Direction.SouthEast:
             case Direction.North:
-                spriteRenderer.transform.eulerAngles = new Vector3(spriteRenderer.transform.eulerAngles.x, spriteRenderer.transform.eulerAngles.y, 0f);
-                break;
-            case Direction.NorthWest:
-                spriteRenderer.transform.eulerAngles = new Vector3(spriteRenderer.transform.eulerAngles.x, spriteRenderer.transform.eulerAngles.y, 45f);
-                break;
-            case Direction.West:
-                spriteRenderer.transform.eulerAngles = new Vector3(spriteRenderer.transform.eulerAngles.x, spriteRenderer.transform.eulerAngles.y, 90f);
-                break;
-            case Direction.SouthWest:
-                spriteRenderer.transform.eulerAngles = new Vector3(spriteRenderer.transform.eulerAngles.x, spriteRenderer.transform.eulerAngles.y, 135f);
+                spriteRenderer.flipX = true; // look right
                 break;
             case Direction.South:
-                spriteRenderer.transform.eulerAngles = new Vector3(spriteRenderer.transform.eulerAngles.x, spriteRenderer.transform.eulerAngles.y, 180f);
-                break;
-            case Direction.SouthEast:
-                spriteRenderer.transform.eulerAngles = new Vector3(spriteRenderer.transform.eulerAngles.x, spriteRenderer.transform.eulerAngles.y, 225f);
-                break;
-            case Direction.East:
-                spriteRenderer.transform.eulerAngles = new Vector3(spriteRenderer.transform.eulerAngles.x, spriteRenderer.transform.eulerAngles.y, 270f);
-                break;
-            case Direction.NorthEast:
-                spriteRenderer.transform.eulerAngles = new Vector3(spriteRenderer.transform.eulerAngles.x, spriteRenderer.transform.eulerAngles.y, 315f);
+            case Direction.West:
+            case Direction.SouthWest:
+            case Direction.NorthWest:
+                spriteRenderer.flipX = false; // look left
                 break;
         }
     }    
@@ -114,7 +104,7 @@ public class Unit : MonoBehaviour
     {   
         if (currentPathIndex < currentPath.Count)
         {
-            var lastPos = gameMap.WorldToCell(transform.position);
+            var lastPos = _gamePlayerMap.WorldToCell(transform.position);
             var nextPos = currentPath[currentPathIndex];
             State = UnitState.Moving;
             lastMoveTime = Time.time;
@@ -196,30 +186,30 @@ public class Unit : MonoBehaviour
     public void BeginMoving(List<Vector3Int> path)
     {
         if (State == UnitState.Moving) return;
-        var oldMapPos = gameMap.WorldToCell(transform.position);
+        var oldMapPos = _gamePlayerMap.WorldToCell(transform.position);
         path.Remove(oldMapPos);
         currentPathIndex = 0;
         currentPath = path;
         State = UnitState.Moving;
         int steps = path.Count;
         //Debug.Log("Moving: " + steps);
-        movesLeft -= steps;
+        MovesLeft -= steps;
         // TELEPORT INSTANTLY TO THE END OF THE PATH ON THE MAP - BECAUSE OF PATHFINDING OF OTHER UNITS
-        gameMap.MoveUnit(this, oldMapPos, path.Last());
+        _gamePlayerMap.MoveUnit(this, oldMapPos, path.Last());
         UpdateMarker();
     }
 
 
     public void AnimateMovement(Vector3Int mapPos)
     {
-        var oldPos = gameMap.WorldToCell(transform.position);
+        var oldPos = _gamePlayerMap.WorldToCell(transform.position);
         RepositionUnitInWorld(mapPos);
         OnStepCompleted(oldPos);
     }
 
     private void RepositionUnitInWorld(Vector3Int mapPos)
     {
-        var cellToWorld = gameMap.CellToWorld(mapPos);
+        var cellToWorld = _gamePlayerMap.CellToWorld(mapPos);
         transform.position = cellToWorld;
     }
 
@@ -248,8 +238,8 @@ public class Unit : MonoBehaviour
         unitRules = mod.GetUnitRule(unitType);
         name = mod.Tr(unitType);
         currentArmor = unitRules.Armor;
-        currentHealth = unitRules.Health;
-        movesLeft = unitRules.Movement;
+        CurrentHealth = unitRules.Health;
+        MovesLeft = unitRules.Movement;
 
         OccupiedTiles = unitRules.OccupiedTiles.ConvertAll(elem => new Vector3Int(elem[0], elem[1], 0));
 
@@ -275,18 +265,18 @@ public class Unit : MonoBehaviour
 
     public void HasAttacked()
     {
-        if (movesLeft != unitRules.Movement)
+        if (MovesLeft != unitRules.Movement)
         {
-            movesLeft = 0;    // can not move before AND after firing
+            MovesLeft = 0;    // can not move before AND after firing
         }
-        canAttack = false;
+        CanAttack = false;
         UpdateMarker();
     }
 
     public void PrepareNewTurn()
     {
-        movesLeft = unitRules.Movement;
-        canAttack = true;
+        MovesLeft = unitRules.Movement;
+        CanAttack = true;
     }
 
     public void SetVisible(bool isVisible)
@@ -297,7 +287,7 @@ public class Unit : MonoBehaviour
     
     public void MarkAsSelected()
     {
-        var unitMarker = gameMap.GetUnitMarker();
+        var unitMarker = _gamePlayerMap.GetUnitMarker();
         
         markerRenderer = unitMarker.GetComponent<SpriteRenderer>();
         markerRenderer.enabled = true;
@@ -334,15 +324,15 @@ public class Unit : MonoBehaviour
     {
         if (markerRenderer != null && markerRenderer.transform.IsChildOf(transform))
         {
-            if (movesLeft > 0 && canAttack)
+            if (MovesLeft > 0 && CanAttack)
             {
                 markerRenderer.color = Color.green;
             }
-            else if (movesLeft <= 0 && canAttack)
+            else if (MovesLeft <= 0 && CanAttack)
             {
                 markerRenderer.color = Color.red;
             }
-            else if (!canAttack && movesLeft > 0)
+            else if (!CanAttack && MovesLeft > 0)
             {
                 markerRenderer.color = Color.yellow;
             }
@@ -367,7 +357,7 @@ public class Unit : MonoBehaviour
 
     public void DamageReceived(Unit source, Weapon weaponUsed, int damage)
     {
-        currentHealth -= damage;
+        CurrentHealth -= damage;
     }
 }
 
