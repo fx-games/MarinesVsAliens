@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Security.Cryptography;
 using DefaultNamespace;
 using GridPathFinder.Map;
 using UnityEngine;
@@ -36,7 +37,9 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     public int Height { get; set; }
 
     public Direction[] Cardinal => new[] {Direction.East, Direction.West, Direction.North, Direction.South};
-    
+    public Direction[] Diagonal => new[] {Direction.NorthEast, Direction.NorthWest, Direction.SouthWest, Direction.SouthEast};
+    public Direction[] Directions => new[] {Direction.East, Direction.West, Direction.North, Direction.South, Direction.NorthEast, Direction.NorthWest, Direction.SouthWest, Direction.SouthEast};
+
 
     public GameObject selectionRectPrefab;
     private GameObject selectionRect;
@@ -44,6 +47,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     public Tile[] floorTiles;
     public Tile[] walls;  // ORDER: NESW
     public Tile[] doors;
+    public Tile[] spawnFloorMarkerTiles;
 
     protected Dictionary<string, Tilemap> layerMap = new Dictionary<string, Tilemap>();
     protected Unit[,] unitMap;
@@ -53,6 +57,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     public Vector3Int CurrentCursorPosition { get; private set; }
     private HashSet<Vector3Int> visibleTiles = new HashSet<Vector3Int>();
     private Mod mod;
+    private IMapGenerator generator;
 
     // Start is called before the first frame update
     void Awake()
@@ -65,10 +70,15 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         
         mod = FindObjectOfType<Mod>();
         var mapLayers = GetComponentsInChildren<Tilemap>();
-        foreach (var layer in mapLayers)
+        foreach (Tilemap layer in mapLayers)
         {
             layerMap[layer.name] = layer;
         }
+
+        var firstLayerSize = layerMap.First().Value.size;
+        Width = firstLayerSize.x;
+        Height = firstLayerSize.y;
+        unitMap = new Unit[Width, Height];
 
         gameCamera = Camera.main;
         if (gameCamera == null)
@@ -76,13 +86,33 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             throw new Exception("Game needs camera.");
         }
     }
+    
+    
+    public void DebugAction()
+    {
+        ((CavernGenerator) generator).MakeCaverns(0);
+    }
+    
+    public void DebugActionTwo()
+    {
+        ((CavernGenerator) generator).MakeCaverns(1);
+    }
 
     public void FromRules(RuleMap mapRules)
     {
-        //IMapGenerator scriptGenerator = new MapFromScript(mod, mapRules);
-        IMapGenerator dungeonGenerator = new DungeonGenerator(25,25);
-        
-        dungeonGenerator.Generate(this);
+        if (mapRules.Generator == 1)
+        {
+            generator = new MapFromScript(mod, mapRules);
+        }
+        else if (mapRules.Generator == 2)
+        {
+            generator = new DungeonGenerator(25,25);
+        }
+        else if (mapRules.Generator == 3)
+        {
+            generator = new CavernGenerator(25,25);
+        }
+        generator.Generate(this);        
     }
 
     public virtual void Init(int width, int height)
@@ -98,7 +128,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         Height = height;
         unitMap = new Unit[Width, Height];
         FillLayer("Floors");
-        FillLayer("FogOfWar");
+        //FillLayer("FogOfWar");
     }   
     private void Start()
     {
@@ -149,9 +179,12 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
 
     public bool IsFloorAt(int x, int y)
     {
-        return layerMap["Floors"].HasTile(new Vector3Int(x,y,0));
+        return IsFloorAt(new Vector3Int(x, y, 0));
     }
-
+    private bool IsFloorAt(Vector3Int pos)
+    {
+        return layerMap["Floors"].HasTile(pos);
+    }
     public void RemoveDoor(Vector3Int pos)
     {
         layerMap["Doors"].SetTile(pos, null);
@@ -159,7 +192,9 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
 
     public void CreateDoor(int x, int y)
     {
-        layerMap["Doors"].SetTile(new Vector3Int(x,y,0), doors[0]);
+        var pos = new Vector3Int(x,y,0);
+        layerMap["Doors"].SetTile(pos, doors[0]);
+        RemoveWallAt(pos); // no walls at door tiles
     }
 
 
@@ -233,6 +268,14 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
                 return position + Vector3Int.down;
             case Direction.West:
                 return position + Vector3Int.left;
+            case Direction.NorthEast:
+                return position + Vector3Int.up + Vector3Int.right;
+            case Direction.SouthWest:
+                return position + Vector3Int.left + Vector3Int.down;
+            case Direction.SouthEast:
+                return position + Vector3Int.down + Vector3Int.right;
+            case Direction.NorthWest:
+                return position + Vector3Int.left + Vector3Int.up;
         }
         return Vector3Int.zero;
     }
@@ -331,7 +374,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         var neighbors = GetAllNeighborsForUnit(currentUnit, mapPos);
         foreach (var neighbor in neighbors)
         {
-            if (CanBePlaced(currentUnit, neighbor) && IsNeighborReachable(currentUnit, mapPos, neighbor))
+            if (IsNeighborReachable(currentUnit, mapPos, neighbor))
             {
                 reachableNeighbors.Add(neighbor);
             }
@@ -495,11 +538,13 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             var offsetPos = mapPos + offset;
             if (!Contains(offsetPos.x, offsetPos.y) 
                 || IsOtherUnitOn(unit, offsetPos)
-                || IsWallAt(offsetPos.x,offsetPos.y)
-                || IsDoorAt(offsetPos))
+                || IsWallAt(offsetPos.x,offsetPos.y))
             {
                 return false;
             }
+
+            if (doorsAreBlocking && IsDoorAt(offsetPos))
+                return false;
         }
         return true;
     }
@@ -564,7 +609,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         {
             return false;
         }
-        if (IsWallAt(oldPos) || IsWallAt(newPos))
+        if (IsWallAt(oldPos) || IsWallAt(newPos) ||  IsDoorAt(oldPos) || IsDoorAt(newPos))
         {
             return false;
         }
@@ -719,6 +764,30 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         if (removeFog)
             RemoveFog(litTile);
         return true;
+    }
+
+    public List<List<Vector3Int>> GetSpawnPoints()
+    {
+        Dictionary<Vector3Int, int> spawnPoints = new Dictionary<Vector3Int, int>();
+        foreach (var pos in RectToList(0,0,Width,Height))
+        {
+            if (!IsFloorAt(pos)) continue;
+            int faction = spawnFloorMarkerTiles.ToList().IndexOf(layerMap["Floors"].GetTile<Tile>(pos));
+                
+            if (faction > -1)
+            {
+                spawnPoints[pos] = faction;
+            }
+        }
+        List<List<Vector3Int>> results = new List<List<Vector3Int>>();
+        int maxFactionIndex = spawnPoints.Values.Max();
+        for (int i = 0; i <= maxFactionIndex; i++)
+        {
+            var factionPoints = spawnPoints.Where(kvp => kvp.Value == i).Select(kvp => kvp.Key);
+            results.Add(new List<Vector3Int>(factionPoints));
+        }
+
+        return results;
     }
 }
 

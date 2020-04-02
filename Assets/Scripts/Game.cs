@@ -23,6 +23,8 @@ public class Game : MonoBehaviour
     }
 
     public GameObject gridMapPrefab;
+    public GameObject[] premadeMapBlocks;
+
     public GameObject unitPrefab;
     public GameObject explosionPrefab;
     private List<Unit> allUnits = new List<Unit>();
@@ -38,26 +40,49 @@ public class Game : MonoBehaviour
     private int phaseFaction;
     private CameraControls cameraController;
     private Vector3Int lastCursorLocation;
+    private int currentMapIndex;
 
     private void Awake()
     {
-        var gridMap = Instantiate(gridMapPrefab);
-    }
-
-    void Start()
-    {
-        _map = FindObjectOfType<Map>();
         mod = GetComponent<Mod>();
         gameCamera = Camera.main;
-        cameraController = gameCamera.GetComponent<CameraControls>();
         if (gameCamera == null)
         {
             throw new Exception("Game needs camera.");
         }
-        
+    }
+
+    void Start()
+    {
+        cameraController = gameCamera.GetComponent<CameraControls>();
         factions = mod.GetFactions();
-        var firstMap = mod.GetMap(0);
-        _map.FromRules(firstMap);
+        currentMapIndex = (0);
+        LoadMap();
+    }
+
+    void LoadMap()
+    {
+        if (_map != null)
+        {
+            Destroy(_map);
+        }
+        var mapRules = mod.GetMap(currentMapIndex);
+        if (mapRules.Generator == 0)
+        {
+            var premadeMap = premadeMapBlocks.First(map => map.name == mapRules.Premade);
+            _map = Instantiate(premadeMap).GetComponent<Map>();
+        }
+        else
+        {
+            _map = Instantiate(gridMapPrefab).GetComponent<Map>();
+            _map.FromRules(mapRules);
+        }
+        
+        Invoke("AfterMapLoad", 0.1f);
+    }
+
+    public void AfterMapLoad()
+    {
         SpawnUnits();
         
         pathfinder = new Pathfinder(_map, 1.0f, 1.2f);
@@ -65,7 +90,6 @@ public class Game : MonoBehaviour
         phaseFaction = -1;
         PrepareNextTurn();
     }
-
     
     // Update is called once per frame
     void Update()
@@ -112,6 +136,16 @@ public class Game : MonoBehaviour
                 lastCursorLocation = cursorLocation;
             }
         }
+    }
+
+    public void DebugButtonPressed()
+    {
+        _map.DebugAction();
+    }
+    
+    public void DebugButtonTwoPressed()
+    {
+        _map.DebugActionTwo();
     }
 
     private void DeselectAll()
@@ -335,9 +369,19 @@ public class Game : MonoBehaviour
 
     private void OpenDoor(Unit unit, Vector3Int mapPos)
     {
-        _map.RemoveDoor(unit, mapPos);
-        _map.UpdateFOV(unit.Cell, unit.CurrentVisionRange);
-        UpdateVisibleUnits();
+        foreach (var direction in _map.Cardinal)
+        {
+            var neighborPos = mapPos + direction.ToVector();
+            if (_map.IsDoorAt(neighborPos))
+            {
+                _map.RemoveDoor(unit, neighborPos);
+                
+                _map.UpdateFOV(unit.Cell, unit.CurrentVisionRange);
+                UpdateVisibleUnits();
+
+                break;
+            }
+        }
     }
 
     public void EndTurnButtonClicked()
@@ -531,6 +575,12 @@ public class Game : MonoBehaviour
 
     private void SpawnUnits()
     {
+        var mapRules = mod.GetMap(currentMapIndex);
+        List<List<Vector3Int>> spawnPointsByFaction = null;
+        if (mapRules.Generator == 0) // premade map, load spawnpoints from map
+        {
+            spawnPointsByFaction =_map.GetSpawnPoints();
+        }
         foreach (var ruleFaction in factions)
         {
             var spawnRule = mod.GetSpawnRule(ruleFaction.Type);
@@ -540,15 +590,28 @@ public class Game : MonoBehaviour
             }
             else
             {
-                List<Vector3Int> spawnPositions = spawnRule.Locations.ConvertAll(elem => new Vector3Int(elem[0], elem[1], 0));
+                List<Vector3Int> spawnPositions;
+                if (mapRules.Generator == 0 && spawnPointsByFaction != null)
+                {
+                    var factionIndex = factions.IndexOf(ruleFaction);
+                    spawnPositions = spawnPointsByFaction[factionIndex];
+                }
+                else
+                {
+                    spawnPositions = spawnRule.Locations.ConvertAll(elem => new Vector3Int(elem[0], elem[1], 0));
+                }
+                
                 int spawnIndex = 0;
                 foreach (var loadOut in ruleFaction.LoadOut)
                 {
                     for (int i = 0; i < loadOut.Count; i++)
                     {
+                        if (spawnIndex >= spawnPositions.Count)
+                            break;
                         var spawnPosition = spawnPositions[spawnIndex];
                         string unitType = loadOut.Unit;
                         SpawnUnit(spawnPosition, unitType, loadOut, ruleFaction);
+                        Debug.Log("Unit " + unitType + " spawned at " + spawnPosition);
                         spawnIndex++;
                     }
                 }

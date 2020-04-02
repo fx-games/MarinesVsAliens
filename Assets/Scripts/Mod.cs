@@ -44,7 +44,9 @@ public class Mod : MonoBehaviour
     public class RuleMap
     {
         public string Type { get; set; }
+        public string Premade { get; set; }
         public int[] Size { get; set; } = {12,12};
+        public int Generator { get; set; } = 0;
         public List<MapScriptCommand> MapScript { get; set; }
     }
     

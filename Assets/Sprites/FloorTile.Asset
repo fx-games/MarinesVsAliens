@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f869ca4ff169e4d9ebeda5b12ebae889, type: 3}
   m_Name: FloorTile
   m_EditorClassIdentifier: 
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: 265596017115981189, guid: 0646cc5396fd44b88bca5707ce558326, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Transform:
     e00: 1
@@ -33,7 +33,9 @@ MonoBehaviour:
     e33: 1
   m_InstancedGameObject: {fileID: 0}
   m_Flags: 1
-  m_ColliderType: 1
-  m_Sprites: []
-  m_Preview: {fileID: 0}
-  tileColor: {r: 0, g: 0, b: 0, a: 0}
+  m_ColliderType: 2
+  m_Sprites:
+  - {fileID: 1246817381012459717, guid: 0646cc5396fd44b88bca5707ce558326, type: 3}
+  m_Preview: {fileID: 265596017115981189, guid: 0646cc5396fd44b88bca5707ce558326,
+    type: 3}
+  tileColor: {r: 0, g: 0, b: 0, a: 1}

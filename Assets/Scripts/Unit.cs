@@ -17,7 +17,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public Weapon MeleeWeapon { get; private set; }
     public GameObject bloodSplatter;
     public int MovesLeft { get; private set; } = 4;
-    public int CurrentVisionRange { get; } = 2;
+    public int CurrentVisionRange { get; } = 20;
     public int CurrentHealth { get; private set; } = 1;
     private int currentArmor = 2;
     public bool CanAttack { get; private set; } = true;
@@ -26,7 +26,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public Vector3Int Cell => _gamePlayerMap.WorldToCell(transform.position);
 
     private float lastMoveTime;
-    private double moveDelay = 0.5f;
+    private double moveDelay = 0.2f;
     private Mod mod;
     private RuleUnit unitRules;
 

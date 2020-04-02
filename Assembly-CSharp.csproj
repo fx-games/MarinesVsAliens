@@ -68,6 +68,7 @@
     <Compile Include="Assets\Scripts\AI\SubsumptionBehavior.cs" />
     <Compile Include="Assets\Scripts\AI\SubsumptionScheduler.cs" />
     <Compile Include="Assets\Scripts\CameraControls.cs" />
+    <Compile Include="Assets\Scripts\CavernGenerator.cs" />
     <Compile Include="Assets\Scripts\DungeonGenerator.cs" />
     <Compile Include="Assets\Scripts\FloorTile.cs" />
     <Compile Include="Assets\Scripts\Game.cs" />
