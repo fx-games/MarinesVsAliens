@@ -358,7 +358,7 @@ public class Game : MonoBehaviour
             Debug.Log(faction.Type + " has been eliminated.");
         }
 
-        if (factions.Count - eliminatedFactions.Count <= 1)
+        if (factions.Count <= 1)
         {
             //only one or zero faction left
             MissionDebriefing();

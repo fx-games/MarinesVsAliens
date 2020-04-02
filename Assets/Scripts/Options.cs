@@ -80,8 +80,8 @@ namespace DefaultNamespace
                 return; // No melee weapon for melee attack
             }
 
-            if (!attacker.HasRangedWeapon)
-                return; // No weapon at all..
+            if (!isMelee && !attacker.HasRangedWeapon)
+                return; // No ranged weapon
         
             var isAoEPosition = targetPos != aoePos;
         
