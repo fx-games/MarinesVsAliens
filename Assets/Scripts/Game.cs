@@ -354,6 +354,8 @@ public class Game : MonoBehaviour
 
     private void StartWaitingForHeatSeatPlayer(RuleFaction faction)
     {
+        selectedUnit = null;
+        _map.HideUnitMarker();
         gameState = GameState.WaitForHotSeatPlayer;
         centerOfScreenLabel.enabled = true;
         centerOfScreenLabel.text = "NEXT PLAYER\n" + faction;
