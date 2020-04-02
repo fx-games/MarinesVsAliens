@@ -44,6 +44,7 @@ public class Game : MonoBehaviour
     private CameraControls cameraController;
     private Vector3Int lastCursorLocation;
     private int currentMapIndex;
+    private int currentTurn = 0;
 
     private void Awake()
     {
@@ -93,7 +94,8 @@ public class Game : MonoBehaviour
         pathfinder = new Pathfinder(_map, 1.0f, 1.2f);
         
         phaseFaction = -1;
-        PrepareNextTurn();
+        NewTurn();
+        PrepareNextPhase();
     }
     
     // Update is called once per frame
@@ -226,7 +228,7 @@ public class Game : MonoBehaviour
             if (!_map.IsUnitOn(aoePos)) continue;
         
             var hitUnit = (Unit)_map.GetUnitAt(aoePos);
-            Options.CombatMechanics.ResolveAttack(attackValues, unitPos,unit, targetedPos, aoePos, (Unit)hitUnit);
+            Options.CombatMechanics.ResolveAttack(attackValues, unitPos,unit, targetedPos, aoePos, hitUnit);
             
             if (isMelee && Options.CombatMechanics is DiceBasedCombat)
             {
@@ -327,11 +329,13 @@ public class Game : MonoBehaviour
 
     public void EndTurnButtonClicked()
     {
-        CheckWinLoseConditions();
-        PrepareNextTurn();
+        if (!IsMissionOver())
+        {
+            PrepareNextPhase();
+        }
     }
 
-    private void CheckWinLoseConditions()
+    private bool IsMissionOver()
     {
         Dictionary<RuleFaction, int> unitCounts = new Dictionary<RuleFaction, int>();
         foreach (var faction in factions)
@@ -349,6 +353,7 @@ public class Game : MonoBehaviour
             if (unitCount != 0) continue;
             
             var faction = kvp.Key;
+            factions.Remove(faction);
             eliminatedFactions.Add(faction);
             Debug.Log(faction.Type + " has been eliminated.");
         }
@@ -357,21 +362,26 @@ public class Game : MonoBehaviour
         {
             //only one or zero faction left
             MissionDebriefing();
+            return true;
         }
+
+        return false;
     }
 
     private void MissionDebriefing()
     {
+        _map.RemoveAllFog();
         Debug.Log("Mission is over!");
     }
 
-    private void PrepareNextTurn()
+    private void PrepareNextPhase()
     {
         ToDefaultState();
         phaseFaction++;
         if (phaseFaction > factions.Count - 1)
         {
             phaseFaction = 0;
+            NewTurn();
         }
 
         bool firstUnitFound = false;
@@ -390,6 +400,12 @@ public class Game : MonoBehaviour
         }
 
         GlobalFOVUpdate();
+    }
+
+    private void NewTurn()
+    {
+        currentTurn++;
+        Debug.Log("Turn :" + currentTurn);
     }
 
     private void CenterCameraOn(Unit unit)
@@ -561,7 +577,12 @@ public class Game : MonoBehaviour
     {
         if (selectedUnit != null)
         {
-            SetLabel(selectedUnit.name + "\n" + selectedUnit.WeaponDescription);
+            SetLabel(selectedUnit.name + " - HP: " + selectedUnit.CurrentHealth + "\n" + selectedUnit.WeaponDescription);
+        }
+        else if (_map.IsOtherFactionOn(CurrentFaction, _map.CurrentCursorPosition))
+        {
+            var enemyUnit = (Unit)_map.GetUnitAt(_map.CurrentCursorPosition);
+            SetLabel(enemyUnit.name + " - HP: " + enemyUnit.CurrentHealth + "\n" + enemyUnit.WeaponDescription);
         }
         else
         {

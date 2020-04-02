@@ -221,7 +221,10 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         layerMap["FogOfWar"].ClearAllTiles();
         layerMap["FogOfWar"].FloodFill(new Vector3Int(Width-1,Height-1,0), floorTiles[0]);
     }
-    
+    public virtual void RemoveAllFog()
+    {
+        layerMap["FogOfWar"].ClearAllTiles();
+    }
     protected virtual void RemoveFog(Vector3Int position)
     {
         layerMap["FogOfWar"].SetTile(position, null);
@@ -495,15 +498,19 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
 
     public bool IsOtherFactionOn(Unit unit, Vector3Int pos)
     {
-        if (!IsUnitOn(pos))
+        return IsOtherFactionOn(unit.Faction, pos);
+    }
+
+    public bool IsOtherFactionOn(RuleFaction faction, Vector3Int mapPosition)
+    {
+        if (!IsUnitOn(mapPosition))
         {
             return false;
         }
 
-        var otherUnit = GetUnitAt(pos);
-        return unit.Faction != otherUnit.Faction;
+        var otherUnit = GetUnitAt(mapPosition);
+        return faction != otherUnit.Faction;
     }
-
 
     public GameObject GetUnitMarker()
     {
@@ -813,6 +820,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             return true;
         return false;
     }
+
 }
 
 

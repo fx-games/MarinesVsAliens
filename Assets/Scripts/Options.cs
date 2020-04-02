@@ -94,17 +94,17 @@ namespace DefaultNamespace
             var isExplosion = weapon.Rules.Radius > 0;
 
             int attackerScore = attackerDice.Sum();
-
+            
             if (isExplosion && isAoEPosition)
             {
                 attackerScore = attackerDice.Max();
             }
-            //Debug.Log("Attack: " + attack);
+            Debug.Log("Attack: " + attackerScore);
 
             if (attackerScore > 0)
             {
                 int defenderScore = target.GetDefense(isMelee);
-
+                Debug.Log("Defense: " + defenderScore);
                 LastMeleeDefense = defenderScore;
                 //target.AttackedWith(attack, isMelee);
                 if (defenderScore >= attackerScore)
@@ -114,7 +114,7 @@ namespace DefaultNamespace
                     {
                         // damage to attacker
                         int returnedMeleeDamage = defenderScore - attackerScore;
-                        attacker.DamageReceived(target, attacker.MeleeWeapon, returnedMeleeDamage);
+                        attacker.DamageReceived(target, target.MeleeWeapon, returnedMeleeDamage);
                     }
                 }
                 else
