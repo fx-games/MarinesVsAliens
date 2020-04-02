@@ -4,6 +4,7 @@ using System.Linq;
 using DefaultNamespace;
 using UnityEngine;
 using UnityEngine.Serialization;
+using UnityEngine.UI;
 using static Map;
 using static Mod;
 using static Mod.RuleFaction;
@@ -35,6 +36,8 @@ public class Unit : MonoBehaviour, IPlayerUnit
     private List<Vector3Int> currentPath;
     private SpriteRenderer spriteRenderer;
     private SpriteRenderer markerRenderer;
+    private Text unitLabel;
+    private Camera gameCamera;
     public UnitState State { get; private set; } = UnitState.Idle;
     public bool HasRangedWeapon => RangedWeapon != null;
     public bool HasMeleeWeapon => MeleeWeapon != null;
@@ -68,6 +71,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     // Start is called before the first frame update
     void Awake()
     {
+        gameCamera = Camera.main;
         _gamePlayerMap = FindObjectOfType<Map>();
         mod = FindObjectOfType<Mod>();
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
@@ -80,6 +84,26 @@ public class Unit : MonoBehaviour, IPlayerUnit
         {
             NextMove();
         }
+    }
+
+    private void OnDestroy()
+    {
+        if (unitLabel != null)
+        {
+            Destroy(unitLabel);
+        }
+    }
+
+    public void SetLabelText(string text)
+    {
+        unitLabel.enabled = true;
+        unitLabel.transform.position = transform.position;
+        unitLabel.text = text;
+    }
+
+    public void RemoveLabel()
+    {
+        unitLabel.enabled = false;
     }
 
     private void SetDirection(Direction direction)
@@ -347,7 +371,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     {
         if (isMelee)
         {
-            return MeleeWeapon.RollDamage().Sum();
+            return HasMeleeWeapon ? MeleeWeapon.RollDamage().Sum() : 0;
         }
         else
         {
@@ -358,6 +382,11 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public void DamageReceived(Unit source, Weapon weaponUsed, int damage)
     {
         CurrentHealth -= damage;
+    }
+
+    public void SetLabel(Text text)
+    {
+        unitLabel = text;
     }
 }
 

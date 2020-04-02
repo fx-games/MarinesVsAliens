@@ -110,6 +110,7 @@ factions:
       - unit: STR_DREADNOUGHT
         count: 1
         weapons:
+          - STR_CLAW_AND_SWORD
           - STR_ROCKET_LAUNCHER
 units:
   - type: STR_SPACE_MARINE

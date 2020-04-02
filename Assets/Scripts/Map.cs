@@ -58,6 +58,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     private HashSet<Vector3Int> visibleTiles = new HashSet<Vector3Int>();
     private Mod mod;
     private IMapGenerator generator;
+    private Vector3Int lastCursorPosition;
 
     // Start is called before the first frame update
     void Awake()
@@ -141,10 +142,11 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     {
         Vector3 pos = gameCamera.ScreenToWorldPoint(Input.mousePosition);
         var mapPos = WorldToCell(pos);
-        if (Contains(mapPos.x, mapPos.y))
+        if (Contains(mapPos.x, mapPos.y) && mapPos != lastCursorPosition)
         {
             CurrentCursorPosition = mapPos;
             selectionRect.transform.position = CellToWorld(mapPos);
+            lastCursorPosition = mapPos;
         }
     }
     
@@ -462,9 +464,10 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return IsOtherFactionOn((Unit) unit, pos);
     }
 
-    public bool CanBePlaced(IPlayerUnit unit, Vector3Int mapPos, bool doorsAreBlocking = true)
+    public bool CanBePlaced(IPlayerUnit unit, Vector3Int mapPos, bool doorsAreBlocking = true,
+        bool friendlyUnitsAreBlocking = true)
     {
-        return CanBePlaced((Unit) unit, mapPos, doorsAreBlocking);
+        return CanBePlaced((Unit) unit, mapPos, doorsAreBlocking, friendlyUnitsAreBlocking);
     }
 
     public bool IsOtherUnitOn(IPlayerUnit unit, Vector3Int mapPos)
@@ -531,18 +534,28 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return thereIsADoor;
     }
 
-    public bool CanBePlaced(Unit unit, Vector3Int mapPos, bool doorsAreBlocking = true)
+    public bool CanBePlaced(Unit unit, Vector3Int mapPos, bool doorsAreBlocking = true,
+        bool friendlyUnitsAreBlocking = true)
     {
         foreach (var offset in unit.OccupiedTiles)
         {
             var offsetPos = mapPos + offset;
             if (!Contains(offsetPos.x, offsetPos.y) 
-                || IsOtherUnitOn(unit, offsetPos)
                 || IsWallAt(offsetPos.x,offsetPos.y))
             {
                 return false;
             }
 
+            if (friendlyUnitsAreBlocking)
+            {
+                if (IsOtherUnitOn(unit, offsetPos))
+                    return false;
+            }
+            else if (IsOtherFactionOn(unit, offsetPos))
+            {
+                return false;
+            }
+            
             if (doorsAreBlocking && IsDoorAt(offsetPos))
                 return false;
         }
@@ -600,7 +613,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             }
         }
         
-        return CanBePlaced(unit, newPos, false);
+        return CanBePlaced(unit, newPos, false, false);
     }
 
     public bool IsNeighborVisible(Vector3Int oldPos, Vector3Int newPos)
@@ -788,6 +801,15 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         }
 
         return results;
+    }
+
+    public bool ContainsWorldPos(Vector3 pos)
+    {
+        var worldMin = transform.TransformPoint(layerMap["Floors"].localBounds.min);
+        var worldMax = transform.TransformPoint(layerMap["Floors"].localBounds.max);
+        if (pos.x >= worldMin.x && pos.x <= worldMax.x && pos.y >= worldMin.y && pos.y <= worldMax.y)
+            return true;
+        return false;
     }
 }
 

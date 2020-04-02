@@ -27,7 +27,7 @@ namespace DefaultNamespace
         bool AreNeighbors(Vector3Int posOne, Vector3Int posTwo, bool includeDiagonals = false);
         List<Vector3Int> AreaOfEffect(Vector3Int unitPos, Weapon weapon, Vector3Int mapPos);
         bool IsOtherFactionOn(IPlayerUnit unit, Vector3Int pos);
-        bool CanBePlaced(IPlayerUnit unit, Vector3Int mapPos, bool doorsAreBlocking = true);
+        bool CanBePlaced(IPlayerUnit unit, Vector3Int mapPos, bool doorsAreBlocking = true, bool friendlyUnitsAreBlocking = true);
         bool IsOtherUnitOn(IPlayerUnit unit, Vector3Int mapPos);
     }
 

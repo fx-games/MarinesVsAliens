@@ -6,6 +6,7 @@ using DefaultNamespace;
 using GridPathFinder;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 using static Mod;
 using static Mod.RuleFaction;
@@ -21,7 +22,8 @@ public class Game : MonoBehaviour
         AttackTargetSelection,
         MovementSelectedPreConfirmation
     }
-
+    public GameObject unitLabelPrefab;
+    public Transform canvasTransform;
     public GameObject gridMapPrefab;
     public GameObject[] premadeMapBlocks;
 
@@ -97,43 +99,57 @@ public class Game : MonoBehaviour
         if (!EventSystem.current.IsPointerOverGameObject())
         {
             Vector3 pos = gameCamera.ScreenToWorldPoint(Input.mousePosition);
-            var cursorLocation = _map.WorldToCell(pos);
-            if (_map.Contains(cursorLocation.x, cursorLocation.y))
+            if (_map.ContainsWorldPos(pos))
+            {
+                var cursorLocation = _map.WorldToCell(pos);
+                if (_map.Contains(cursorLocation.x, cursorLocation.y))
+                {
+                    if (Input.GetMouseButtonDown(0))
+                    {
+                        if (_map.Contains(cursorLocation.x, cursorLocation.y))
+                        {
+                            InputPressedOnMap(cursorLocation);
+                        }
+                        else
+                        {
+                            DeselectAll();
+                        }
+                    }
+                    else if (Input.GetMouseButtonUp(0))
+                    {
+                        if (_map.Contains(cursorLocation.x, cursorLocation.y))
+                        {
+                            InputReleasedOnMap(cursorLocation);
+                        }
+                    }
+                    else if (Input.GetMouseButtonDown(1))
+                    {
+                        if (_map.Contains(cursorLocation.x, cursorLocation.y))
+                        {
+                            MapRightClicked(cursorLocation);
+                        }
+                        else
+                        {
+                            DeselectAll();
+                        }
+                    }
+                    else if (selectedUnit != null && gameState == GameState.MoveTargetSelection &&
+                             cursorLocation != lastCursorLocation)
+                    {
+                        //Debug.Log("PreviewMovement at " + cursorLocation);
+                        PreviewMovement(selectedUnit, cursorLocation);
+                    }
+                }
+
+                //Debug.Log("lastCursorLocation at " + cursorLocation);
+                lastCursorLocation = cursorLocation;
+            }
+            else
             {
                 if (Input.GetMouseButtonDown(0))
                 {
-                    if (_map.Contains(cursorLocation.x, cursorLocation.y))
-                    {
-                        InputPressedOnMap(cursorLocation);
-                    }
-                    else
-                    {
-                        DeselectAll();
-                    }
+                    DeselectAll();
                 }
-                else if (Input.GetMouseButtonUp(0))
-                {
-                    if (_map.Contains(cursorLocation.x, cursorLocation.y))
-                    {
-                        InputReleasedOnMap(cursorLocation);
-                    }
-                }
-                else if (Input.GetMouseButtonDown(1))
-                {
-                    if (_map.Contains(cursorLocation.x, cursorLocation.y))
-                    {
-                        MapRightClicked(cursorLocation);
-                    }
-                    else
-                    {
-                        DeselectAll();
-                    }
-                }
-                else if (selectedUnit != null && gameState == GameState.MoveTargetSelection && cursorLocation != lastCursorLocation)
-                {
-                    PreviewMovement(selectedUnit, cursorLocation);
-                }
-                lastCursorLocation = cursorLocation;
             }
         }
     }
@@ -226,14 +242,18 @@ public class Game : MonoBehaviour
 
     private void UnitSelected(Vector3Int mapPos)
     {
-        selectedUnit = (Unit)_map.GetUnitAt(mapPos);
-        selectedUnit.MarkAsSelected();
-        if (selectedUnit.MovesLeft > 0)
+        if (_map.IsUnitOn(mapPos))
         {
-            ShowReachableTiles(selectedUnit, selectedUnit.MovesLeft);
-            gameState = GameState.MoveTargetSelection;
+            selectedUnit = (Unit) _map.GetUnitAt(mapPos);
+            selectedUnit.MarkAsSelected();
+            if (selectedUnit.MovesLeft > 0)
+            {
+                ShowReachableTiles(selectedUnit, selectedUnit.MovesLeft);
+                gameState = GameState.MoveTargetSelection;
+            }
+
+            UpdateLabel();
         }
-        UpdateLabel();
     }
 
 
@@ -241,6 +261,7 @@ public class Game : MonoBehaviour
     {
         _map.RemoveAllHighlights();
         _map.RemoveAllHighlights(1);
+        allUnits.ForEach(unit => unit.RemoveLabel());
         gameState = GameState.Default;
     }
 
@@ -290,6 +311,15 @@ public class Game : MonoBehaviour
     private void ResolveAttack(int[] attackerDice, Vector3Int attackerPos, Unit attacker, Vector3Int targetPos, Vector3Int aoePos, Unit target)
     {
         var isMelee = IsMelee(attacker, target);
+
+        if (isMelee && !attacker.HasMeleeWeapon)
+        {
+            return; // No melee weapon for melee attack
+        }
+
+        if (!attacker.HasRangedWeapon)
+            return; // No weapon at all..
+        
         var isAoEPosition = targetPos != aoePos;
         
         var weapon = attacker.RangedWeapon;
@@ -429,8 +459,33 @@ public class Game : MonoBehaviour
             _map.RemoveAllHighlights(0);
             _map.RemoveAllHighlights(1);
             PreviewAttack(selectedUnit, _map.WorldToCell(selectedUnit.transform.position), 10);
-            gameState = GameState.AttackTargetSelection;
+            var unitsInRange = validTargets.Where(pos => _map.IsOtherFactionOn(selectedUnit, pos))
+                .Select(pos => _map.GetUnitAt(pos));
+            foreach (var unit in unitsInRange)
+            {
+                int chanceToHit = CalculateChanceToHit(selectedUnit, (Unit)unit);
+                ((Unit)unit).SetLabelText(chanceToHit.ToString());
+            }
+
+            if (validTargets.Count > 0)
+            {
+                gameState = GameState.AttackTargetSelection;
+            }
+            else
+            {
+                Debug.Log("No Targets");
+            }
         }
+    }
+
+    private int CalculateChanceToHit(Unit attackingUnit, Unit targetUnit)
+    {
+        int baseAccuracy = 70;
+        float distance = (attackingUnit.Cell - targetUnit.Cell).magnitude;
+
+        int accuracy = (int) Math.Max(baseAccuracy - (distance * 7.5f), 0);
+
+        return accuracy;
     }
 
     private void PreviewAttack(Unit unit, Vector3Int unitPos, int maxDistance)
@@ -472,6 +527,7 @@ public class Game : MonoBehaviour
             AddToValidMeleeTargets(unit,unitPos,unitPos + Vector3Int.down);
             AddToValidMeleeTargets(unit,unitPos,unitPos + Vector3Int.left);
         }
+        // never allow diagonal attacks
         validTargets.Remove(unitPos + Vector3Int.up + Vector3Int.right);
         validTargets.Remove(unitPos + Vector3Int.down + Vector3Int.left);
         validTargets.Remove(unitPos + Vector3Int.down + Vector3Int.right);
@@ -633,6 +689,12 @@ public class Game : MonoBehaviour
             
             unit.FinishedMoving += UnitFinishedMoving;
             unit.StepCompleted += UnitStepCompleted;
+            
+            var unitLabel = Instantiate(unitLabelPrefab).GetComponent<Text>();
+            unitLabel.transform.SetParent(canvasTransform);
+            unitLabel.enabled = false;
+            unit.SetLabel(unitLabel);
+            
             allUnits.Add(unit);
             
             //gameMap.UpdateFOV(spawnPosition, unit.visionRange);
