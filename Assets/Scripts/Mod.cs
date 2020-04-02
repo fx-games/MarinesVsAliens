@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Networking;
 using YamlDotNet.RepresentationModel;
 using YamlDotNet.Samples;
 using YamlDotNet.Serialization;
@@ -120,18 +121,25 @@ public class Mod : MonoBehaviour
     {
         ReadRules();
     }
-
-    string ReadTextFile(string filePath)
+#if UNITY_WEBGL
+    void ReadTextFile(string fileUrl)
+    {
+        var request = new UnityWebRequest(fileUrl);
+        request.SendWebRequest().completed += operation => { OnRuleFileLoaded(request.downloadHandler.text); };
+    }
+#else
+    void ReadTextFile(string filePath)
     {
         StreamReader streamReader = new StreamReader(filePath);
         string output = streamReader.ReadToEnd();
         streamReader.Close();
-        return output;
+        OnRuleFileLoaded(output);
     }
-    private void ReadRules()
+#endif
+
+    private void OnRuleFileLoaded(string ruleText)
     {
-        var unitsFile = Path.Combine(Application.streamingAssetsPath, "core.rul");
-        var input = new StringReader(ReadTextFile(unitsFile));
+        var input = new StringReader(ruleText);
         //var yaml = new YamlStream();
         //yaml.Load(input);
         var deserializerBuilder = new DeserializerBuilder().IgnoreUnmatchedProperties().WithNamingConvention(new CamelCaseNamingConvention());
@@ -170,6 +178,11 @@ public class Mod : MonoBehaviour
         {
             translations[translation.Lang] = translation;
         }
+    }
+    private void ReadRules()
+    {
+        var unitsFile = Path.Combine(Application.streamingAssetsPath, "core.rul");
+        ReadTextFile(unitsFile);
     }
 
     public RuleUnit GetUnitRule(string type)
