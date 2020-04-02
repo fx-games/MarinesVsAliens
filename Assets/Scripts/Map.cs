@@ -601,6 +601,8 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         // handle diagonal cases
         if (oldPos.x != newPos.x && oldPos.y != newPos.y)
         {
+            if (!Options.AllowDiagonalMovement) return false;
+            
             var dx = oldPos.x - newPos.x;
             var dy = oldPos.y - newPos.y;
             // one is to the top right of two

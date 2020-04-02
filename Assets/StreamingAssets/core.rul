@@ -51,6 +51,7 @@ spawns:
 
 factions:
   - type: STR_BLUE_MARINES
+    spritePrefix: Marine
     color: [57,135,203,1]
     loadOut:
       - unit: STR_MARINE_COMMANDER
@@ -73,6 +74,7 @@ factions:
           - STR_MARINE_MELEE
           - STR_PLASMA_GUN
   - type: STR_RED_MARINES
+    spritePrefix: RedSpace
     color: [226,55,60,1]
     loadOut:
       - unit: STR_MARINE_COMMANDER
@@ -95,6 +97,7 @@ factions:
           - STR_MARINE_MELEE
           - STR_PLASMA_GUN
   - type: STR_ALIENS
+    spritePrefix: Alien
     color: [177, 52, 235, 1]
     loadOut:
       - unit: STR_GRINDLING
@@ -107,25 +110,28 @@ factions:
         weapons:
           - STR_MARINE_MELEE
           - STR_RIFLE
-      - unit: STR_DREADNOUGHT
-        count: 1
-        weapons:
-          - STR_CLAW_AND_SWORD
-          - STR_ROCKET_LAUNCHER
+#      - unit: STR_DREADNOUGHT
+#        count: 1
+#        weapons:
+#          - STR_CLAW_AND_SWORD
+#          - STR_ROCKET_LAUNCHER
 units:
   - type: STR_SPACE_MARINE
     movement: 4
     health: 1
     armor: 2
   - type: STR_MARINE_COMMANDER
+    unitSprite: Commander
     movement: 6
     health: 6
     armor: 2
   - type: STR_GRINDLING
+    unitSprite: Spider
     movement: 8
     health: 1
     armor: 0
   - type: STR_ORK
+    unitSprite: Rifle
     movement: 6
     health: 1
     armor: 1
@@ -145,6 +151,7 @@ weapons:
       - [1,2,3,0,0,0]
     isMelee: true
   - type: STR_RIFLE
+    weaponSprite: Rifle
     damage:
       - [1,2,0,0,0,0]
       - [1,2,0,0,0,0]
@@ -154,16 +161,19 @@ weapons:
       - [1,2,0,0,0,0]
     isMelee: true
   - type: STR_ROCKET_LAUNCHER
+    weaponSprite: Rocket
     damage:
       - [1,2,3,0,0,0]
       - [1,2,3,0,0,0]
     radius: 1
   - type: STR_HEAVY_ASSAULT_CANNON
+    weaponSprite: Heavy
     damage:
       - [1,2,3,0,0,0]
       - [1,2,3,0,0,0]
     damageDistribution: true
   - type: STR_PLASMA_GUN
+    weaponSprite: Heavy
     damage:
       - [1,2,3,0,0,0]
       - [1,2,3,0,0,0]

@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6319958624270810967}
   - component: {fileID: 2107280276493282762}
+  - component: {fileID: 4190640149630756145}
   m_Layer: 0
   m_Name: Sprite
   m_TagString: Untagged
@@ -70,7 +71,7 @@ SpriteRenderer:
   m_SortingLayerID: 2079868369
   m_SortingLayer: 2
   m_SortingOrder: 0
-  m_Sprite: {fileID: -7801199871535558032, guid: ab3cb6d4caafa46808f2d173069831a1,
+  m_Sprite: {fileID: -7883922284296554688, guid: ab3cb6d4caafa46808f2d173069831a1,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -82,6 +83,22 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+--- !u!114 &4190640149630756145
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 745819063688846956}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 38564dc6ca4c346e2a9f90ee66535d7b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  frames:
+  - {fileID: -7883922284296554688, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 1513697457679494925, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  DestroyOnFinish: 1
 --- !u!1 &3510056058709453012
 GameObject:
   m_ObjectHideFlags: 0
@@ -93,7 +110,7 @@ GameObject:
   - component: {fileID: 3510056058709453009}
   - component: {fileID: 3510056058709453015}
   m_Layer: 0
-  m_Name: Unit
+  m_Name: RedSpaceRifle 1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -126,7 +143,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6de6faf0488604afb89d26432d543eb8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  uiLabelPrefab: {fileID: 4860974059615001587, guid: 4e4b815aad9d347d69c6d2dae5a0bd75,
-    type: 3}
   bloodSplatter: {fileID: 5972786585338085383, guid: 18b98604ca4274cdcbb7ea9a3dfce325,
     type: 3}

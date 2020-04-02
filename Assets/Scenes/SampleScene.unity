@@ -560,8 +560,19 @@ MonoBehaviour:
   premadeMapBlocks:
   - {fileID: 8754880735499266654, guid: 6e9dfcc2367df4acb8b9e9adce5500bc, type: 3}
   - {fileID: 2223305004873385641, guid: 4373d706cfe934cf581754da9fdb3a37, type: 3}
-  unitPrefab: {fileID: 3510056058709453012, guid: 160bfee3402b1467482642e64bde1023,
-    type: 3}
+  unitPrefabs:
+  - {fileID: 3510056058709453012, guid: afa119a5405264ff49ddab1b23605099, type: 3}
+  - {fileID: 3510056058709453012, guid: 830c0d4175b9d4042b9beb6b04d205fa, type: 3}
+  - {fileID: 3510056058709453012, guid: 3ce33b0e64c7a49eeb8b3213c8e8611d, type: 3}
+  - {fileID: 3510056058709453012, guid: 160bfee3402b1467482642e64bde1023, type: 3}
+  - {fileID: 3510056058709453012, guid: 1ac83802138074b5db3bc9ac14a88dc1, type: 3}
+  - {fileID: 3510056058709453012, guid: e68d0daa36c82416ab53dcd10eb81552, type: 3}
+  - {fileID: 3510056058709453012, guid: b8d98e1d32e8a4e73a9c53ab83b7facb, type: 3}
+  - {fileID: 3510056058709453012, guid: 5ca6b539893fb45998a06145cc0f00a9, type: 3}
+  - {fileID: 3510056058709453012, guid: c50bb781ec3d14d0198c190128d2a999, type: 3}
+  - {fileID: 3510056058709453012, guid: 7b7b599f6fb204a2eae6dda06374cff5, type: 3}
+  - {fileID: 3510056058709453012, guid: 0926a0953939944c9a691b3ae618f5a7, type: 3}
+  - {fileID: 3510056058709453012, guid: 9edc324d3c06a4b9d9ebcce4aa3dd9d9, type: 3}
   explosionPrefab: {fileID: 5012863476137197226, guid: 5b8a5482dc39842e18a1802f79c1f97a,
     type: 3}
   selectedUnit: {fileID: 0}

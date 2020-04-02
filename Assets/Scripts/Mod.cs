@@ -67,6 +67,7 @@ public class Mod : MonoBehaviour
     public class RuleFaction
     {
         public string Type { get; set; }
+        public string SpritePrefix { get; set; } = "Marine";
         public int[] Color { get; set; }
 
         public List<RuleLoadout> LoadOut { get; set; }
@@ -86,6 +87,7 @@ public class Mod : MonoBehaviour
         [DefaultValue(0)] public int Armor { get; set; } = 0;
         public List<int[]> OccupiedTiles { get; set; } = new List<int[]> {new []{0,0}};
         public bool CanMoveDiagonally { get; set; } = true;
+        public string UnitSprite { get; set; } = "";
     }
     
     public class RuleWeapon
@@ -96,6 +98,7 @@ public class Mod : MonoBehaviour
         [DefaultValue(false)] public bool IsMelee { get; set; } = false;
         [DefaultValue(false)] public bool StraightLineOnly { get; set; } = false;
         [DefaultValue(false)] public bool DamageLineOfFire { get; set; } = false;
+        public string WeaponSprite { get; set; } = "";
     }
     private Dictionary<string, RuleFaction> factionRules = new Dictionary<string, RuleFaction>();
     private Dictionary<string, RuleUnit> unitRules = new Dictionary<string, RuleUnit>();

@@ -20,18 +20,18 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public int MovesLeft { get; private set; } = 4;
     public int CurrentVisionRange { get; } = 20;
     public int CurrentHealth { get; private set; } = 1;
-    private int currentArmor = 2;
+    public int CurrentArmor { get; set; } = 2;
     public bool CanAttack { get; private set; } = true;
     public RuleFaction Faction { get; set; }
     
-    public Vector3Int Cell => _gamePlayerMap.WorldToCell(transform.position);
+    public Vector3Int Cell => _map.WorldToCell(transform.position);
 
     private float lastMoveTime;
     private double moveDelay = 0.2f;
     private Mod mod;
     private RuleUnit unitRules;
 
-    private Map _gamePlayerMap;
+    private Map _map;
     private int currentPathIndex;
     private List<Vector3Int> currentPath;
     private SpriteRenderer spriteRenderer;
@@ -72,7 +72,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     void Awake()
     {
         gameCamera = Camera.main;
-        _gamePlayerMap = FindObjectOfType<Map>();
+        _map = FindObjectOfType<Map>();
         mod = FindObjectOfType<Mod>();
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
     }
@@ -128,7 +128,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     {   
         if (currentPathIndex < currentPath.Count)
         {
-            var lastPos = _gamePlayerMap.WorldToCell(transform.position);
+            var lastPos = _map.WorldToCell(transform.position);
             var nextPos = currentPath[currentPathIndex];
             State = UnitState.Moving;
             lastMoveTime = Time.time;
@@ -210,7 +210,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public void BeginMoving(List<Vector3Int> path)
     {
         if (State == UnitState.Moving) return;
-        var oldMapPos = _gamePlayerMap.WorldToCell(transform.position);
+        var oldMapPos = _map.WorldToCell(transform.position);
         path.Remove(oldMapPos);
         currentPathIndex = 0;
         currentPath = path;
@@ -219,26 +219,27 @@ public class Unit : MonoBehaviour, IPlayerUnit
         //Debug.Log("Moving: " + steps);
         MovesLeft -= steps;
         // TELEPORT INSTANTLY TO THE END OF THE PATH ON THE MAP - BECAUSE OF PATHFINDING OF OTHER UNITS
-        _gamePlayerMap.MoveUnit(this, oldMapPos, path.Last());
+        _map.MoveUnit(this, oldMapPos, path.Last());
         UpdateMarker();
     }
 
 
     public void AnimateMovement(Vector3Int mapPos)
     {
-        var oldPos = _gamePlayerMap.WorldToCell(transform.position);
+        var oldPos = _map.WorldToCell(transform.position);
         RepositionUnitInWorld(mapPos);
         OnStepCompleted(oldPos);
     }
 
     private void RepositionUnitInWorld(Vector3Int mapPos)
     {
-        var cellToWorld = _gamePlayerMap.CellToWorld(mapPos);
+        var cellToWorld = _map.CellToWorld(mapPos);
         transform.position = cellToWorld;
     }
 
     public void UnitDeath()
     {
+        Deselect();
         Instantiate(bloodSplatter, transform.position, Quaternion.identity);
         Destroy(gameObject);
     }
@@ -261,7 +262,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
         unitRules = mod.GetUnitRule(unitType);
         name = mod.Tr(unitType);
-        currentArmor = unitRules.Armor;
+        CurrentArmor = unitRules.Armor;
         CurrentHealth = unitRules.Health;
         MovesLeft = unitRules.Movement;
 
@@ -311,12 +312,22 @@ public class Unit : MonoBehaviour, IPlayerUnit
     
     public void MarkAsSelected()
     {
-        var unitMarker = _gamePlayerMap.GetUnitMarker();
+        var unitMarker = _map.GetUnitMarker();
         
         markerRenderer = unitMarker.GetComponent<SpriteRenderer>();
         markerRenderer.enabled = true;
         SetMarkerSize(unitMarker);
         UpdateMarker();
+    }
+
+    public void Deselect()
+    {
+        if (markerRenderer != null)
+        {
+            markerRenderer.transform.SetParent(null);
+            markerRenderer.enabled = false;
+            markerRenderer = null;
+        }
     }
 
     private void SetMarkerSize(GameObject unitMarker)
@@ -375,7 +386,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
         }
         else
         {
-            return currentArmor;
+            return CurrentArmor;
         }
     }
 
@@ -387,6 +398,22 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public void SetLabel(Text text)
     {
         unitLabel = text;
+    }
+
+    public bool IsNextTo(Unit target)
+    {
+        foreach (var targetOccupiedTile in target.OccupiedTiles)
+        {
+            foreach (var occupiedTile in OccupiedTiles)
+            {
+                if (_map.AreNeighbors(Cell + occupiedTile, target.Cell + targetOccupiedTile))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }
 

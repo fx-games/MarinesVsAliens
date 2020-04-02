@@ -76,11 +76,13 @@
     <Compile Include="Assets\Scripts\Map.cs" />
     <Compile Include="Assets\Scripts\MapFromScript.cs" />
     <Compile Include="Assets\Scripts\Mod.cs" />
+    <Compile Include="Assets\Scripts\Options.cs" />
     <Compile Include="Assets\Scripts\Pathfinder.cs" />
     <Compile Include="Assets\Scripts\PlayerInterface.cs" />
     <Compile Include="Assets\Scripts\RandomSprite.cs" />
     <Compile Include="Assets\Scripts\SimpleAnimation.cs" />
     <Compile Include="Assets\Scripts\Unit.cs" />
+    <Compile Include="Assets\Scripts\UnitAnimator.cs" />
     <Compile Include="Assets\Scripts\WallTile.cs" />
     <None Include="Assets\Packages\C5.2.5.3\lib\netstandard1.0\C5.xml" />
     <None Include="Assets\PaidAssets\BitmapFonts\Pixel\_PixelCharLimits.txt" />
