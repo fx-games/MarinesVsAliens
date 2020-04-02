@@ -32,14 +32,14 @@ mapBlocks:
 
 
 spawns:
-  - faction: STR_BLUE_MARINES
+  - faction: STR_GREEN_MARINES
     locations:
       - [0,0]
       - [0,1]
       - [1,0]
       - [1,1]
       - [1,2]
-  - faction: STR_RED_MARINES
+  - faction: STR_RED_SPACEMEN
     locations:
       - [11,11]
       - [10,11]
@@ -50,92 +50,92 @@ spawns:
     randomPlacement: true
 
 factions:
-  - type: STR_BLUE_MARINES
+  - type: STR_GREEN_MARINES
     spritePrefix: Marine
     color: [57,135,203,1]
     loadOut:
-      - unit: STR_MARINE_COMMANDER
+      - unit: STR_SQUAD_LEADER
         weapons:
-          - STR_CLAW_AND_SWORD
-      - unit: STR_SPACE_MARINE
+          - STR_HARD_HITTER
+      - unit: STR_SQUADDIE
         weapons:
-          - STR_MARINE_MELEE
+          - STR_NORMAL_HITTER
           - STR_RIFLE
-      - unit: STR_SPACE_MARINE
+      - unit: STR_SQUADDIE
         weapons:
-          - STR_MARINE_MELEE
+          - STR_NORMAL_HITTER
           - STR_ROCKET_LAUNCHER
-      - unit: STR_SPACE_MARINE
+      - unit: STR_SQUADDIE
         weapons:
-          - STR_MARINE_MELEE
+          - STR_NORMAL_HITTER
           - STR_HEAVY_ASSAULT_CANNON
-      - unit: STR_SPACE_MARINE
+      - unit: STR_SQUADDIE
         weapons:
-          - STR_MARINE_MELEE
+          - STR_NORMAL_HITTER
           - STR_PLASMA_GUN
-  - type: STR_RED_MARINES
+  - type: STR_RED_SPACEMEN
     spritePrefix: RedSpace
     color: [226,55,60,1]
     loadOut:
-      - unit: STR_MARINE_COMMANDER
+      - unit: STR_SQUAD_LEADER
         weapons:
-          - STR_CLAW_AND_SWORD
-      - unit: STR_SPACE_MARINE
+          - STR_HARD_HITTER
+      - unit: STR_SQUADDIE
         weapons:
-          - STR_MARINE_MELEE
+          - STR_NORMAL_HITTER
           - STR_RIFLE
-      - unit: STR_SPACE_MARINE
+      - unit: STR_SQUADDIE
         weapons:
-          - STR_MARINE_MELEE
+          - STR_NORMAL_HITTER
           - STR_ROCKET_LAUNCHER
-      - unit: STR_SPACE_MARINE
+      - unit: STR_SQUADDIE
         weapons:
-          - STR_MARINE_MELEE
+          - STR_NORMAL_HITTER
           - STR_HEAVY_ASSAULT_CANNON
-      - unit: STR_SPACE_MARINE
+      - unit: STR_SQUADDIE
         weapons:
-          - STR_MARINE_MELEE
+          - STR_NORMAL_HITTER
           - STR_PLASMA_GUN
   - type: STR_ALIENS
     spritePrefix: Alien
     color: [177, 52, 235, 1]
     loadOut:
-      - unit: STR_GRINDLING
+      - unit: STR_SPIDER_ALIEN
         count: 3
         weapons:
-          - STR_MARINE_MELEE
+          - STR_NORMAL_HITTER
           - STR_RIFLE
-      - unit: STR_ORK
+      - unit: STR_RIFLE_ALIEN
         count: 3
         weapons:
-          - STR_MARINE_MELEE
+          - STR_NORMAL_HITTER
           - STR_RIFLE
-#      - unit: STR_DREADNOUGHT
+#      - unit: STR_BIG_ALIEN
 #        count: 1
 #        weapons:
-#          - STR_CLAW_AND_SWORD
+#          - STR_HARD_HITTER
 #          - STR_ROCKET_LAUNCHER
 units:
-  - type: STR_SPACE_MARINE
+  - type: STR_SQUADDIE
     movement: 4
     health: 1
     armor: 2
-  - type: STR_MARINE_COMMANDER
+  - type: STR_SQUAD_LEADER
     unitSprite: Commander
     movement: 6
     health: 6
     armor: 2
-  - type: STR_GRINDLING
+  - type: STR_SPIDER_ALIEN
     unitSprite: Spider
     movement: 8
     health: 1
     armor: 0
-  - type: STR_ORK
+  - type: STR_RIFLE_ALIEN
     unitSprite: Rifle
     movement: 6
     health: 1
     armor: 1
-  - type: STR_DREADNOUGHT
+  - type: STR_BIG_ALIEN
     movement: 4
     health: 3
     armor: 4
@@ -143,7 +143,7 @@ units:
     canMoveDiagonally: false
 
 weapons:
-  - type: STR_CLAW_AND_SWORD
+  - type: STR_HARD_HITTER
     damage:
       - [1,2,0,0,0,0]
       - [1,2,0,0,0,0]
@@ -155,7 +155,7 @@ weapons:
     damage:
       - [1,2,0,0,0,0]
       - [1,2,0,0,0,0]
-  - type: STR_MARINE_MELEE
+  - type: STR_NORMAL_HITTER
     damage:
       - [1,2,0,0,0,0]
       - [1,2,0,0,0,0]
@@ -183,18 +183,18 @@ weapons:
 translations:
   - lang: en-US
     strings:
-      STR_FIRST_MISSION: Mission Dreadnought
-      STR_ALIENS: Hordes of Chaos
-      STR_BLUE_MARINES: Ultra Marines
-      STR_RED_MARINES: Blood Angels
-      STR_YELLOW_MARINES: Imperial Fist
-      STR_ORK: Ork
-      STR_GRINDLING: Grindling
-      STR_SPACE_MARINE: Space Marine
-      STR_MARINE_COMMANDER: Marine Commander
+      STR_FIRST_MISSION: Mission One
+      STR_ALIENS: Alien Lifeforms
+      STR_GREEN_MARINES: Colonial Marines
+      STR_RED_SPACEMEN: Travellers
+      STR_YELLOW_MARINES: Legion
+      STR_SPIDER_ALIEN: Spiderbrain
+      STR_RIFLE_ALIEN: Xenophob
+      STR_SQUADDIE: Space Marine
+      STR_SQUAD_LEADER: Squad Leader
       STR_PLASMA_GUN: Plasma Gun
       STR_HEAVY_ASSAULT_CANNON: Assault Cannon
       STR_ROCKET_LAUNCHER: Missile Launcher
-      STR_MARINE_MELEE: Melee
-      STR_RIFLE: Bolter
-      STR_CLAW_AND_SWORD: Powerfist & Sword
+      STR_NORMAL_HITTER: Melee
+      STR_RIFLE: Plasma Rifle
+      STR_HARD_HITTER: Charged Punch

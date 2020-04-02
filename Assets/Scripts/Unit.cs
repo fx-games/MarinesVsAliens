@@ -88,6 +88,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     private void OnDestroy()
     {
+        Debug.Log("OnDestroy of " + name);
         if (unitLabel != null)
         {
             Destroy(unitLabel);
@@ -106,6 +107,18 @@ public class Unit : MonoBehaviour, IPlayerUnit
         unitLabel.enabled = false;
     }
 
+    public void TurnTowards(Vector3Int position)
+    {
+        if (position.x > Cell.x)
+        {
+            SetDirection(Direction.East);
+        }
+        else
+        {
+            SetDirection(Direction.West);
+        }
+    }
+    
     private void SetDirection(Direction direction)
     {
         switch (direction)
@@ -132,8 +145,9 @@ public class Unit : MonoBehaviour, IPlayerUnit
             var nextPos = currentPath[currentPathIndex];
             State = UnitState.Moving;
             lastMoveTime = Time.time;
-            AnimateMovement(nextPos);
+            RepositionUnitInWorld(nextPos);
             UpdateDirection(lastPos, nextPos);
+            OnStepCompleted(lastPos);
             currentPathIndex++;
         }
         else
@@ -223,14 +237,6 @@ public class Unit : MonoBehaviour, IPlayerUnit
         UpdateMarker();
     }
 
-
-    public void AnimateMovement(Vector3Int mapPos)
-    {
-        var oldPos = _map.WorldToCell(transform.position);
-        RepositionUnitInWorld(mapPos);
-        OnStepCompleted(oldPos);
-    }
-
     private void RepositionUnitInWorld(Vector3Int mapPos)
     {
         var cellToWorld = _map.CellToWorld(mapPos);
@@ -239,6 +245,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     public void UnitDeath()
     {
+        Debug.Log("Death of " + name);
         Deselect();
         Instantiate(bloodSplatter, transform.position, Quaternion.identity);
         Destroy(gameObject);
@@ -298,7 +305,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
         UpdateMarker();
     }
 
-    public void PrepareNewTurn()
+    public void PrepareNewPhase()
     {
         MovesLeft = unitRules.Movement;
         CanAttack = true;

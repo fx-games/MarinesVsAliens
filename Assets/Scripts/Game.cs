@@ -20,7 +20,8 @@ public class Game : MonoBehaviour
         Default,
         MoveTargetSelection,
         AttackTargetSelection,
-        MovementSelectedPreConfirmation
+        MovementSelectedPreConfirmation,
+        WaitForHotSeatPlayer
     }
     public GameObject unitLabelPrefab;
     public Transform canvasTransform;
@@ -35,6 +36,7 @@ public class Game : MonoBehaviour
     public Unit selectedUnit;
     private Camera gameCamera;
     public Text topLeftLabel;
+    public Text centerOfScreenLabel;
     private Pathfinder pathfinder;
     private GameState gameState = GameState.Default;
     private HashSet<Vector3Int> validTargets = new HashSet<Vector3Int>();
@@ -48,6 +50,7 @@ public class Game : MonoBehaviour
 
     private void Awake()
     {
+        centerOfScreenLabel.enabled = false;
         mod = GetComponent<Mod>();
         gameCamera = Camera.main;
         if (gameCamera == null)
@@ -94,6 +97,7 @@ public class Game : MonoBehaviour
         pathfinder = new Pathfinder(_map, 1.0f, 1.2f);
         
         phaseFaction = -1;
+        
         NewTurn();
         PrepareNextPhase();
     }
@@ -213,12 +217,14 @@ public class Game : MonoBehaviour
     {
         if (unit == null) return;
         ToDefaultState();
+        unit.TurnTowards(targetedPos);
+        
         var unitPos = unit.Cell;
         var isMelee = _map.AreNeighbors(unitPos,targetedPos);
         var weapon = isMelee ? unit.MeleeWeapon : unit.RangedWeapon;
         var areaOfEffect = _map.AreaOfEffect(unitPos, weapon, targetedPos);
         int[] attackValues = Options.CombatMechanics.AttackValues(isMelee, unit, targetedPos);
-        
+        var attackScore = attackValues.Sum();
         foreach (var aoePos in areaOfEffect)
         {
             if (!_map.AoEAllowed(unit, weapon, targetedPos, aoePos)) continue;
@@ -228,9 +234,12 @@ public class Game : MonoBehaviour
             if (!_map.IsUnitOn(aoePos)) continue;
         
             var hitUnit = (Unit)_map.GetUnitAt(aoePos);
+            
+            hitUnit.TurnTowards(unit.Cell);
+            
             Options.CombatMechanics.ResolveAttack(attackValues, unitPos,unit, targetedPos, aoePos, hitUnit);
             
-            if (isMelee && Options.CombatMechanics is DiceBasedCombat)
+            if (attackScore > 0 && isMelee && Options.CombatMechanics is DiceBasedCombat)
             {
                 var defense = ((DiceBasedCombat) Options.CombatMechanics).LastMeleeDefense;
                 hitUnit.SetLabelText(defense.ToString());
@@ -238,8 +247,9 @@ public class Game : MonoBehaviour
         }
 
         unit.HasAttacked();
+
         
-        unit.SetLabelText(attackValues.Sum().ToString());
+        unit.SetLabelText(attackScore.ToString());
 
         
     }
@@ -320,7 +330,7 @@ public class Game : MonoBehaviour
                 _map.RemoveDoor(unit, neighborPos);
                 
                 _map.UpdateFOV(unit.Cell, unit.CurrentVisionRange);
-                UpdateVisibleUnits();
+                UpdateVisibleUnits(unit);
 
                 break;
             }
@@ -329,11 +339,30 @@ public class Game : MonoBehaviour
 
     public void EndTurnButtonClicked()
     {
-        if (!IsMissionOver())
+        if (gameState == GameState.WaitForHotSeatPlayer)
         {
-            PrepareNextPhase();
+            StartNextPhase();
+        }
+        else
+        {
+            if (!IsMissionOver())
+            {
+                PrepareNextPhase();
+            }
         }
     }
+
+    private void StartWaitingForHeatSeatPlayer(RuleFaction faction)
+    {
+        gameState = GameState.WaitForHotSeatPlayer;
+        centerOfScreenLabel.enabled = true;
+        centerOfScreenLabel.text = "NEXT PLAYER\n" + faction;
+        allUnits.ForEach(unit => unit.SetVisible(false));
+        _map.ResetFog();
+        CenterCameraOn(new Vector3Int(_map.Width / 2, _map.Height / 2, 0));
+    }
+
+    
 
     private bool IsMissionOver()
     {
@@ -383,13 +412,20 @@ public class Game : MonoBehaviour
             phaseFaction = 0;
             NewTurn();
         }
+        
+        StartWaitingForHeatSeatPlayer(CurrentFaction);
+    }
 
+    private void StartNextPhase()
+    {
+        centerOfScreenLabel.enabled = false;
+            
         bool firstUnitFound = false;
         foreach (var unit in allUnits)
         {
             if (unit.Faction == CurrentFaction)
             {
-                unit.PrepareNewTurn();
+                unit.PrepareNewPhase();
                 if (!firstUnitFound)
                 {
                     firstUnitFound = true;
@@ -412,6 +448,10 @@ public class Game : MonoBehaviour
     {
         var unitPos = unit.transform.position;
         gameCamera.GetComponent<CameraControls>().SmoothTransition(unitPos);
+    }
+    private void CenterCameraOn(Vector3Int pos)
+    {
+        gameCamera.GetComponent<CameraControls>().SmoothTransition(_map.CellToWorld(pos));
     }
 
     public void AttackButtonClicked()
@@ -708,16 +748,21 @@ public class Game : MonoBehaviour
         _map.IsStandingOnDoor(unit, true);
         
         _map.UpdateFOV(newPos, unit.CurrentVisionRange);
-        UpdateVisibleUnits();
+        
+        UpdateVisibleUnits(unit);
     }
 
-    private void UpdateVisibleUnits()
+    private void UpdateVisibleUnits(Unit sourceUnit)
     {
         foreach (var unit in allUnits)
         {
             var unitPos = _map.WorldToCell(unit.transform.position);
             var shouldBeVisible = unit.Faction == CurrentFaction
                                   || !_map.IsInFog(unitPos);
+            if (shouldBeVisible && unit.Faction != CurrentFaction)
+            {
+                unit.TurnTowards(sourceUnit.Cell);
+            }
             unit.SetVisible(shouldBeVisible);
         }
     }

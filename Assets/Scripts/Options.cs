@@ -74,7 +74,7 @@ namespace DefaultNamespace
         public void ResolveAttack(int[] attackerDice, Vector3Int attackerPos, Unit attacker, Vector3Int targetPos, Vector3Int aoePos, Unit target)
         {
             var isMelee = IsMelee(attacker, target);
-
+            
             if (isMelee && !attacker.HasMeleeWeapon)
             {
                 return; // No melee weapon for melee attack

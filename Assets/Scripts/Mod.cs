@@ -66,6 +66,8 @@ public class Mod : MonoBehaviour
 
     public class RuleFaction
     {
+        public Mod Mod { get; set; }
+
         public string Type { get; set; }
         public string SpritePrefix { get; set; } = "Marine";
         public int[] Color { get; set; }
@@ -77,6 +79,11 @@ public class Mod : MonoBehaviour
             public string Unit { get; set; }
             [DefaultValue(1)] public int Count { get; set; } = 1;
             public List<string> Weapons { get; set; }
+        }
+
+        public override string ToString()
+        {
+            return Mod.Tr(Type);
         }
     }
     public class RuleUnit
@@ -134,6 +141,7 @@ public class Mod : MonoBehaviour
         //Debug.Log("Rules: " + rules.Factions.Count + "/" + rules.Units.Count + "/" + rules.Weapons.Count + "/" + rules.Spawns.Count);
         foreach (var ruleFaction in rules.Factions)
         {
+            ruleFaction.Mod = this;
             factionRules[ruleFaction.Type] = ruleFaction;
         }
         foreach (var ruleUnit in rules.Units)
@@ -149,7 +157,6 @@ public class Mod : MonoBehaviour
         {
             spawnRules[ruleSpawn.Faction] = ruleSpawn;
         }
-        
         
         foreach (var ruleMap in rules.Maps)
         {
