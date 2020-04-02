@@ -171,6 +171,7 @@ weapons:
     damage:
       - [1,2,3,0,0,0]
       - [1,2,3,0,0,0]
+    multipleTargets: true
     damageDistribution: true
   - type: STR_PLASMA_GUN
     weaponSprite: Heavy

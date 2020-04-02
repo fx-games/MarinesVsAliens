@@ -106,6 +106,8 @@ public class Mod : MonoBehaviour
         [DefaultValue(false)] public bool IsMelee { get; set; } = false;
         [DefaultValue(false)] public bool StraightLineOnly { get; set; } = false;
         [DefaultValue(false)] public bool DamageLineOfFire { get; set; } = false;
+        [DefaultValue(false)] public bool DamageDistribution { get; set; } = false;
+        public bool MultipleTargets { get; set; } = false;
         public string WeaponSprite { get; set; } = "";
     }
     private Dictionary<string, RuleFaction> factionRules = new Dictionary<string, RuleFaction>();

@@ -397,10 +397,18 @@ public class Unit : MonoBehaviour, IPlayerUnit
         }
     }
 
-    public void DamageReceived(Unit source, Weapon weaponUsed, int damage)
+    public int DamageReceived(Unit source, Weapon weaponUsed, int damage)
     {
         Debug.Log(name + " received " + damage + " damage");
+        var oldHealth = CurrentHealth;
         CurrentHealth -= damage;
+        
+        if (damage > oldHealth)
+        {
+            return damage - oldHealth;
+        }
+
+        return 0;
     }
 
     public void SetLabel(Text text)

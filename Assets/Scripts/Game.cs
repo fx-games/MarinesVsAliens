@@ -47,6 +47,7 @@ public class Game : MonoBehaviour
     private Vector3Int lastCursorLocation;
     private int currentMapIndex;
     private int currentTurn = 0;
+    private HashSet<Vector3Int> multipleTargets = new HashSet<Vector3Int>();
 
     private void Awake()
     {
@@ -213,45 +214,84 @@ public class Game : MonoBehaviour
         UpdateLabel();
     }
 
-    private void TryAttackWithUnit(Unit unit, Vector3Int targetedPos)
+    private void TryAttackWithUnit(Unit unit, Vector3Int targetedPos, bool isMultipleTargetConfirmation = false)
     {
         if (unit == null) return;
-        ToDefaultState();
-        unit.TurnTowards(targetedPos);
-        
         var unitPos = unit.Cell;
         var isMelee = _map.AreNeighbors(unitPos,targetedPos);
         var weapon = isMelee ? unit.MeleeWeapon : unit.RangedWeapon;
-        var areaOfEffect = _map.AreaOfEffect(unitPos, weapon, targetedPos);
-        int[] attackValues = Options.CombatMechanics.AttackValues(isMelee, unit, targetedPos);
-        var attackScore = attackValues.Sum();
-        foreach (var aoePos in areaOfEffect)
+
+        if (weapon.Rules.MultipleTargets && !isMultipleTargetConfirmation)
         {
-            if (!_map.AoEAllowed(unit, weapon, targetedPos, aoePos)) continue;
+            multipleTargets.Add(targetedPos);
+            return;
+        }
         
-            CreateExplosion(aoePos);
+        ToDefaultState();
         
-            if (!_map.IsUnitOn(aoePos)) continue;
-        
-            var hitUnit = (Unit)_map.GetUnitAt(aoePos);
-            
-            hitUnit.TurnTowards(unit.Cell);
-            
-            Options.CombatMechanics.ResolveAttack(attackValues, unitPos,unit, targetedPos, aoePos, hitUnit);
-            
-            if (attackScore > 0 && isMelee && Options.CombatMechanics is DiceBasedCombat)
-            {
-                var defense = ((DiceBasedCombat) Options.CombatMechanics).LastMeleeDefense;
-                hitUnit.SetLabelText(defense.ToString());
-            }
+        unit.TurnTowards(targetedPos);
+        var multipleTargetPositions = new HashSet<Vector3Int>(new []{targetedPos});
+        if (weapon.Rules.MultipleTargets && isMultipleTargetConfirmation)
+        {
+            multipleTargetPositions = multipleTargets;
         }
 
+        bool firstPos = true;
+        int attackScore = -1;
+        int[] attackValues = new int[0];
+        int damageLeft = -1;
+        string scoreForLabel = "";
+        foreach (var multiHitPosition in multipleTargetPositions)
+        {
+            if (firstPos || !weapon.Rules.DamageDistribution)
+            {
+                attackValues = Options.CombatMechanics.AttackValues(isMelee, unit, multiHitPosition);
+                attackScore = attackValues.Sum();    // set on first pos for distributed and everytime else
+                scoreForLabel = attackScore.ToString();
+                firstPos = false;
+            }
+
+            if (weapon.Rules.DamageDistribution & damageLeft != -1)
+            {
+                if (damageLeft == 0)
+                {
+                    break;
+                }
+                else if (damageLeft > 0)
+                {
+                    attackValues = new[] {damageLeft};    // adjust dice left
+                    attackScore = attackValues.Sum();
+                }
+            }
+
+            var areaOfEffect = _map.AreaOfEffect(unitPos, weapon, multiHitPosition);
+        
+            foreach (var aoePos in areaOfEffect)
+            {
+                if (!_map.AoEAllowed(unit, weapon, multiHitPosition, aoePos)) continue;
+        
+                CreateExplosion(aoePos);
+        
+                if (!_map.IsUnitOn(aoePos)) continue;
+        
+                var hitUnit = (Unit)_map.GetUnitAt(aoePos);
+            
+                hitUnit.TurnTowards(unit.Cell);
+                
+                damageLeft = Options.CombatMechanics.ResolveAttack(attackValues, unitPos,unit, multiHitPosition, aoePos, hitUnit);
+            
+                if (attackScore > 0 && isMelee && Options.CombatMechanics is DiceBasedCombat)
+                {
+                    var defense = ((DiceBasedCombat) Options.CombatMechanics).LastMeleeDefense;
+                    hitUnit.SetLabelText(defense.ToString());
+                }
+            }
+        }
+        
+
         unit.HasAttacked();
-
         
-        unit.SetLabelText(attackScore.ToString());
-
-        
+        unit.SetLabelText(scoreForLabel);
     }
 
 
@@ -459,7 +499,26 @@ public class Game : MonoBehaviour
 
     public void AttackButtonClicked()
     {
-        if (selectedUnit != null && selectedUnit.State != UnitState.Moving && selectedUnit.CanAttack)
+        if (selectedUnit == null) return;
+
+        if (gameState == GameState.AttackTargetSelection && multipleTargets.Count > 0)
+        {
+            if (selectedUnit.HasMeleeWeapon)
+            {
+                if (selectedUnit.MeleeWeapon.Rules.DamageDistribution)
+                {
+                    TryAttackWithUnit(selectedUnit, multipleTargets.First(), true);
+                }
+            }
+            if (selectedUnit.HasRangedWeapon)
+            {
+                if (selectedUnit.RangedWeapon.Rules.DamageDistribution)
+                {
+                    TryAttackWithUnit(selectedUnit, multipleTargets.First(), true);
+                }
+            }
+        }
+        if (selectedUnit.State != UnitState.Moving && selectedUnit.CanAttack)
         {
             _map.RemoveAllHighlights(0);
             _map.RemoveAllHighlights(1);
@@ -475,6 +534,7 @@ public class Game : MonoBehaviour
             if (validTargets.Count > 0)
             {
                 gameState = GameState.AttackTargetSelection;
+                multipleTargets.Clear();
             }
             else
             {

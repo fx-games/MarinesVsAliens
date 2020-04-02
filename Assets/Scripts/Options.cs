@@ -20,7 +20,8 @@ namespace DefaultNamespace
         event UnitEvent UnitKilled;
         string AttackPreviewInformationFor(Unit unit, Unit attackingUnit);
         int[] AttackValues(bool isMelee, Unit unit, Vector3Int targetedPos);
-        void ResolveAttack(int[] attackValues, Vector3Int unitPos, Unit unit, Vector3Int targetedPos, Vector3Int aoePos, Unit hitUnit);
+        int ResolveAttack(int[] attackValues, Vector3Int unitPos, Unit unit, Vector3Int targetedPos, Vector3Int aoePos,
+            Unit hitUnit);
     }
 
     public abstract class CombatBase
@@ -71,17 +72,19 @@ namespace DefaultNamespace
             return isMelee ? unit.MeleeWeapon.RollDamage() : unit.RangedWeapon.RollDamage();
         }
         
-        public void ResolveAttack(int[] attackerDice, Vector3Int attackerPos, Unit attacker, Vector3Int targetPos, Vector3Int aoePos, Unit target)
+        public int ResolveAttack(int[] attackerDice, Vector3Int attackerPos, Unit attacker, Vector3Int targetPos,
+            Vector3Int aoePos, Unit target)
         {
+            int damageLeft = -1;
             var isMelee = IsMelee(attacker, target);
             
             if (isMelee && !attacker.HasMeleeWeapon)
             {
-                return; // No melee weapon for melee attack
+                return damageLeft; // No melee weapon for melee attack
             }
 
             if (!isMelee && !attacker.HasRangedWeapon)
-                return; // No ranged weapon
+                return damageLeft; // No ranged weapon
         
             var isAoEPosition = targetPos != aoePos;
         
@@ -110,6 +113,7 @@ namespace DefaultNamespace
                 if (defenderScore >= attackerScore)
                 {
                     // no damage to target
+                    damageLeft = 0;
                     if (isMelee && defenderScore > attackerScore)
                     {
                         // damage to attacker
@@ -121,7 +125,7 @@ namespace DefaultNamespace
                 {
                     // damage to target
                     int damage = attackerScore - defenderScore;
-                    target.DamageReceived(attacker, weapon, damage);
+                    damageLeft = target.DamageReceived(attacker, weapon, damage);
                 }
                 if (target.CurrentHealth <= 0)
                 {
@@ -132,6 +136,8 @@ namespace DefaultNamespace
                     OnUnitKilled(attacker);
                 }
             }
+
+            return damageLeft;
         }
 
         public int LastMeleeDefense { get; private set; }
@@ -151,7 +157,8 @@ namespace DefaultNamespace
             throw new NotImplementedException();
         }
 
-        public void ResolveAttack(int[] attackValues, Vector3Int unitPos, Unit unit, Vector3Int targetedPos, Vector3Int aoePos,
+        public int ResolveAttack(int[] attackValues, Vector3Int unitPos, Unit unit, Vector3Int targetedPos,
+            Vector3Int aoePos,
             Unit hitUnit)
         {
             throw new NotImplementedException();
