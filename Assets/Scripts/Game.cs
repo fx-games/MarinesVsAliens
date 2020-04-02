@@ -357,8 +357,9 @@ public class Game : MonoBehaviour
         gameState = GameState.WaitForHotSeatPlayer;
         centerOfScreenLabel.enabled = true;
         centerOfScreenLabel.text = "NEXT PLAYER\n" + faction;
-        allUnits.ForEach(unit => unit.SetVisible(false));
+        allUnits.ForEach(unit => { unit.SetVisible(false); unit.Deselect(); });
         _map.ResetFog();
+        UpdateLabel();
         CenterCameraOn(new Vector3Int(_map.Width / 2, _map.Height / 2, 0));
     }
 
@@ -615,6 +616,11 @@ public class Game : MonoBehaviour
 
     private void UpdateLabel()
     {
+        if (gameState == GameState.WaitForHotSeatPlayer)
+        {
+            SetLabel("");
+            return;
+        }
         if (selectedUnit != null)
         {
             SetLabel(selectedUnit.name + " - HP: " + selectedUnit.CurrentHealth + "\n" + selectedUnit.WeaponDescription);

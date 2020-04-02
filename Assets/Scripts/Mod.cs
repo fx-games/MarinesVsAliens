@@ -122,10 +122,23 @@ public class Mod : MonoBehaviour
         ReadRules();
     }
 #if UNITY_WEBGL
+    IEnumerator LoadFromWeb(string fileUrl) 
+    {
+        UnityWebRequest www = UnityWebRequest.Get(fileUrl);
+        yield return www.SendWebRequest();
+ 
+        if(www.isNetworkError || www.isHttpError) 
+        {
+            Debug.Log(www.error);
+        }
+        else 
+        {
+            OnRuleFileLoaded(www.downloadHandler.text);
+        }
+    }
     void ReadTextFile(string fileUrl)
     {
-        var request = new UnityWebRequest(fileUrl);
-        request.SendWebRequest().completed += operation => { OnRuleFileLoaded(request.downloadHandler.text); };
+        StartCoroutine(LoadFromWeb(fileUrl));
     }
 #else
     void ReadTextFile(string filePath)
