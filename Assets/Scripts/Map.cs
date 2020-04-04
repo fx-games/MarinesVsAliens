@@ -59,6 +59,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     private Mod mod;
     private IMapGenerator generator;
     private Vector3Int lastCursorPosition;
+    private bool spectatorMode = false;
 
     // Start is called before the first frame update
     void Awake()
@@ -366,6 +367,13 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
 
 
     public Vector3Int RandomPosition => new Vector3Int(Random.Range(0, Width), Random.Range(0, Height), 0);
+    public List<Vector3Int> AllPositions => RectToList(0, 0, Width, Height).ToList();
+
+    public void EnableSpectatorMode()
+    {
+        spectatorMode = true;
+        //layerMap["FogOfWar"].GetComponent<TilemapRenderer>().enabled = false;
+    }
 
     public virtual bool Contains(int x, int y)
     {
@@ -397,7 +405,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             mapPos + Vector3Int.down,
             mapPos + Vector3Int.left,
         };
-        if (currentUnit.Rules.CanMoveDiagonally)
+        if (currentUnit.Rules.CanMoveDiagonally && Options.AllowDiagonalMovement)
         {
             neighbors.AddRange(new[]
             {
@@ -511,6 +519,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         var otherUnit = GetUnitAt(mapPosition);
         return faction != otherUnit.Faction;
     }
+
 
     public GameObject GetUnitMarker()
     {
@@ -706,8 +715,6 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return linePositions;
     }
 
-
-
     public HashSet<Vector3Int> GetFOV(Vector3Int position, int radius, bool unitsAreBlocking = false)
     {
         var fieldOfView = new HashSet<Vector3Int>();
@@ -729,6 +736,16 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return fieldOfView;
     }
 
+    public bool IsLineOfFireBetween(Vector3Int source, Vector3Int target)
+    {
+        return LineCast(source.x, source.y, target.x, target.y, false, true);
+    }
+    
+    public bool IsLineOfSightBetween(Vector3Int source, Vector3Int target)
+    {
+        return LineCast(source.x, source.y, target.x, target.y);
+    }
+    
     private bool LineCast(int x0, int y0, int x1, int y1, bool removeFog = false, bool unitsAreBlocking = false)
     {
         int sx, sy, xnext, ynext, dx, dy, prevX, prevY;
@@ -821,6 +838,15 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return false;
     }
 
+    public string GetPosDebugInfo(Vector3Int pos)
+    {
+        var wallHere = IsWallAt(pos) ? "W" : "";
+        var doorHere = IsDoorAt(pos) ? "D" : "";
+        var unitHere = IsUnitOn(pos) ? "U" : "";
+        var floorHere = IsFloorAt(pos) ? "" : "X";
+        var fogHere = IsInFog(pos) ? "F" : "";
+        return wallHere + doorHere + unitHere + floorHere + fogHere;
+    }
 }
 
 
@@ -867,6 +893,11 @@ public static class Vector3IntExtension
         if (v == Vector3Int.left + Vector3Int.down) return Direction.SouthWest;
         
         return Direction.None;
+    }
+    
+    public static Point ToPoint(this Vector3Int v)
+    {
+        return new Point(v.x, v.y);
     }
 }
 

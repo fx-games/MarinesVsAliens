@@ -65,6 +65,8 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     public RuleUnit Rules => unitRules;
     public List<Vector3Int> OccupiedTiles { get; set; }
+    public HashSet<IPlayerUnit> VisibleEnemies { get; set; }
+    public HashSet<Vector3Int> FieldOfView { get; set; }
 
     public event UnitEvent FinishedMoving;
     public event UnitEvent StepCompleted;
@@ -316,7 +318,6 @@ public class Unit : MonoBehaviour, IPlayerUnit
         spriteRenderer.enabled = isVisible;
     }
     
-    
     public void MarkAsSelected()
     {
         var unitMarker = _map.GetUnitMarker();
@@ -405,7 +406,9 @@ public class Unit : MonoBehaviour, IPlayerUnit
         
         if (damage > oldHealth)
         {
-            return damage - oldHealth;
+            var damageLeft = damage - oldHealth;
+            Debug.Log("Damage left: " + damageLeft);
+            return damageLeft;
         }
 
         return 0;
@@ -430,6 +433,11 @@ public class Unit : MonoBehaviour, IPlayerUnit
         }
 
         return false;
+    }
+
+    public override string ToString()
+    {
+        return name + " (M:" + MovesLeft + ")";
     }
 }
 

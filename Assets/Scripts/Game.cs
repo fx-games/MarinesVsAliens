@@ -5,6 +5,7 @@ using System.Linq;
 using DefaultNamespace;
 using GridPathFinder;
 using UnityEngine;
+using UnityEngine.Assertions.Comparers;
 using UnityEngine.EventSystems;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
@@ -13,7 +14,7 @@ using static Mod.RuleFaction;
 using static Unit;
 using Color = UnityEngine.Color;
 
-public class Game : MonoBehaviour
+public class Game : MonoBehaviour, IGame
 {
     public enum GameState
     {
@@ -48,6 +49,10 @@ public class Game : MonoBehaviour
     private int currentMapIndex;
     private int currentTurn = 0;
     private HashSet<Vector3Int> multipleTargets = new HashSet<Vector3Int>();
+    private Dictionary<RuleFaction, AIPlayer> aiPlayers = new Dictionary<RuleFaction, AIPlayer>();
+    private double lastAiCommandTime;
+    private double aiCommandDelay = 0.5f;
+    private bool spectatorMode = false;
 
     private void Awake()
     {
@@ -70,6 +75,11 @@ public class Game : MonoBehaviour
         LoadMap();
     }
 
+    void EnableSpectatorMode()
+    {
+        spectatorMode = true;
+        _map.EnableSpectatorMode();
+    }
     void LoadMap()
     {
         if (_map != null)
@@ -101,20 +111,43 @@ public class Game : MonoBehaviour
         
         NewTurn();
         PrepareNextPhase();
+
+        CreateAIPlayers();
+        
+        //DEBUG
+        EnableSpectatorMode();
     }
-    
+
+    private void CreateAIPlayers()
+    {
+        foreach (var faction in factions)
+        {
+            var playerAi = new AIPlayer(this, mod, _map, faction);
+            aiPlayers[faction] = playerAi;
+        }
+    }
+
     // Update is called once per frame
     void Update()
     {
+        if (gameState != GameState.WaitForHotSeatPlayer 
+            && aiPlayers.ContainsKey(CurrentFaction) 
+            && Time.time - lastAiCommandTime > aiCommandDelay)
+        {
+            aiPlayers[CurrentFaction].ExecuteNextCommand();
+            lastAiCommandTime = Time.time;
+            return;
+        }
+        
         if (Input.GetMouseButtonDown(1))
         {
             DeselectAll();
         }
 
         if (EventSystem.current.IsPointerOverGameObject()) return;
-        
+
         Vector3 pos = gameCamera.ScreenToWorldPoint(Input.mousePosition);
-        
+
         if (_map.ContainsWorldPos(pos))
         {
             var cursorLocation = _map.WorldToCell(pos);
@@ -122,6 +155,7 @@ public class Game : MonoBehaviour
             {
                 InputReleasedOnMap(cursorLocation);
             }
+
             if (selectedUnit != null && gameState == GameState.MoveTargetSelection &&
                 cursorLocation != lastCursorLocation)
             {
@@ -345,8 +379,6 @@ public class Game : MonoBehaviour
         allUnits.Remove(unit);
     }
 
-  
-
     private void CreateExplosion(Vector3Int mapPos)
     {
         Instantiate(explosionPrefab, _map.CellToWorld(mapPos), Quaternion.identity);
@@ -354,6 +386,7 @@ public class Game : MonoBehaviour
 
     public void OpenDoorButtonClicked()
     {
+        if (aiPlayers.ContainsKey(CurrentFaction)) return;
         if (selectedUnit != null)
         {
             OpenDoor(selectedUnit, selectedUnit.Cell);
@@ -394,12 +427,20 @@ public class Game : MonoBehaviour
 
     private void StartWaitingForHeatSeatPlayer(RuleFaction faction)
     {
+        
         selectedUnit = null;
         _map.HideUnitMarker();
+        allUnits.ForEach(unit => { unit.SetVisible(false); unit.Deselect(); });
+
+        if (spectatorMode)
+        {
+            gameState = GameState.Default;
+            StartNextPhase();
+            return;
+        }
         gameState = GameState.WaitForHotSeatPlayer;
         centerOfScreenLabel.enabled = true;
-        centerOfScreenLabel.text = "NEXT PLAYER\n" + faction;
-        allUnits.ForEach(unit => { unit.SetVisible(false); unit.Deselect(); });
+        centerOfScreenLabel.text = "NEXT PLAYER\n" + faction;        
         _map.ResetFog();
         UpdateLabel();
         CenterCameraOn(new Vector3Int(_map.Width / 2, _map.Height / 2, 0));
@@ -461,24 +502,27 @@ public class Game : MonoBehaviour
 
     private void StartNextPhase()
     {
+        gameState = GameState.Default;
         centerOfScreenLabel.enabled = false;
             
         bool firstUnitFound = false;
         foreach (var unit in allUnits)
         {
-            if (unit.Faction == CurrentFaction)
-            {
-                unit.PrepareNewPhase();
-                if (!firstUnitFound)
-                {
-                    firstUnitFound = true;
-                    UnitSelected(unit.Cell);
-                    CenterCameraOn(unit);
-                }
-            }
+            if (unit.Faction != CurrentFaction) continue;
+            unit.PrepareNewPhase();
+            
+            if (firstUnitFound || spectatorMode) continue;
+            firstUnitFound = true;            
+            UnitSelected(unit.Cell);
+            CenterCameraOn(unit);
         }
 
         GlobalFOVUpdate();
+
+        if (aiPlayers.ContainsKey(CurrentFaction))
+        {
+            aiPlayers[CurrentFaction].NextPhase();
+        }
     }
 
     private void NewTurn()
@@ -500,6 +544,8 @@ public class Game : MonoBehaviour
     public void AttackButtonClicked()
     {
         if (selectedUnit == null) return;
+        
+        if (aiPlayers.ContainsKey(CurrentFaction)) return;
 
         if (gameState == GameState.AttackTargetSelection && multipleTargets.Count > 0)
         {
@@ -607,14 +653,25 @@ public class Game : MonoBehaviour
 
     private void ShowReachableTiles(Unit unit, int maxDistance)
     {
-        var startPos = _map.WorldToCell(unit.transform.position);
         _map.RemoveAllHighlights();
-        pathfinder.MaxCost = maxDistance + 1f;
+        var reachableMapPositions = GetReachableMapPositions(unit);
+        
+        foreach (var pos in reachableMapPositions)
+        {
+            if (!_map.IsUnitOn(pos)) // never highlight tiles with units on it
+            {
+                _map.HighlightTile(pos, new Color(0, 0.8f, 0, 0.2f));
+            }
+        }
+    }
+
+    public HashSet<Vector3Int> GetReachableMapPositions(Unit unit)
+    {
+        var startPos = unit.Cell;
+        pathfinder.MaxCost = unit.MovesLeft + 1f;
         pathfinder.CurrentUnit = unit;
-        
-        pathfinder.Dijkstra(new HashSet<Point>{new Point(startPos.x, startPos.y)}, new HashSet<Point>());
-        //pathfinder.PrintDistMap();
-        
+
+        pathfinder.Dijkstra(new HashSet<Point> {new Point(startPos.x, startPos.y)}, new HashSet<Point>());
         var nodeList = pathfinder.ReachableList.ToList().ConvertAll(point => new Vector3Int(point.X, point.Y, 0));
         HashSet<Vector3Int> reachable = new HashSet<Vector3Int>();
         foreach (var reachablePos in nodeList)
@@ -626,18 +683,26 @@ public class Game : MonoBehaviour
                 reachable.Add(reachablePos + offset); // also highlight tiles for big units
             }
         }
-        foreach (var pos in reachable)
+        return reachable;
+    }
+
+    public void AttackWithUnit(Unit unit, List<Vector3Int> targets)
+    {
+        foreach (var target in targets)
         {
-            if (!_map.IsUnitOn(pos)) // never highlight tiles with units on it
-            {
-                _map.HighlightTile(pos, new Color(0, 0.8f, 0, 0.2f));
-            }
+            TryAttackWithUnit(unit, target);
+        }
+        
+        if (targets.Count > 1)
+        {
+            TryAttackWithUnit(unit, targets.First(), true);
         }
     }
 
     private void UnitFinishedMoving(object sender, UnitEventArgs args)
     {
-        //var unit = args.unit;
+        if (gameState == GameState.WaitForHotSeatPlayer) return;
+        
         GlobalFOVUpdate();
         
         if (selectedUnit == args.unit && selectedUnit.MovesLeft > 0)
@@ -656,7 +721,9 @@ public class Game : MonoBehaviour
             if (unit.Faction == CurrentFaction)
             {
                 unit.SetVisible(true);
-                _map.UpdateFOV(_map.WorldToCell(unit.transform.position), unit.CurrentVisionRange);
+                var fov = _map.GetFOV(_map.WorldToCell(unit.transform.position), unit.CurrentVisionRange);
+                unit.FieldOfView = fov;
+                unit.VisibleEnemies = new HashSet<IPlayerUnit>(unit.FieldOfView.Where(pos => _map.IsOtherFactionOn(CurrentFaction, pos)).Select(pos => _map.GetUnitAt(pos)));
             }
         }
         foreach (var unit in allUnits)
@@ -814,6 +881,8 @@ public class Game : MonoBehaviour
         var newPos = _map.WorldToCell(unit.transform.position);
 
         _map.IsStandingOnDoor(unit, true);
+
+        if (gameState == GameState.WaitForHotSeatPlayer) return;
         
         _map.UpdateFOV(newPos, unit.CurrentVisionRange);
         
@@ -856,5 +925,86 @@ public class Game : MonoBehaviour
                 }
             }
         }
+    }
+
+    public Vector3Int GetBestMoveTowards(Unit unit, Vector3Int goalPosition)
+    {
+        var shortestPath = GetShortestPath(unit, goalPosition, false);
+        if (shortestPath.Count == 0)
+        {
+            Debug.LogError("No path for " + unit + " at " + unit.Cell + " to " + goalPosition);
+            Debug.LogError(_map.GetPosDebugInfo(goalPosition));
+            return unit.Cell;
+        }
+        Debug.Log(PathToString(shortestPath));
+        
+        var bestMoveTowards = shortestPath.Last();
+        if (shortestPath.Count > unit.MovesLeft + 1)
+        {
+            bestMoveTowards = shortestPath.Skip(unit.MovesLeft).First();
+        }
+        
+        if (!_map.IsUnitOn(bestMoveTowards)) return bestMoveTowards;
+        
+        var reachable = GetReachableMapPositions(unit).ToList();
+
+        if (reachable.Count == 0)
+        {
+            Debug.LogError("No reachable pos for " + unit + " at " + unit.Cell + " to " + goalPosition);
+            Debug.LogError(_map.GetPosDebugInfo(goalPosition));
+            return unit.Cell;
+        }
+        reachable.Sort((posOne, posTwo) =>  (posOne - goalPosition).magnitude.CompareTo((posTwo - goalPosition).magnitude));
+
+        bestMoveTowards = reachable.First();
+        // problem left: There could be a unit on any position on the path
+        // especially on bestMoveTowards..
+        
+        return bestMoveTowards;
+    }
+
+    private string PathToString(List<Vector3Int> shortestPath)
+    {
+        string output = "";
+
+        foreach (var pos in shortestPath)
+        {
+            output += pos.ToString();
+        }
+
+        return output;
+    }
+
+    public void EndPhase(AIPlayer aiPlayer)
+    {
+        if (aiPlayer.Faction == CurrentFaction)
+        {
+            EndTurnButtonClicked();
+        }
+    }
+
+    public void MoveUnit(Unit unit, Vector3Int targetPos)
+    {
+        UnitSelected(unit.Cell);
+        TryMoveWithUnit(unit, targetPos);
+    }
+
+    private List<Vector3Int> GetShortestPath(Unit unit, Vector3Int goalPosition, bool useMovesLeftAsMaxDistance = true)
+    {
+        pathfinder.MaxCost = useMovesLeftAsMaxDistance ? unit.MovesLeft + 1f : -1;
+        pathfinder.CurrentUnit = unit;
+        pathfinder.Dijkstra(new HashSet<Point>(new[] {unit.Cell.ToPoint()}), new HashSet<Point>() {goalPosition.ToPoint()});
+        return pathfinder.GetShortestPath(goalPosition.ToPoint()).Select(point => new Vector3Int(point.X, point.Y, 0)).ToList();
+    }
+
+    public List<Unit> GetAllUnits(AIPlayer aiPlayer)
+    {
+        var factionOfPlayer = aiPlayer.Faction;
+        return allUnits.Where(unit => unit.Faction == factionOfPlayer).ToList();
+    }
+
+    public List<Unit> GetVisibleEnemies(AIPlayer aiPlayer)
+    {
+        return allUnits.Where(unit => unit.Faction != aiPlayer.Faction && !_map.IsInFog(unit.Cell)).ToList();
     }
 }
