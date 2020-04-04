@@ -105,7 +105,7 @@ public class Game : MonoBehaviour, IGame
     {
         SpawnUnits();
         
-        pathfinder = new Pathfinder(_map, 1.0f, 1.2f);
+        pathfinder = new Pathfinder(_map, 1.0f, Options.DiagonalMovementCost);
         
         phaseFaction = -1;
         
@@ -692,8 +692,10 @@ public class Game : MonoBehaviour, IGame
         {
             TryAttackWithUnit(unit, target);
         }
-        
-        if (targets.Count > 1)
+
+        var isMelee = targets.TrueForAll(pos => _map.AreNeighbors(unit.Cell, pos));
+        if ((isMelee && unit.HasMeleeWeapon && unit.MeleeWeapon.Rules.DamageDistribution)
+            ||(!isMelee && unit.HasRangedWeapon && unit.RangedWeapon.Rules.DamageDistribution))
         {
             TryAttackWithUnit(unit, targets.First(), true);
         }
@@ -939,11 +941,11 @@ public class Game : MonoBehaviour, IGame
         Debug.Log(PathToString(shortestPath));
         
         var bestMoveTowards = shortestPath.Last();
-        if (shortestPath.Count > unit.MovesLeft + 1)
+        if (shortestPath.Count > unit.MovesLeft - 1)
         {
             bestMoveTowards = shortestPath.Skip(unit.MovesLeft).First();
         }
-        
+        Debug.Log("BestMoveInfo ("+bestMoveTowards+"): " + _map.GetPosDebugInfo(bestMoveTowards));
         if (!_map.IsUnitOn(bestMoveTowards)) return bestMoveTowards;
         
         var reachable = GetReachableMapPositions(unit).ToList();

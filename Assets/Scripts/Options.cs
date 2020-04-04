@@ -12,7 +12,7 @@ namespace DefaultNamespace
         public static bool AllowDiagonalAdjacentAttacks { get; set; } = false;
 
         public static ICombatMechanics CombatMechanics { get; set; } = new DiceBasedCombat();
-
+        public static float DiagonalMovementCost { get; set; } = 1.0f;
     }
 
     public interface ICombatMechanics
