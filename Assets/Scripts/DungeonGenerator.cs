@@ -90,7 +90,7 @@ namespace DefaultNamespace
     
                     foreach (var neighborDirection in map.Cardinal)
                     {
-                        if (!map.IsWallAt(map.GetNeighbour(pos, neighborDirection))) exits++;
+                        if (!map.IsWallAt(map.GetNeighborInDirection(pos, neighborDirection))) exits++;
                     }
                     
                     if (exits != 1) continue;
@@ -223,8 +223,8 @@ namespace DefaultNamespace
                         direction = unmadeCells[Random.Range(0, unmadeCells.Count)];
                     }
     
-                    var firstCarvePos = map.GetNeighbour(cell, direction);
-                    var secondCarvePos = map.GetNeighbour(firstCarvePos, direction);
+                    var firstCarvePos = map.GetNeighborInDirection(cell, direction);
+                    var secondCarvePos = map.GetNeighborInDirection(firstCarvePos, direction);
     
                     map.RemoveWallAt(firstCarvePos);
                     genRegions[firstCarvePos] = genCurrentRegion;

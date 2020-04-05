@@ -22,8 +22,13 @@ namespace AI
         /// </summary>
         public abstract void Init();
 
-        public abstract bool CheckIfFired(MapTileInfo[,] mapKnowledge, List<Unit> allUnits, List<Unit> visibleEnemies);
+        public abstract bool CheckIfFired(Unit unit, MapTileInfo[,] mapKnowledge, List<Unit> visibleEnemies);
 
-        public abstract PlayerCommand Fire(MapTileInfo[,] mapKnowledge, List<Unit> allUnits, List<Unit> visibleEnemies);
+        public abstract PlayerCommand Fire(Unit unit, MapTileInfo[,] mapKnowledge, List<Unit> visibleEnemies);
+
+        public override string ToString()
+        {
+            return Name;
+        }
     }
 }

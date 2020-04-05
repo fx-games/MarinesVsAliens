@@ -8,10 +8,12 @@ using GridPathFinder.Map;
 using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.Tilemaps;
+using UnityEngine.UI;
 using UnityEngine.Video;
 using static Map;
 using static Mod;
 using Color = UnityEngine.Color;
+using Object = UnityEngine.Object;
 using Random = UnityEngine.Random;
 
 public interface IMapGenerator
@@ -60,10 +62,14 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     private IMapGenerator generator;
     private Vector3Int lastCursorPosition;
     private bool spectatorMode = false;
+    public GameObject cellLabelPrefab;
+    private HashSet<Text> cellLabels = new HashSet<Text>();
+    private Transform worldCanvas;
 
     // Start is called before the first frame update
     void Awake()
     {
+        worldCanvas = FindObjectsOfType<Canvas>().First(c => c.name == "WorldCanvas").transform;
         selectionRect = Instantiate(selectionRectPrefab);
         unitSelectedMarker = Instantiate(selectionRectPrefab);
         var spriteRenderer = unitSelectedMarker.GetComponent<SpriteRenderer>();
@@ -262,7 +268,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     {
         layerMap["Floors"].SetTile(pos, floorTiles[0]);
     }
-    public virtual Vector3Int GetNeighbour(Vector3Int position, Direction direction)
+    public virtual Vector3Int GetNeighborInDirection(Vector3Int position, Direction direction)
     {
         switch (direction)
         {
@@ -396,7 +402,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return reachableNeighbors.ConvertAll(elem => new Point(elem.x, elem.y));
     }
 
-    private static List<Vector3Int> GetAllNeighborsForUnit(Unit currentUnit, Vector3Int mapPos)
+    public List<Vector3Int> GetAllNeighborsForUnit(Unit currentUnit, Vector3Int mapPos)
     {
         List<Vector3Int> neighbors = new List<Vector3Int>()
         {
@@ -421,12 +427,22 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     
     public bool AreNeighbors(Vector3Int posOne, Vector3Int posTwo, bool includeDiagonals = false)
     {
-        if (includeDiagonals)
+        if (includeDiagonals && AreDiagonalNeighbors(posOne, posTwo))
         {
-            var areNeighbors = Mathf.Abs(posOne.y - posTwo.y) == 1 && Mathf.Abs(posOne.x - posTwo.x) == 1;
-            if (areNeighbors)
-                return true;
+            return true;
         }
+
+        var neighbors = AreCardinalNeighbors(posOne, posTwo);
+        return neighbors;
+    }
+
+    public static bool AreDiagonalNeighbors(Vector3Int posOne, Vector3Int posTwo)
+    {
+        return Mathf.Abs(posOne.y - posTwo.y) == 1 && Mathf.Abs(posOne.x - posTwo.x) == 1;
+    }
+
+    public static bool AreCardinalNeighbors(Vector3Int posOne, Vector3Int posTwo)
+    {
         return posOne.x == posTwo.x && Mathf.Abs(posOne.y - posTwo.y) == 1
                || posOne.y == posTwo.y && Mathf.Abs(posOne.x - posTwo.x) == 1;
     }
@@ -738,6 +754,10 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
 
     public bool IsLineOfFireBetween(Vector3Int source, Vector3Int target)
     {
+        if (!Options.AllowDiagonalAdjacentAttacks && AreDiagonalNeighbors(source, target))
+        {
+            return false;
+        }
         return LineCast(source.x, source.y, target.x, target.y, false, true);
     }
     
@@ -846,6 +866,23 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         var floorHere = IsFloorAt(pos) ? "" : "X";
         var fogHere = IsInFog(pos) ? "F" : "";
         return wallHere + doorHere + unitHere + floorHere + fogHere;
+    }
+
+    public void SetTextAt(Vector3Int mapPos, string text)
+    {
+        Text cellLabel = Instantiate(cellLabelPrefab, CellToWorld(mapPos), Quaternion.identity).GetComponent<Text>();
+        cellLabel.transform.SetParent(worldCanvas);
+        cellLabels.Add(cellLabel);
+        cellLabel.text = text;
+    }
+
+    public void RemoveAllCellLabels()
+    {
+        foreach (var cellLabel in cellLabels)
+        {
+            Destroy(cellLabel);
+        }
+        cellLabels.Clear();
     }
 }
 

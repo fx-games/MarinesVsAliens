@@ -22,7 +22,7 @@ namespace AI
 
         public SubsumptionScheduler(IGame game, IPlayerMap map, Mod mod, Mod.RuleFaction faction)
         {
-            Verbose = false;
+            Verbose = true;
             mBehaviors = new List<SubsumptionBehavior>();
             this.game = game;
             this.map = map;
@@ -49,14 +49,14 @@ namespace AI
         /// Runs the scheduler. Will execute a behavior if possible.
         /// </summary>
         /// <returns>The behavior which was executed.</returns>
-        public virtual SubsumptionBehavior Run(MapTileInfo[,] mapKnowledge, List<Unit> allUnits,
+        public virtual SubsumptionBehavior Run(Unit unit, MapTileInfo[,] mapKnowledge,
             List<Unit> visibleEnemies)
         {
             if (mBehaviors.Count == 0) return null;
             List<SubsumptionBehavior> firingBehaviors = new List<SubsumptionBehavior>();
             foreach (SubsumptionBehavior behavior in mBehaviors)
             {
-                if (behavior.CheckIfFired(mapKnowledge, allUnits, visibleEnemies))
+                if (behavior.CheckIfFired(unit, mapKnowledge, visibleEnemies))
                     firingBehaviors.Add(behavior);
             }
             if (firingBehaviors.Count == 0) return null;

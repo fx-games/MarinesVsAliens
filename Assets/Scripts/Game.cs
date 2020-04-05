@@ -51,7 +51,7 @@ public class Game : MonoBehaviour, IGame
     private HashSet<Vector3Int> multipleTargets = new HashSet<Vector3Int>();
     private Dictionary<RuleFaction, AIPlayer> aiPlayers = new Dictionary<RuleFaction, AIPlayer>();
     private double lastAiCommandTime;
-    private double aiCommandDelay = 0.5f;
+    private double aiCommandDelay = 0.8f;
     private bool spectatorMode = false;
 
     private void Awake()
@@ -105,7 +105,7 @@ public class Game : MonoBehaviour, IGame
     {
         SpawnUnits();
         
-        pathfinder = new Pathfinder(_map, 1.0f, Options.DiagonalMovementCost);
+        pathfinder = new Pathfinder(_map, 1.0f, 1.41f);
         
         phaseFaction = -1;
         
@@ -130,10 +130,13 @@ public class Game : MonoBehaviour, IGame
     // Update is called once per frame
     void Update()
     {
+        if (factions.Count == 0) return;
+        /* Automatic AI moves disabled */
         if (gameState != GameState.WaitForHotSeatPlayer 
             && aiPlayers.ContainsKey(CurrentFaction) 
             && Time.time - lastAiCommandTime > aiCommandDelay)
         {
+            ToDefaultState();
             aiPlayers[CurrentFaction].ExecuteNextCommand();
             lastAiCommandTime = Time.time;
             return;
@@ -177,12 +180,14 @@ public class Game : MonoBehaviour, IGame
 
     public void DebugButtonPressed()
     {
-        _map.DebugAction();
+        //aiPlayers[CurrentFaction].NextPhase();
+        if (gameState != GameState.WaitForHotSeatPlayer)
+            aiPlayers[CurrentFaction].ExecuteNextCommand();
     }
     
     public void DebugButtonTwoPressed()
     {
-        _map.DebugActionTwo();
+        //
     }
 
     private void DeselectAll()
@@ -251,6 +256,10 @@ public class Game : MonoBehaviour, IGame
     private void TryAttackWithUnit(Unit unit, Vector3Int targetedPos, bool isMultipleTargetConfirmation = false)
     {
         if (unit == null) return;
+
+        if (validTargets.Contains(targetedPos))
+            return;
+        
         var unitPos = unit.Cell;
         var isMelee = _map.AreNeighbors(unitPos,targetedPos);
         var weapon = isMelee ? unit.MeleeWeapon : unit.RangedWeapon;
@@ -326,6 +335,8 @@ public class Game : MonoBehaviour, IGame
         unit.HasAttacked();
         
         unit.SetLabelText(scoreForLabel);
+        
+        multipleTargets.Clear();
     }
 
 
@@ -362,7 +373,7 @@ public class Game : MonoBehaviour, IGame
         
         var path = pathfinder.GetShortestPath(new Point(mapPos.x, mapPos.y)).ConvertAll(p => new Vector3Int(p.X, p.Y, 0));
         
-        if (path.Count <= 0) return false;
+        if (path.Count <= 0 || path.Count - 1 > unit.MovesLeft) return false;
         
         _map.RemoveAllHighlights();
         _map.RemoveAllHighlights(1);
@@ -484,6 +495,7 @@ public class Game : MonoBehaviour, IGame
     private void MissionDebriefing()
     {
         _map.RemoveAllFog();
+        allUnits.ForEach(u => u.SetVisible(true));
         Debug.Log("Mission is over!");
     }
 
@@ -568,7 +580,7 @@ public class Game : MonoBehaviour, IGame
         {
             _map.RemoveAllHighlights(0);
             _map.RemoveAllHighlights(1);
-            PreviewAttack(selectedUnit, _map.WorldToCell(selectedUnit.transform.position), 10);
+            ShowValidTargets(selectedUnit);
             var unitsInRange = validTargets.Where(pos => _map.IsOtherFactionOn(selectedUnit, pos))
                 .Select(pos => _map.GetUnitAt(pos));
             foreach (var unit in unitsInRange)
@@ -589,67 +601,15 @@ public class Game : MonoBehaviour, IGame
         }
     }
 
-    private void PreviewAttack(Unit unit, Vector3Int unitPos, int maxDistance)
+    private void ShowValidTargets(Unit unit)
     {
-        validTargets.Clear();
-        if (unit.HasRangedWeapon)
-        {
-            var weaponRules = unit.RangedWeapon.Rules;
-            if (weaponRules.StraightLineOnly)
-            {
-                validTargets.UnionWith(_map.GetStraightLine(unitPos, Map.Direction.North, maxDistance));
-                validTargets.UnionWith(_map.GetStraightLine(unitPos, Map.Direction.South, maxDistance));
-                validTargets.UnionWith(_map.GetStraightLine(unitPos, Map.Direction.East, maxDistance));
-                validTargets.UnionWith(_map.GetStraightLine(unitPos, Map.Direction.West, maxDistance));
-                validTargets.UnionWith(_map.GetStraightLine(unitPos, Map.Direction.NorthEast, maxDistance));
-                validTargets.UnionWith(_map.GetStraightLine(unitPos, Map.Direction.NorthWest, maxDistance));
-                validTargets.UnionWith(_map.GetStraightLine(unitPos, Map.Direction.SouthEast, maxDistance));
-                validTargets.UnionWith(_map.GetStraightLine(unitPos, Map.Direction.SouthWest, maxDistance));   
-            }
-            else
-            {
-                validTargets = _map.GetFOV(unitPos, maxDistance, true);
-            }
-            
-            validTargets.Remove(unitPos);
-        }
-        
-        if (!unit.HasMeleeWeapon) // can only attack these tiles with melee
-        {
-            validTargets.Remove(unitPos + Vector3Int.right);
-            validTargets.Remove(unitPos + Vector3Int.up);
-            validTargets.Remove(unitPos + Vector3Int.down);
-            validTargets.Remove(unitPos + Vector3Int.left);
-        }
-        else
-        {
-            AddToValidTargets(unit,unitPos,unitPos + Vector3Int.right);
-            AddToValidTargets(unit,unitPos,unitPos + Vector3Int.up);
-            AddToValidTargets(unit,unitPos,unitPos + Vector3Int.down);
-            AddToValidTargets(unit,unitPos,unitPos + Vector3Int.left);
-        }
-
-        if (!Options.AllowDiagonalAdjacentAttacks)
-        {
-            validTargets.Remove(unitPos + Vector3Int.up + Vector3Int.right);
-            validTargets.Remove(unitPos + Vector3Int.down + Vector3Int.left);
-            validTargets.Remove(unitPos + Vector3Int.down + Vector3Int.right);
-            validTargets.Remove(unitPos + Vector3Int.up + Vector3Int.left);
-        }
-
+        validTargets = unit.GetValidAttackTargets();
         foreach (var tile in validTargets)
         {
             _map.HighlightTile(tile, new Color(0.6f, 0f, 0, 0.5f));
         }
     }
 
-    private void AddToValidTargets(Unit unit, Vector3Int unitPos, Vector3Int pos)
-    {
-        if (_map.Contains(pos.x, pos.y) && !_map.IsWallAt(pos))
-        {
-            validTargets.Add(pos);
-        }
-    }
 
     private void ShowReachableTiles(Unit unit, int maxDistance)
     {
@@ -668,7 +628,7 @@ public class Game : MonoBehaviour, IGame
     public HashSet<Vector3Int> GetReachableMapPositions(Unit unit)
     {
         var startPos = unit.Cell;
-        pathfinder.MaxCost = unit.MovesLeft + 1f;
+        pathfinder.MaxCost = unit.MovesLeft + 1;
         pathfinder.CurrentUnit = unit;
 
         pathfinder.Dijkstra(new HashSet<Point> {new Point(startPos.x, startPos.y)}, new HashSet<Point>());
@@ -688,6 +648,10 @@ public class Game : MonoBehaviour, IGame
 
     public void AttackWithUnit(Unit unit, List<Vector3Int> targets)
     {
+        UnitSelected(unit.Cell);
+        
+        AttackButtonClicked();
+        
         foreach (var target in targets)
         {
             TryAttackWithUnit(unit, target);
@@ -919,7 +883,7 @@ public class Game : MonoBehaviour, IGame
             {
                 Vector3Int randomPosition = _map.RandomPosition;
                 int tryCounter = 0;
-                while (!SpawnUnit(randomPosition, loadOut.Unit, loadOut, ruleFaction) && tryCounter < 5)
+                while (!SpawnUnit(randomPosition, loadOut.Unit, loadOut, ruleFaction) && tryCounter < 100)
                 {
                     // wait for free spawn pos
                     randomPosition = _map.RandomPosition;
@@ -934,35 +898,30 @@ public class Game : MonoBehaviour, IGame
         var shortestPath = GetShortestPath(unit, goalPosition, false);
         if (shortestPath.Count == 0)
         {
-            Debug.LogError("No path for " + unit + " at " + unit.Cell + " to " + goalPosition);
-            Debug.LogError(_map.GetPosDebugInfo(goalPosition));
+            Debug.LogWarning("No path for " + unit + " to " + goalPosition + " ("+_map.GetPosDebugInfo(goalPosition)+")");
             return unit.Cell;
         }
-        Debug.Log(PathToString(shortestPath));
-        
-        var bestMoveTowards = shortestPath.Last();
-        if (shortestPath.Count > unit.MovesLeft - 1)
-        {
-            bestMoveTowards = shortestPath.Skip(unit.MovesLeft).First();
-        }
-        Debug.Log("BestMoveInfo ("+bestMoveTowards+"): " + _map.GetPosDebugInfo(bestMoveTowards));
-        if (!_map.IsUnitOn(bestMoveTowards)) return bestMoveTowards;
-        
-        var reachable = GetReachableMapPositions(unit).ToList();
+        if (Options.Debug) shortestPath.ForEach(p => _map.SetTextAt(p, "_"));
+        var reachable = GetReachableMapPositions(unit).Where(pos => !_map.IsUnitOn(pos)).ToList();
 
         if (reachable.Count == 0)
         {
-            Debug.LogError("No reachable pos for " + unit + " at " + unit.Cell + " to " + goalPosition);
-            Debug.LogError(_map.GetPosDebugInfo(goalPosition));
+            Debug.LogWarning("No reachable pos for " + unit + " to " + goalPosition + " (" + _map.GetPosDebugInfo(goalPosition) + ")");
             return unit.Cell;
         }
-        reachable.Sort((posOne, posTwo) =>  (posOne - goalPosition).magnitude.CompareTo((posTwo - goalPosition).magnitude));
+        if (Options.Debug) reachable.ForEach(p => _map.SetTextAt(p, "R"));
+        shortestPath.Reverse();
 
-        bestMoveTowards = reachable.First();
-        // problem left: There could be a unit on any position on the path
-        // especially on bestMoveTowards..
-        
-        return bestMoveTowards;
+        foreach (var pos in shortestPath)
+        {
+            if (reachable.Contains(pos))
+            {
+                if (Options.Debug) _map.SetTextAt(pos, "BST");
+                return pos;
+            }
+        }
+        Debug.LogWarning("No Best move towards found for " + unit + " and goal " + goalPosition);
+        return unit.Cell;
     }
 
     private string PathToString(List<Vector3Int> shortestPath)
@@ -991,12 +950,26 @@ public class Game : MonoBehaviour, IGame
         TryMoveWithUnit(unit, targetPos);
     }
 
-    private List<Vector3Int> GetShortestPath(Unit unit, Vector3Int goalPosition, bool useMovesLeftAsMaxDistance = true)
+    public List<Vector3Int> GetShortestPath(Unit unit, Vector3Int goalPosition, bool useMovesLeftAsMaxDistance = true)
     {
-        pathfinder.MaxCost = useMovesLeftAsMaxDistance ? unit.MovesLeft + 1f : -1;
+        pathfinder.MaxCost = useMovesLeftAsMaxDistance ? unit.MovesLeft + 1 : -1;
         pathfinder.CurrentUnit = unit;
         pathfinder.Dijkstra(new HashSet<Point>(new[] {unit.Cell.ToPoint()}), new HashSet<Point>() {goalPosition.ToPoint()});
-        return pathfinder.GetShortestPath(goalPosition.ToPoint()).Select(point => new Vector3Int(point.X, point.Y, 0)).ToList();
+        var shortestPath = pathfinder.GetShortestPath(goalPosition.ToPoint()).Select(point => new Vector3Int(point.X, point.Y, 0)).ToList();
+        return shortestPath;
+    }
+    
+    public List<Vector3Int> GetShortestPath(Unit unit, Vector3Int startPosition, Vector3Int goalPosition)
+    {
+        pathfinder.MaxCost =  -1;
+        pathfinder.CurrentUnit = unit;
+        Debug.Log("GetShortestPath(" + startPosition + ", " + goalPosition + ")");
+        //_map.SetTextAt(startPosition, "BGN");
+        //_map.SetTextAt(goalPosition, "END");
+        pathfinder.Dijkstra(new HashSet<Point>(new[] {startPosition.ToPoint()}), new HashSet<Point>() {goalPosition.ToPoint()});
+        var shortestPath = pathfinder.GetShortestPath(goalPosition.ToPoint()).Select(point => new Vector3Int(point.X, point.Y, 0)).ToList();
+        if (Options.Debug) shortestPath.ForEach(p => _map.SetTextAt(p, "."));
+        return shortestPath;
     }
 
     public List<Unit> GetAllUnits(AIPlayer aiPlayer)
@@ -1008,5 +981,15 @@ public class Game : MonoBehaviour, IGame
     public List<Unit> GetVisibleEnemies(AIPlayer aiPlayer)
     {
         return allUnits.Where(unit => unit.Faction != aiPlayer.Faction && !_map.IsInFog(unit.Cell)).ToList();
+    }
+    
+    public List<Unit> GetVisibleEnemies(Unit unit)
+    {
+        return allUnits.Where(u => unit.Faction != u.Faction && !_map.IsInFog(u.Cell) && _map.IsLineOfSightBetween(unit.Cell, u.Cell)).ToList();
+    }
+    
+    public List<Unit> GetVisibleEnemies(Vector3Int pos, RuleFaction faction)
+    {
+        return allUnits.Where(u => faction != u.Faction && !_map.IsInFog(u.Cell) && _map.IsLineOfSightBetween(pos, u.Cell)).ToList();
     }
 }

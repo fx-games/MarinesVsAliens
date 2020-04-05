@@ -194,6 +194,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 2761cb4ca438e4f90a51615ff12b6f1f, type: 2}
   blanktilePrefab: {fileID: 3202311177981434715, guid: 2d339a0b1eb8141b3baa5266c83ddf08,
     type: 3}
+  cellLabelPrefab: {fileID: 4860974059615001587, guid: 4e4b815aad9d347d69c6d2dae5a0bd75,
+    type: 3}
+  worldCanvas: {fileID: 0}
 --- !u!1 &7611691132727075929
 GameObject:
   m_ObjectHideFlags: 0

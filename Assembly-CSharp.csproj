@@ -65,8 +65,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\Scripts\AI\DestroyBehaviour.cs" />
-    <Compile Include="Assets\Scripts\AI\ExplorationBehaviour.cs" />
+    <Compile Include="Assets\Scripts\AI\AttackBehaviour.cs" />
+    <Compile Include="Assets\Scripts\AI\MovementBehaviour.cs" />
+    <Compile Include="Assets\Scripts\AI\NoopBehaviour.cs" />
     <Compile Include="Assets\Scripts\AI\SubsumptionBehavior.cs" />
     <Compile Include="Assets\Scripts\AI\SubsumptionScheduler.cs" />
     <Compile Include="Assets\Scripts\AIPlayer.cs" />

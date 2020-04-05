@@ -1,9 +1,7 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using DefaultNamespace;
 using UnityEngine;
-using UnityEngine.Serialization;
 using UnityEngine.UI;
 using static Map;
 using static Mod;
@@ -27,7 +25,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public Vector3Int Cell => _map.WorldToCell(transform.position);
 
     private float lastMoveTime;
-    private double moveDelay = 0.2f;
+    private double moveDelay = 0.3f;
     private Mod mod;
     private RuleUnit unitRules;
 
@@ -63,6 +61,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
         return melee + ranged;
     } }
 
+    public bool CanAct => CanAttack || MovesLeft > 0;
     public RuleUnit Rules => unitRules;
     public List<Vector3Int> OccupiedTiles { get; set; }
     public HashSet<IPlayerUnit> VisibleEnemies { get; set; }
@@ -90,7 +89,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     private void OnDestroy()
     {
-        Debug.Log("OnDestroy of " + name);
+        //Debug.Log("OnDestroy of " + name);
         if (unitLabel != null)
         {
             Destroy(unitLabel);
@@ -392,22 +391,20 @@ public class Unit : MonoBehaviour, IPlayerUnit
         {
             return HasMeleeWeapon ? MeleeWeapon.RollDamage().Sum() : 0;
         }
-        else
-        {
-            return CurrentArmor;
-        }
+
+        return CurrentArmor;
     }
 
     public int DamageReceived(Unit source, Weapon weaponUsed, int damage)
     {
-        Debug.Log(name + " received " + damage + " damage");
+        //Debug.Log(name + " received " + damage + " damage");
         var oldHealth = CurrentHealth;
         CurrentHealth -= damage;
         
         if (damage > oldHealth)
         {
             var damageLeft = damage - oldHealth;
-            Debug.Log("Damage left: " + damageLeft);
+            //Debug.Log("Damage left: " + damageLeft);
             return damageLeft;
         }
 
@@ -435,9 +432,78 @@ public class Unit : MonoBehaviour, IPlayerUnit
         return false;
     }
 
+    public bool CanAttackUnit(Unit otherUnit)
+    {
+        return CanAttack
+               && (HasMeleeWeapon && _map.AreNeighbors(Cell, otherUnit.Cell) ||
+                   HasRangedWeapon && GetValidAttackTargets().Contains(otherUnit.Cell));
+    }
+    
+    
+    public HashSet<Vector3Int> GetValidAttackTargets()
+    {
+        int maxDistance = 20;
+        
+        var unitPos = Cell;
+        HashSet<Vector3Int> validTargets = new HashSet<Vector3Int>();
+        if (HasRangedWeapon)
+        {
+            var weaponRules = RangedWeapon.Rules;
+            if (weaponRules.StraightLineOnly)
+            {
+                validTargets.UnionWith(_map.GetStraightLine(unitPos, Direction.North, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(unitPos, Direction.South, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(unitPos, Direction.East, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(unitPos, Direction.West, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(unitPos, Direction.NorthEast, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(unitPos, Direction.NorthWest, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(unitPos, Direction.SouthEast, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(unitPos, Direction.SouthWest, maxDistance));   
+            }
+            else
+            {
+                validTargets = _map.GetFOV(unitPos, maxDistance, true);
+            }
+            
+            validTargets.Remove(unitPos);
+        }
+        
+        if (!HasMeleeWeapon) // can only attack these tiles with melee
+        {
+            validTargets.Remove(unitPos + Vector3Int.right);
+            validTargets.Remove(unitPos + Vector3Int.up);
+            validTargets.Remove(unitPos + Vector3Int.down);
+            validTargets.Remove(unitPos + Vector3Int.left);
+        }
+        else
+        {
+            AddToValidTargets(ref validTargets,unitPos + Vector3Int.right);
+            AddToValidTargets(ref validTargets,unitPos + Vector3Int.up);
+            AddToValidTargets(ref validTargets,unitPos + Vector3Int.down);
+            AddToValidTargets(ref validTargets,unitPos + Vector3Int.left);
+        }
+
+        if (!Options.AllowDiagonalAdjacentAttacks)
+        {
+            validTargets.Remove(unitPos + Vector3Int.up + Vector3Int.right);
+            validTargets.Remove(unitPos + Vector3Int.down + Vector3Int.left);
+            validTargets.Remove(unitPos + Vector3Int.down + Vector3Int.right);
+            validTargets.Remove(unitPos + Vector3Int.up + Vector3Int.left);
+        }
+
+        return validTargets;
+    }
+    private void AddToValidTargets(ref HashSet<Vector3Int> validTargets, Vector3Int pos)
+    {
+        if (_map.Contains(pos.x, pos.y) && !_map.IsWallAt(pos))
+        {
+            validTargets.Add(pos);
+        }
+    }
+    
     public override string ToString()
     {
-        return name + " (M:" + MovesLeft + ")";
+        return name + " (M:" + MovesLeft + "/H:"+ CurrentHealth+")@"+Cell;
     }
 }
 

@@ -7,6 +7,6 @@ namespace GridPathFinder.Map
     {
         int Width { get; }
         int Height { get; }
-        List<Point> GetNeighbors(Unit currentUnit, Point smallestDistCell);
+        List<Point> GetNeighbors(Unit currentUnit, Point cellPosition);
     }
 }

@@ -26,7 +26,7 @@ public class AIPlayer
     private MapTileInfo[,] mapKnowledge;
     private List<Unit> visibleEnemies = new List<Unit>();
     private int nextUnit;
-    private SubsumptionBehavior behaviourForThisPhase;
+    private HashSet<Unit> noopUnits = new HashSet<Unit>();
 
     public AIPlayer(IGame game, Mod mod, IPlayerMap map, Mod.RuleFaction faction)
     {
@@ -41,8 +41,9 @@ public class AIPlayer
         
         scheduler = new SubsumptionScheduler(game, map, mod, faction);
         
-        scheduler.AddBehavior(new DestroyBehaviour(game, map) {Level = 0});
-        scheduler.AddBehavior(new ExplorationBehaviour(game, map) {Level = 10});
+        scheduler.AddBehavior(new AttackBehaviour(game, map) {Name = "Attack", Level = 0});
+        scheduler.AddBehavior(new MovementBehaviour(game, map) {Name = "Move", Level = 10});
+        scheduler.AddBehavior(new NoopBehaviour(game, map) {Name = "Noop", Level = 100});
         
     }
 
@@ -50,8 +51,8 @@ public class AIPlayer
     // needs to end turn when done
     public void NextPhase()
     {
+        noopUnits.Clear();
         GatherInformation(); // should update mapKnowledge and visibleEnemies
-        behaviourForThisPhase = scheduler.Run(mapKnowledge, allUnits, visibleEnemies);
     }
 
     private void GatherInformation()
@@ -81,11 +82,28 @@ public class AIPlayer
 
     public void ExecuteNextCommand()
     {   
-        if (allUnits.Count == 0)
+        map.RemoveAllCellLabels();
+        // high-level plan
+        
+        // assess the situation
+        // choose best unit which can still act
+        // create command for that unit
+        // endCondition: No unit can act anymore OR No action would improve the situation
+        
+        var availableUnits = allUnits.Where(u => u.CanAct && !noopUnits.Contains(u)).ToList();
+
+        if (availableUnits.Count == 0)
         {
             game.EndPhase(this);
+            return;
         }
-        var playerCommand = behaviourForThisPhase.Fire(mapKnowledge, allUnits, visibleEnemies);
+
+        var firstAvailableUnit = availableUnits.First();
+        
+        var behaviourForThisPhase = scheduler.Run(firstAvailableUnit, mapKnowledge, visibleEnemies);
+        var playerCommand = behaviourForThisPhase.Fire(firstAvailableUnit, mapKnowledge, visibleEnemies);
+        
+        Debug.Log(playerCommand.ToString());
         
         if (playerCommand.Type == CommandType.Movement)
         {
@@ -96,6 +114,10 @@ public class AIPlayer
         {
             ExecuteAttack(playerCommand.PlayerUnit, playerCommand.Targets);
             GatherInformation();
+        }
+        else if (playerCommand.Type == CommandType.Noop)
+        {
+            noopUnits.Add(firstAvailableUnit);
         }
         else if (playerCommand.Type == CommandType.EndTurn)
         {
@@ -123,6 +145,10 @@ public interface IGame
     void MoveUnit(Unit unit, Vector3Int targetPos);
     HashSet<Vector3Int> GetReachableMapPositions(Unit unit);
     void AttackWithUnit(Unit unit, List<Vector3Int> targets);
+    List<Unit> GetVisibleEnemies(Unit unit);
+    List<Unit> GetVisibleEnemies(Vector3Int mapPos, Mod.RuleFaction playerFaction);
+    List<Vector3Int> GetShortestPath(Unit unit, Vector3Int goalPosition, bool movesLeftIsMaxDistance = false);
+    List<Vector3Int> GetShortestPath(Unit unit, Vector3Int startPosition, Vector3Int goalPosition);
 }
 
 public enum CommandType
@@ -142,4 +168,13 @@ public class PlayerCommand
     public CommandType Type { get; set; }
     public Unit PlayerUnit { get; set; }
     public List<Vector3Int> Targets { get; set; }
+
+    public override string ToString()
+    {
+        string commandType = Enum.GetName(typeof(CommandType), Type);
+        string unit = PlayerUnit != null ? PlayerUnit.ToString() : "";
+        string target = Targets != null && Targets.Count > 0 ? Targets.First().ToString() : "";
+
+        return commandType + "(" + unit + " -> " + target + ")";
+    }
 }

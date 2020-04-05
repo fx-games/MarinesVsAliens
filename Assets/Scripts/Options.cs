@@ -12,7 +12,8 @@ namespace DefaultNamespace
         public static bool AllowDiagonalAdjacentAttacks { get; set; } = false;
 
         public static ICombatMechanics CombatMechanics { get; set; } = new DiceBasedCombat();
-        public static float DiagonalMovementCost { get; set; } = 1.0f;
+
+        public static bool Debug { get; set; } = false;
     }
 
     public interface ICombatMechanics
@@ -76,6 +77,7 @@ namespace DefaultNamespace
             Vector3Int aoePos, Unit target)
         {
             int damageLeft = -1;
+            
             var isMelee = IsMelee(attacker, target);
             
             if (isMelee && !attacker.HasMeleeWeapon)
@@ -97,17 +99,18 @@ namespace DefaultNamespace
             var isExplosion = weapon.Rules.Radius > 0;
 
             int attackerScore = attackerDice.Sum();
+            int damage = -1;
             
             if (isExplosion && isAoEPosition)
             {
                 attackerScore = attackerDice.Max();
             }
-            Debug.Log("Attack: " + attackerScore);
-
+            //Debug.Log("Attack: " + attackerScore);
+            int defenderScore = -1;
             if (attackerScore > 0)
             {
-                int defenderScore = target.GetDefense(isMelee);
-                Debug.Log("Defense: " + defenderScore);
+                defenderScore = target.GetDefense(isMelee);
+                //Debug.Log("Defense: " + defenderScore);
                 LastMeleeDefense = defenderScore;
                 //target.AttackedWith(attack, isMelee);
                 if (defenderScore >= attackerScore)
@@ -124,7 +127,7 @@ namespace DefaultNamespace
                 else
                 {
                     // damage to target
-                    int damage = attackerScore - defenderScore;
+                    damage = attackerScore - defenderScore;
                     damageLeft = target.DamageReceived(attacker, weapon, damage);
                 }
                 if (target.CurrentHealth <= 0)
@@ -136,7 +139,9 @@ namespace DefaultNamespace
                     OnUnitKilled(attacker);
                 }
             }
-
+            
+            Debug.Log("ATT:" + attacker + "(" + attackerScore + ") -> " + target + "("+defenderScore+") => Dmg: " + damage);
+            
             return damageLeft;
         }
 

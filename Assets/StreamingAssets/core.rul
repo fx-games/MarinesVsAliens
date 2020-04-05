@@ -100,21 +100,26 @@ factions:
     spritePrefix: Alien
     color: [177, 52, 235, 1]
     loadOut:
-      - unit: STR_SPIDER_ALIEN
+      - unit: STR_ANDROID_ALIEN
         count: 3
+        weapons:
+          - STR_HEAVY_HITTER
+          - STR_ANDROID_RIFLE
+      - unit: STR_BIG_ALIEN
+        count: 1
+        weapons:
+          - STR_HARD_HITTER
+          - STR_ROCKET_LAUNCHER
+      - unit: STR_SPIDER_ALIEN
+        count: 8
         weapons:
           - STR_NORMAL_HITTER
           - STR_RIFLE
       - unit: STR_RIFLE_ALIEN
-        count: 3
+        count: 8
         weapons:
           - STR_NORMAL_HITTER
           - STR_RIFLE
-#      - unit: STR_BIG_ALIEN
-#        count: 1
-#        weapons:
-#          - STR_HARD_HITTER
-#          - STR_ROCKET_LAUNCHER
 units:
   - type: STR_SQUADDIE
     movement: 4
@@ -130,17 +135,23 @@ units:
     movement: 8
     health: 1
     armor: 0
+  - type: STR_ANDROID_ALIEN
+    unitSprite: Android
+    movement: 4
+    health: 1
+    armor: 2
   - type: STR_RIFLE_ALIEN
     unitSprite: Rifle
     movement: 6
     health: 1
     armor: 1
   - type: STR_BIG_ALIEN
+    unitSprite: Rocket
     movement: 4
     health: 3
     armor: 4
-    occupiedTiles: [[0,0],[0,1],[1,0],[1,1]]
-    canMoveDiagonally: false
+#    occupiedTiles: [[0,0],[0,1],[1,0],[1,1]]
+#    canMoveDiagonally: false
 
 weapons:
   - type: STR_HARD_HITTER
@@ -155,10 +166,21 @@ weapons:
     damage:
       - [1,2,0,0,0,0]
       - [1,2,0,0,0,0]
+  - type: STR_ANDROID_RIFLE
+    weaponSprite: Rifle
+    damage:
+      - [1,2,0,0,0,0]
+      - [1,2,0,0,0,0]
+      - [1,2,0,0,0,0]
   - type: STR_NORMAL_HITTER
     damage:
       - [1,2,0,0,0,0]
       - [1,2,0,0,0,0]
+    isMelee: true
+  - type: STR_HEAVY_HITTER
+    damage:
+      - [1,2,3,0,0,0]
+      - [1,2,3,0,0,0]
     isMelee: true
   - type: STR_ROCKET_LAUNCHER
     weaponSprite: Rocket
@@ -199,3 +221,6 @@ translations:
       STR_NORMAL_HITTER: Melee
       STR_RIFLE: Plasma Rifle
       STR_HARD_HITTER: Charged Punch
+      STR_ANDROID_ALIEN: Manic-depressive Android
+      STR_HEAVY_HITTER: Mechanic Punch
+      STR_ANDROID_RIFLE: Laser Rifle

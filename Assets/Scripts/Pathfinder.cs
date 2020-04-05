@@ -47,14 +47,7 @@ namespace GridPathFinder
         public System.Collections.Generic.HashSet<Point> ReachableList { get; private set; }
 
         public float MaxCost { get; set; }
-
-        public float CardinalCost
-        {
-            get { return mCardinalCost; }
-        }
-
         public Unit CurrentUnit { get; set; }
-
         public Pathfinder(IGridMap map, float cardinalCost, float diagonalCost)
         {
             mMap = map;

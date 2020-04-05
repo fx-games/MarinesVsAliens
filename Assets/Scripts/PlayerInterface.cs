@@ -20,7 +20,7 @@ namespace DefaultNamespace
         bool IsUnitOn(Vector3Int mapPos);
         bool IsNeighborReachable(IPlayerUnit unit, Vector3Int tileOne, Vector3Int tileTwo);
         bool IsNeighborVisible(Vector3Int oldPos, Vector3Int newPos);
-        Vector3Int GetNeighbour(Vector3Int position, Map.Direction direction);
+        Vector3Int GetNeighborInDirection(Vector3Int position, Map.Direction direction);
         int Width { get; }
         int Height { get; }
         Vector3Int RandomPosition { get; }
@@ -37,6 +37,9 @@ namespace DefaultNamespace
         bool IsLineOfFireBetween(Vector3Int source, Vector3Int target);
         bool IsLineOfSightBetween(Vector3Int source, Vector3Int target);
         string GetPosDebugInfo(Vector3Int pos);
+        void SetTextAt(Vector3Int mapPos, string text);
+        void RemoveAllCellLabels();
+        List<Vector3Int> GetAllNeighborsForUnit(Unit unit, Vector3Int mapPos);
     }
 
     public interface IPlayerUnit

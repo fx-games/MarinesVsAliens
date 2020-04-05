@@ -574,6 +574,8 @@ MonoBehaviour:
   - {fileID: 3510056058709453012, guid: 7b7b599f6fb204a2eae6dda06374cff5, type: 3}
   - {fileID: 3510056058709453012, guid: 0926a0953939944c9a691b3ae618f5a7, type: 3}
   - {fileID: 3510056058709453012, guid: 9edc324d3c06a4b9d9ebcce4aa3dd9d9, type: 3}
+  - {fileID: 3510056058709453012, guid: 3c915dd1c792746bcb84218c833bba4c, type: 3}
+  - {fileID: 3510056058709453012, guid: 0f4f7acaa6f43485386aca92d8176408, type: 3}
   explosionPrefab: {fileID: 5012863476137197226, guid: 5b8a5482dc39842e18a1802f79c1f97a,
     type: 3}
   selectedUnit: {fileID: 0}
@@ -816,7 +818,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &991913730
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1362,7 +1364,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1806750443
 RectTransform:
   m_ObjectHideFlags: 0
