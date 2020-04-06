@@ -74,11 +74,6 @@ public class Game : MonoBehaviour, IGame
         LoadMap();
     }
 
-    void EnableSpectatorMode()
-    {
-        spectatorMode = true;
-        _map.EnableSpectatorMode();
-    }
     void LoadMap()
     {
         if (_map != null)
@@ -98,7 +93,7 @@ public class Game : MonoBehaviour, IGame
             _map.FromRules(mapRules);
         }
         
-        Invoke("AfterMapLoad", 0.1f);
+        Invoke(nameof(AfterMapLoad), 0.1f);
     }
 
     public void AfterMapLoad()
@@ -113,9 +108,14 @@ public class Game : MonoBehaviour, IGame
         CreateAIPlayers();
         
         //DEBUG
-        //EnableSpectatorMode();
+        EnableSpectatorMode();
     }
 
+    void EnableSpectatorMode()
+    {
+        spectatorMode = true;
+        _map.EnableSpectatorMode();
+    }
     private void CreateAIPlayers()
     {
         foreach (var faction in factions)
@@ -128,12 +128,11 @@ public class Game : MonoBehaviour, IGame
     // Update is called once per frame
     void Update()
     {
-        if (factions.Count == 0) return;
+        if (factions.Count <= 1) return;
         /* Automatic AI moves disabled */
         if (gameState != GameState.WaitForHotSeatPlayer 
-            && aiPlayers.ContainsKey(CurrentFaction))
+            && aiPlayers.ContainsKey(CurrentFaction) && spectatorMode)
         {
-            /*
             if (aiPlayers[CurrentFaction].State == AIState.Idle && currentAiCoroutine != null)
             {
                 StopCoroutine(currentAiCoroutine);
@@ -147,7 +146,7 @@ public class Game : MonoBehaviour, IGame
             }
 
             return;
-            */
+            
         }
         
         if (Input.GetMouseButtonDown(1))
@@ -168,7 +167,7 @@ public class Game : MonoBehaviour, IGame
             }
 
             if (selectedUnit != null && gameState == GameState.MoveTargetSelection &&
-                cursorLocation != lastCursorLocation)
+                cursorLocation != lastCursorLocation && selectedUnit.ReachablePositions.Contains(cursorLocation))
             {
                 //Debug.Log("PreviewMovement at " + cursorLocation);
                 PreviewMovement(selectedUnit, cursorLocation);
@@ -396,10 +395,15 @@ public class Game : MonoBehaviour, IGame
     
     private void KillUnit(Unit unit)
     {
+        foreach (var otherUnit in allUnits)
+        {
+            if (unit != otherUnit) otherUnit.VisibleEnemies.Remove(unit);
+        }
+        
         unit.FinishedMoving -= UnitFinishedMoving;
-        unit.UnitDeath();
         _map.RemoveUnit(unit);
         allUnits.Remove(unit);
+        unit.UnitDeath();
     }
 
     private void CreateExplosion(Vector3Int mapPos)
@@ -425,7 +429,8 @@ public class Game : MonoBehaviour, IGame
             {
                 _map.RemoveDoor(unit, neighborPos);
                 
-                _map.UpdateFOV(unit.Cell, unit.CurrentVisionRange);
+                unit.UpdateFoV();
+                
                 UpdateVisibleUnits(unit);
 
                 break;
@@ -569,7 +574,7 @@ public class Game : MonoBehaviour, IGame
     {
         if (selectedUnit == null) return;
         
-        if (aiPlayers.ContainsKey(CurrentFaction)) return;
+        //if (aiPlayers.ContainsKey(CurrentFaction) ) return;
 
         if (gameState == GameState.AttackTargetSelection && multipleTargets.Count > 0)
         {
@@ -624,6 +629,7 @@ public class Game : MonoBehaviour, IGame
 
     private void HighlightTiles(List<Vector3Int> positions)
     {
+        _map.RemoveAllHighlights();
         foreach (var pos in positions)
         {
             _map.HighlightTile(pos, new Color(0, 0.8f, 0, 0.2f));
@@ -653,11 +659,13 @@ public class Game : MonoBehaviour, IGame
     {
         if (gameState == GameState.WaitForHotSeatPlayer) return;
         
+        
         GlobalFOVUpdate();
         
         if (selectedUnit == args.unit && selectedUnit.MovesLeft > 0)
         {
             gameState = GameState.MoveTargetSelection;
+            HighlightTiles(selectedUnit.ReachablePositions);
         }
     }
 
@@ -823,15 +831,12 @@ public class Game : MonoBehaviour, IGame
     private void UnitStepCompleted(object sender, UnitEventArgs args)
     {
         var unit = args.unit;
-        var oldPos = args.previousPosition;
-        
-        var newPos = _map.WorldToCell(unit.transform.position);
 
         _map.IsStandingOnDoor(unit, true);
 
         if (gameState == GameState.WaitForHotSeatPlayer) return;
         
-        _map.UpdateFOV(newPos, unit.CurrentVisionRange);
+        unit.UpdateFoV();
         
         UpdateVisibleUnits(unit);
     }
@@ -876,6 +881,7 @@ public class Game : MonoBehaviour, IGame
 
     public Vector3Int GetBestMoveTowards(Unit unit, Vector3Int goalPosition)
     {
+        var reachable = unit.ReachablePositions;
         var shortestPath = unit.GetShortestPath(goalPosition);
         if (shortestPath.Count == 0)
         {
@@ -883,8 +889,7 @@ public class Game : MonoBehaviour, IGame
             return unit.Cell;
         }
         if (Options.Debug) shortestPath.ForEach(p => _map.SetTextAt(p, "_"));
-        var reachable = unit.ReachablePositions;
-
+        
         if (reachable.Count == 0)
         {
             Debug.LogWarning("No reachable pos for " + unit + " to " + goalPosition + " (" + _map.GetPosDebugInfo(goalPosition) + ")");

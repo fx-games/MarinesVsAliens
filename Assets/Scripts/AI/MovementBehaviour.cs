@@ -62,7 +62,7 @@ namespace AI
                     if (Options.Debug) map.SetTextAt(moveTarget, "RND");
                     */
                 }
-
+                Debug.Log("EXPLORATION TARGET");
                 PlayerCommand moveUnit = new PlayerCommand(CommandType.Movement)
                 {
                     PlayerUnit = unit,
@@ -71,7 +71,7 @@ namespace AI
                 callback(moveUnit);
                 yield break;
             }
-            else // move to attack
+            else // enemies are visible to some units, move to attack
             {
                 var reachableMapPositions = unit.ReachablePositions;
 
@@ -82,35 +82,51 @@ namespace AI
                     callback(new PlayerCommand(CommandType.Noop));
                     yield break;
                 }
-                var visibleToUnit = visibleEnemies.Where(enemy => map.IsLineOfSightBetween(enemy.Cell, unit.Cell));
 
-                Unit targetEnemy;
-                if (visibleToUnit.Any())
+                foreach (var mapPosition in reachableMapPositions)
                 {
-                    targetEnemy = visibleToUnit.First();
+                    var validTargets = unit.GetValidAttackTargetsAt(mapPosition);
+                    foreach (var visibleEnemy in visibleEnemies)
+                    {
+                        if (!validTargets.Contains(visibleEnemy.Cell)) continue;
+                        Debug.Log("ATTACK POSITION FOUND");
+                        PlayerCommand moveUnit = new PlayerCommand(CommandType.Movement)
+                        {
+                            PlayerUnit = unit,
+                            Targets = new List<Vector3Int>() {mapPosition}
+                        };
+                        callback(moveUnit);
+                        yield break;
+                    }
                 }
-                else
+                // no attack position found
+
+                // just move towards
                 {
                     visibleEnemies.Sort((one,two) => (one.Cell - unit.Cell).magnitude.CompareTo((two.Cell - unit.Cell).magnitude));
-                    targetEnemy = visibleEnemies.First();
+                    var targetEnemy = visibleEnemies.First();
+                    var cellsNextToEnemy = map.GetAllNeighborsForUnit(unit, targetEnemy.Cell);
+                    var freeCells = cellsNextToEnemy.Where(p => map.CanBePlaced(unit, p, false, false)).ToList();
+                    if (freeCells.Any())
+                    {
+                        var targetPos = freeCells.First();
+                        Vector3Int moveTarget = game.GetBestMoveTowards(unit, targetPos);
+                        if (moveTarget == unit.Cell)
+                        {
+                            callback(new PlayerCommand(CommandType.Noop));
+                            yield break;
+                        }
+                        Debug.Log("BEST MOVE TOWARDS " + targetPos);
+                        PlayerCommand moveUnit = new PlayerCommand(CommandType.Movement)
+                        {
+                            PlayerUnit = unit,
+                            Targets = new List<Vector3Int>() {moveTarget}
+                        };
+                        callback(moveUnit);
+                        yield break;
+                    }
                 }
 
-                yield return GetScoreMap(unit, reachableMapPositions, targetEnemy, scoreMap =>
-                {
-                    var scoreList = scoreMap.ToList();
-                    scoreList.Sort((one, two) => one.Value.CompareTo(two.Value));
-
-                    var bestChoice = scoreList.Last().Key;
-                
-                    PlayerCommand moveUnit = new PlayerCommand(CommandType.Movement)
-                    {
-                        PlayerUnit = unit,
-                        Targets = new List<Vector3Int>() {bestChoice}
-                    };
-                    callback(moveUnit);
-                });
-
-                
                 yield break;
             }
             

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using DefaultNamespace;
 using GridPathFinder;
@@ -7,6 +8,7 @@ using UnityEngine.UI;
 using static Map;
 using static Mod;
 using static Mod.RuleFaction;
+using Random = UnityEngine.Random;
 
 
 public class Unit : MonoBehaviour, IPlayerUnit
@@ -65,17 +67,17 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public bool CanAct => CanAttack || MovesLeft > 0;
     public RuleUnit Rules => unitRules;
     public List<Vector3Int> OccupiedTiles { get; set; }
-    public List<IPlayerUnit> VisibleEnemies { get; set; }
+    public List<IPlayerUnit> VisibleEnemies { get; set; } = new List<IPlayerUnit>();
     public HashSet<Vector3Int> FieldOfView { get; set; }
 
     public List<Vector3Int> ReachablePositions
     {
-        get => _reachablePositions.Where(p => !_map.IsUnitOn(p)).ToList();
-        private set => _reachablePositions = value;
+        get => _reachablePositions.Value.Where(p => !_map.IsUnitOn(p)).ToList();
     }
 
     private Pathfinder pathfinder;
-    private List<Vector3Int> _reachablePositions;
+    private Lazy<List<Vector3Int>> _reachablePositions;
+    private Lazy<HashSet<Vector3Int>> _validTargets;
     public event UnitEvent FinishedMoving;
     public event UnitEvent StepCompleted;
     // Start is called before the first frame update
@@ -86,6 +88,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
         mod = FindObjectOfType<Mod>();
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
         pathfinder = new Pathfinder(_map, 1.0f, 1.41f);
+        _reachablePositions = new Lazy<List<Vector3Int>>(CreateMovementMap);
     }
 
     
@@ -168,12 +171,8 @@ public class Unit : MonoBehaviour, IPlayerUnit
             currentPathIndex = -1;
             currentPath = null;
 
-            if (MovesLeft > 0)
-            {
-                CreateMovementMap();
-            }
+            _reachablePositions = new Lazy<List<Vector3Int>>(CreateMovementMap);
             UpdateValidAttackTargets();
-            
             OnFinishedMoving();
         }
     }
@@ -329,10 +328,13 @@ public class Unit : MonoBehaviour, IPlayerUnit
         MovesLeft = unitRules.Movement;
         CanAttack = true;
         UpdateValidAttackTargets();
-        CreateMovementMap();
+        _reachablePositions = new Lazy<List<Vector3Int>>(CreateMovementMap);
     }
 
-    public HashSet<Vector3Int> ValidTargets { get; private set; }
+    public HashSet<Vector3Int> ValidTargets
+    {
+        get => _validTargets.Value;
+    }
 
     public void SetVisible(bool isVisible)
     {
@@ -454,66 +456,68 @@ public class Unit : MonoBehaviour, IPlayerUnit
         return false;
     }
 
-    public bool CanAttackUnit(Unit otherUnit)
+    public bool CanAttackUnit(IPlayerUnit otherUnit)
     {
         return CanAttack
                && (HasMeleeWeapon && _map.AreNeighbors(Cell, otherUnit.Cell) ||
                    HasRangedWeapon && ValidTargets.Contains(otherUnit.Cell));
     }
-    
-    
-    private void UpdateValidAttackTargets()
+
+    public HashSet<Vector3Int> GetValidAttackTargetsAt(Vector3Int mapPos)
     {
         int maxDistance = 20;
-        
-        var unitPos = Cell;
         HashSet<Vector3Int> validTargets = new HashSet<Vector3Int>();
         if (HasRangedWeapon)
         {
             var weaponRules = RangedWeapon.Rules;
             if (weaponRules.StraightLineOnly)
             {
-                validTargets.UnionWith(_map.GetStraightLine(unitPos, Direction.North, maxDistance));
-                validTargets.UnionWith(_map.GetStraightLine(unitPos, Direction.South, maxDistance));
-                validTargets.UnionWith(_map.GetStraightLine(unitPos, Direction.East, maxDistance));
-                validTargets.UnionWith(_map.GetStraightLine(unitPos, Direction.West, maxDistance));
-                validTargets.UnionWith(_map.GetStraightLine(unitPos, Direction.NorthEast, maxDistance));
-                validTargets.UnionWith(_map.GetStraightLine(unitPos, Direction.NorthWest, maxDistance));
-                validTargets.UnionWith(_map.GetStraightLine(unitPos, Direction.SouthEast, maxDistance));
-                validTargets.UnionWith(_map.GetStraightLine(unitPos, Direction.SouthWest, maxDistance));   
+                validTargets.UnionWith(_map.GetStraightLine(mapPos, Direction.North, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(mapPos, Direction.South, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(mapPos, Direction.East, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(mapPos, Direction.West, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(mapPos, Direction.NorthEast, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(mapPos, Direction.NorthWest, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(mapPos, Direction.SouthEast, maxDistance));
+                validTargets.UnionWith(_map.GetStraightLine(mapPos, Direction.SouthWest, maxDistance));   
             }
             else
             {
-                validTargets = _map.GetFOV(unitPos, maxDistance, true);
+                validTargets = _map.GetFOV(mapPos, maxDistance, true);
             }
             
-            validTargets.Remove(unitPos);
+            validTargets.Remove(mapPos);
         }
         
         if (!HasMeleeWeapon) // can only attack these tiles with melee
         {
-            validTargets.Remove(unitPos + Vector3Int.right);
-            validTargets.Remove(unitPos + Vector3Int.up);
-            validTargets.Remove(unitPos + Vector3Int.down);
-            validTargets.Remove(unitPos + Vector3Int.left);
+            validTargets.Remove(mapPos + Vector3Int.right);
+            validTargets.Remove(mapPos + Vector3Int.up);
+            validTargets.Remove(mapPos + Vector3Int.down);
+            validTargets.Remove(mapPos + Vector3Int.left);
         }
         else
         {
-            AddToValidTargets(ref validTargets,unitPos + Vector3Int.right);
-            AddToValidTargets(ref validTargets,unitPos + Vector3Int.up);
-            AddToValidTargets(ref validTargets,unitPos + Vector3Int.down);
-            AddToValidTargets(ref validTargets,unitPos + Vector3Int.left);
+            AddToValidTargets(ref validTargets,mapPos + Vector3Int.right);
+            AddToValidTargets(ref validTargets,mapPos + Vector3Int.up);
+            AddToValidTargets(ref validTargets,mapPos + Vector3Int.down);
+            AddToValidTargets(ref validTargets,mapPos + Vector3Int.left);
         }
 
         if (!Options.AllowDiagonalAdjacentAttacks)
         {
-            validTargets.Remove(unitPos + Vector3Int.up + Vector3Int.right);
-            validTargets.Remove(unitPos + Vector3Int.down + Vector3Int.left);
-            validTargets.Remove(unitPos + Vector3Int.down + Vector3Int.right);
-            validTargets.Remove(unitPos + Vector3Int.up + Vector3Int.left);
+            validTargets.Remove(mapPos + Vector3Int.up + Vector3Int.right);
+            validTargets.Remove(mapPos + Vector3Int.down + Vector3Int.left);
+            validTargets.Remove(mapPos + Vector3Int.down + Vector3Int.right);
+            validTargets.Remove(mapPos + Vector3Int.up + Vector3Int.left);
         }
 
-        ValidTargets = validTargets;
+        return validTargets;
+    }
+    
+    private void UpdateValidAttackTargets()
+    {
+        _validTargets = new Lazy<HashSet<Vector3Int>>(() => GetValidAttackTargetsAt(Cell));
     }
     private void AddToValidTargets(ref HashSet<Vector3Int> validTargets, Vector3Int pos)
     {
@@ -529,18 +533,18 @@ public class Unit : MonoBehaviour, IPlayerUnit
     }
     
 
-    private void CreateMovementMap()
+    private List<Vector3Int> CreateMovementMap()
     {
         pathfinder.MaxReachableCost = MovesLeft;
         pathfinder.MaxCost =  -1;
         pathfinder.CurrentUnit = this;
         pathfinder.Dijkstra(new HashSet<Vector3Int>(){Cell}, new HashSet<Vector3Int>());
-        ReachablePositions = pathfinder.ReachableList.ToList();
+        return pathfinder.ReachableList.ToList();
     }
     
     public List<Vector3Int> GetShortestPath(Vector3Int startPosition, Vector3Int goalPosition)
     {
-        Debug.Log("GetShortestPath(" + startPosition + ", " + goalPosition + ")");
+//        Debug.Log("GetShortestPath(" + startPosition + ", " + goalPosition + ")");
         //_map.SetTextAt(startPosition, "BGN");
         //_map.SetTextAt(goalPosition, "END");
         var shortestPath = pathfinder.GetShortestPath(goalPosition);

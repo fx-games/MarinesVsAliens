@@ -228,3 +228,5 @@ translations:
       STR_ANDROID_ALIEN: Manic-depressive Android
       STR_HEAVY_HITTER: Mechanic Punch
       STR_ANDROID_RIFLE: Laser Rifle
+      STR_BIG_ALIEN: Cyclone Soldier
+      STR_LOW_HITTER: Pummel

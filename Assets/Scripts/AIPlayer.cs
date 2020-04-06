@@ -150,6 +150,10 @@ public class AIPlayer
     private void ExecuteMovement(Unit unit, Vector3Int pos)
     {
         game.MoveUnit(unit, pos);
+        if (!unit.CanAttack)
+        {
+            noopUnits.Add(unit); // only move once
+        }
     }
 }
 

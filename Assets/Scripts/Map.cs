@@ -518,7 +518,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         {
             affectedTiles.UnionWith(GetStraightLine(unitPos, mapPos));
             affectedTiles.Remove(unitPos);
-            affectedTiles.RemoveWhere(pos => AreNeighbors(unitPos, pos, true));
+            //affectedTiles.RemoveWhere(pos => AreNeighbors(unitPos, pos, true));
         }
         
         if (radius > 0)
@@ -717,7 +717,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         {
             return false;
         }
-        if (IsWallAt(xOld, yOld) || IsWallAt(xNew, yNew) ||  IsDoorAt(xOld, yOld) || IsDoorAt(xNew, yNew))
+        if (IsWallAt(xOld, yOld) || IsWallAt(xNew, yNew) || IsDoorAt(xOld, yOld) || IsDoorAt(xNew, yNew))
         {
             return false;
         }
@@ -725,7 +725,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         if (xOld != xNew && yOld != yNew)
         {
             var dx = xOld - xNew;
-            var dy = xOld - yNew;
+            var dy = yOld - yNew;
             // one is to the top right of two
             if (IsWallAt(xNew + dx, yNew) || IsWallAt(xNew, yNew + dy)) // no diagonal looking around and through walls
             {
@@ -735,17 +735,6 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return true;
     }
 
-
-    public void UpdateFOV(Vector3Int position, int radius)
-    {
-        //Debug.Log("UpdateFoV: " + position);
-        radius++;
-        int i, j;
-        for (i = -radius; i <= radius; i++)
-            for (j = -radius; j <= radius; j++)
-                if (i * i + j * j < radius * radius)
-                    LineCast(position.x, position.y, position.x + i, position.y + j, true);
-    }
     public HashSet<Vector3Int> GetStraightLine(Vector3Int unitPos, Direction rayDirection, int maxDistance)
     {
         HashSet<Vector3Int> linePositions = new HashSet<Vector3Int>();
@@ -849,12 +838,12 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
                 //tag_memorised(xnext, ynext); // make a note of the wall
                 return false;
             }
-
+            
             if (unitsAreBlocking && !(xnext == x0 && ynext == y0) && IsUnitOn(xnext, ynext))
             {
                 return false;
             }
-
+            
             prevX = xnext;
             prevY = ynext;
             // Line-to-point distance formula < 0.5 

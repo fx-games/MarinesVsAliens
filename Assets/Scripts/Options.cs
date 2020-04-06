@@ -31,10 +31,7 @@ namespace DefaultNamespace
 
         public void OnUnitKilled(Unit unit)
         {
-            if (UnitKilled != null)
-            {
-                UnitKilled(this, new UnitEventArgs(){unit = unit});
-            }
+            UnitKilled?.Invoke(this, new UnitEventArgs(){unit = unit});
         }
 
         protected bool IsMelee(Unit attacker, Unit target)

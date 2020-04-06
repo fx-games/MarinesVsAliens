@@ -26,13 +26,13 @@ namespace AI
 
         public override bool CheckIfFired(Unit unit, MapTileInfo[,] mapKnowledge, List<Unit> visibleEnemies)
         {
-            if (visibleEnemies.Count == 0 || !unit.CanAttack) return false;
-            return visibleEnemies.Any(unit.CanAttackUnit);
+            if (unit.VisibleEnemies.Count == 0 || !unit.CanAttack) return false;
+            return unit.VisibleEnemies.Any(unit.CanAttackUnit);
         }
 
         public override IEnumerator Fire(Unit unit, MapTileInfo[,] mapKnowledge, List<Unit> visibleEnemies, Action<PlayerCommand> callback)
         {
-            var attackTarget = visibleEnemies.First(unit.CanAttackUnit).Cell;
+            var attackTarget = unit.VisibleEnemies.First(unit.CanAttackUnit).Cell;
             if (Options.Debug) map.SetTextAt(attackTarget, "ATT");
             callback(new PlayerCommand(CommandType.Attack)
             {
