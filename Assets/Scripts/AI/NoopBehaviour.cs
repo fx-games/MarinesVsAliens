@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -27,9 +29,10 @@ namespace AI
             return true;
         }
 
-        public override PlayerCommand Fire(Unit unit, MapTileInfo[,] mapKnowledge, List<Unit> visibleEnemies)
+        public override IEnumerator Fire(Unit unit, MapTileInfo[,] mapKnowledge, List<Unit> visibleEnemies, Action<PlayerCommand> callback)
         {
-            return new PlayerCommand(CommandType.Noop);
+            callback(new PlayerCommand(CommandType.Noop));
+            yield return null;
         }
 
 

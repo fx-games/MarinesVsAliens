@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -28,15 +30,16 @@ namespace AI
             return visibleEnemies.Any(unit.CanAttackUnit);
         }
 
-        public override PlayerCommand Fire(Unit unit, MapTileInfo[,] mapKnowledge, List<Unit> visibleEnemies)
+        public override IEnumerator Fire(Unit unit, MapTileInfo[,] mapKnowledge, List<Unit> visibleEnemies, Action<PlayerCommand> callback)
         {
             var attackTarget = visibleEnemies.First(unit.CanAttackUnit).Cell;
             if (Options.Debug) map.SetTextAt(attackTarget, "ATT");
-            return new PlayerCommand(CommandType.Attack)
+            callback(new PlayerCommand(CommandType.Attack)
             {
                 PlayerUnit = unit,
                 Targets = new List<Vector3Int> {attackTarget}
-            };
+            });
+            yield return null;
         }
 
 

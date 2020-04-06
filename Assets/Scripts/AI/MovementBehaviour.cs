@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using DefaultNamespace;
@@ -27,14 +29,18 @@ namespace AI
             return true;
         }
 
-        public override PlayerCommand Fire(Unit unit, MapTileInfo[,] mapKnowledge, List<Unit> visibleEnemies)
+        public override IEnumerator Fire(Unit unit, MapTileInfo[,] mapKnowledge, List<Unit> visibleEnemies, Action<PlayerCommand> callback)
         {
             if (visibleEnemies.Count == 0)
             {
                 Vector3Int target = FindExplorationTarget(mapKnowledge);
                 if (Options.Debug) map.SetTextAt(target, "EX");
                 // no moves or nothing left to explore
-                if (target == Vector3Int.down + Vector3Int.left) return new PlayerCommand(CommandType.Noop);
+                if (target == Vector3Int.down + Vector3Int.left)
+                {
+                    callback(new PlayerCommand(CommandType.Noop));
+                    yield break;
+                }
 
                 Vector3Int moveTarget = game.GetBestMoveTowards(unit, target);
 
@@ -44,7 +50,9 @@ namespace AI
                     Debug.Log("NO Target for " + unit + ": " + target);
                     Debug.Log("With best move towards being: " + moveTarget);
                     Debug.Log("PosInfo: " + map.GetPosDebugInfo(moveTarget));
-                    return new PlayerCommand(CommandType.Noop);
+                    callback(new PlayerCommand(CommandType.Noop));
+                    yield break;
+                    /*
                     var reachableMapPositions =
                         game.GetReachableMapPositions(unit).Where(pos => !map.IsUnitOn(pos)).ToList();
                     reachableMapPositions.Sort((posOne, posTwo) =>
@@ -52,6 +60,7 @@ namespace AI
                     moveTarget = reachableMapPositions.Last();
                     Debug.LogWarning("Random movement to: " + moveTarget);
                     if (Options.Debug) map.SetTextAt(moveTarget, "RND");
+                    */
                 }
 
                 PlayerCommand moveUnit = new PlayerCommand(CommandType.Movement)
@@ -59,18 +68,19 @@ namespace AI
                     PlayerUnit = unit,
                     Targets = new List<Vector3Int>() {moveTarget}
                 };
-                
-                return moveUnit;
+                callback(moveUnit);
+                yield break;
             }
             else // move to attack
             {
-                var reachableMapPositions = game.GetReachableMapPositions(unit).Where(p => !map.IsUnitOn(p)).ToList();
+                var reachableMapPositions = unit.ReachablePositions;
 
                 if (reachableMapPositions.Count == 0)
                 {
                     // cannot move anywhere
                     Debug.LogWarning(unit + " CANNOT MOVE anywhere.");
-                    return new PlayerCommand(CommandType.Noop);
+                    callback(new PlayerCommand(CommandType.Noop));
+                    yield break;
                 }
                 var visibleToUnit = visibleEnemies.Where(enemy => map.IsLineOfSightBetween(enemy.Cell, unit.Cell));
 
@@ -85,34 +95,45 @@ namespace AI
                     targetEnemy = visibleEnemies.First();
                 }
 
-                var scoreMap = new Dictionary<Vector3Int, int>();
-                foreach (var reachableMapPosition in reachableMapPositions)
+                yield return GetScoreMap(unit, reachableMapPositions, targetEnemy, scoreMap =>
                 {
-                    int posScore = AssignScore(unit, reachableMapPosition, targetEnemy);
-                    scoreMap[reachableMapPosition] = posScore;
-                }
+                    var scoreList = scoreMap.ToList();
+                    scoreList.Sort((one, two) => one.Value.CompareTo(two.Value));
 
-                var scoreList = scoreMap.ToList();
-                scoreList.Sort((one, two) => one.Value.CompareTo(two.Value));
+                    var bestChoice = scoreList.Last().Key;
+                
+                    PlayerCommand moveUnit = new PlayerCommand(CommandType.Movement)
+                    {
+                        PlayerUnit = unit,
+                        Targets = new List<Vector3Int>() {bestChoice}
+                    };
+                    callback(moveUnit);
+                });
 
-                var bestChoice = scoreList.Last().Key;
                 
-                PlayerCommand moveUnit = new PlayerCommand(CommandType.Movement)
-                {
-                    PlayerUnit = unit,
-                    Targets = new List<Vector3Int>() {bestChoice}
-                };
-                
-                return moveUnit;
+                yield break;
             }
             
+        }
+
+        private IEnumerator GetScoreMap(Unit unit, List<Vector3Int> reachableMapPositions, Unit targetEnemy, Action<Dictionary<Vector3Int, int>> callback)
+        {
+            var scoreMap = new Dictionary<Vector3Int, int>();
+            foreach (var reachableMapPosition in reachableMapPositions)
+            {
+                int posScore = AssignScore(unit, reachableMapPosition, targetEnemy);
+                scoreMap[reachableMapPosition] = posScore;
+                yield return null;
+            }
+            callback(scoreMap);
+            yield break;
         }
 
         private int AssignScore(Unit unit, Vector3Int reachableMapPosition, Unit targetEnemy)
         {
             int positionScore = 0;
-            
-            int visibleEnemies = game.GetVisibleEnemies(reachableMapPosition, unit.Faction).Count;
+
+            int visibleEnemies = unit.VisibleEnemiesFrom(reachableMapPosition).Count;
             
             var isAttackPos = false;
             
@@ -143,7 +164,7 @@ namespace AI
                 if (freeCells.Any())
                 {
                     var targetPos = freeCells.First();
-                    var shortestPath = game.GetShortestPath(unit, reachableMapPosition, targetPos);
+                    var shortestPath = unit.GetShortestPath(reachableMapPosition, targetPos);
                     if (shortestPath.Count > 0)
                     {
                         positionScore += 20 - shortestPath.Count;
@@ -153,29 +174,8 @@ namespace AI
             
             //map.SetTextAt(reachableMapPosition, visibleEnemies + (isAttackPos ? "F" : ""));
             var dbgInfo = positionScore == 0 ? "_" : positionScore.ToString();
-            if (Options.Debug) map.SetTextAt(reachableMapPosition, dbgInfo);
-            
+            if (Options.Debug) map.SetTextAt(reachableMapPosition, dbgInfo);            
             return positionScore;
-        }
-
-        private List<Vector3Int> GetReachableAttackPositions(Unit unit, Unit enemyUnit)
-        {
-            List<Vector3Int> firingPositions = new List<Vector3Int>();
-            if (!unit.CanAttack || unit.MovesLeft <= 0)
-                return firingPositions;
-            
-            var reachableMapPositions = game.GetReachableMapPositions(unit).Where(p => !map.IsUnitOn(p)).ToList();
-            
-            if (unit.HasRangedWeapon)
-            {
-                firingPositions = reachableMapPositions.Where(p => map.IsLineOfFireBetween(p, enemyUnit.Cell)).ToList();
-            }
-            else if (unit.HasMeleeWeapon)
-            {
-                firingPositions = reachableMapPositions.Where(p => map.AreNeighbors(p, enemyUnit.Cell)).ToList();
-            }
-
-            return firingPositions;
         }
 
         private Vector3Int FindExplorationTarget(MapTileInfo[,] mapKnowledge)

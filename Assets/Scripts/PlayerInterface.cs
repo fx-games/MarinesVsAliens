@@ -19,7 +19,7 @@ namespace DefaultNamespace
         IPlayerUnit GetUnitAt(Vector3Int mapPos);
         bool IsUnitOn(Vector3Int mapPos);
         bool IsNeighborReachable(IPlayerUnit unit, Vector3Int tileOne, Vector3Int tileTwo);
-        bool IsNeighborVisible(Vector3Int oldPos, Vector3Int newPos);
+        bool IsNeighborVisible(int xOne, int yOne, int xTwo, int yTwo);
         Vector3Int GetNeighborInDirection(Vector3Int position, Map.Direction direction);
         int Width { get; }
         int Height { get; }

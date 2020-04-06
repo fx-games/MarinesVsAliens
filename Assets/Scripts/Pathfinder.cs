@@ -11,13 +11,12 @@ namespace GridPathFinder
 
     public class DijkstraNode : IComparable<DijkstraNode>
     {
-        public DijkstraNode(Point cell)
+        public DijkstraNode(Vector3Int cell)
         {
             GridCoordinate = cell;
             TentativeDistance = float.PositiveInfinity;
         }
-
-        public Point GridCoordinate { get; set; }
+        public Vector3Int GridCoordinate { get; set; }
         public float TentativeDistance { get; set; }
         public float EstimatedCostPath { get; set; }
         public DijkstraNode Parent { get; set; }
@@ -35,16 +34,18 @@ namespace GridPathFinder
 
         private readonly DijkstraNode[,] mNodeMap;
         
+        public float MaxReachableCost { get; set; } = -1f;
+
         private readonly float mCardinalCost;
         private readonly float mDiagonalCost;
         private IntervalHeap<DijkstraNode> mOpenList;
         private int mMapWidth;
         private int mMapHeight;
 
-        public System.Collections.Generic.HashSet<Point> ClosedList { get; private set; }
-        private System.Collections.Generic.HashSet<Point> mStartNodes;
-        private System.Collections.Generic.HashSet<Point> mGoalNodes;
-        public System.Collections.Generic.HashSet<Point> ReachableList { get; private set; }
+        public System.Collections.Generic.HashSet<Vector3Int> ClosedList { get; private set; }
+        private System.Collections.Generic.HashSet<Vector3Int> mStartNodes;
+        private System.Collections.Generic.HashSet<Vector3Int> mGoalNodes;
+        public System.Collections.Generic.HashSet<Vector3Int> ReachableList { get; private set; } = new System.Collections.Generic.HashSet<Vector3Int>();
 
         public float MaxCost { get; set; }
         public Unit CurrentUnit { get; set; }
@@ -61,14 +62,15 @@ namespace GridPathFinder
 
             mOpenList = new IntervalHeap<DijkstraNode>();
             
-            ClosedList = new System.Collections.Generic.HashSet<Point>();
+            ClosedList = new System.Collections.Generic.HashSet<Vector3Int>();
         }
 
-        public void Dijkstra(System.Collections.Generic.HashSet<Point> startNodes, System.Collections.Generic.HashSet<Point> goalNodes)
+        public void Dijkstra(System.Collections.Generic.HashSet<Vector3Int> startNodes, System.Collections.Generic.HashSet<Vector3Int> goalNodes)
         {
-            ReachableList = new System.Collections.Generic.HashSet<Point>();
+            ReachableList.Clear();
             mStartNodes = startNodes;
             mGoalNodes = goalNodes;
+            List<Vector3Int> neighbors = new List<Vector3Int>();
             InitDijkstra();
             while (!EndCondition())
             {
@@ -78,26 +80,32 @@ namespace GridPathFinder
                     continue;
 
                 //Console.WriteLine("Expanding Node: " + smallestDistCell.GridCoordinate + " (" + smallestDistCell.TentativeDistance + ")");
-                List<Point> neighbors = mMap.GetNeighbors(CurrentUnit, smallestDistCell.GridCoordinate);
-                foreach (Point neighbor in neighbors)
+                neighbors.Clear();
+                mMap.GetNeighbors(neighbors, CurrentUnit, smallestDistCell.GridCoordinate);
+                foreach (Vector3Int neighbor in neighbors)
                 {
                     if (!ClosedList.Contains(neighbor))
                     {
-                        float newTentativeDistance = mNodeMap[smallestDistCell.GridCoordinate.Y, smallestDistCell.GridCoordinate.X].TentativeDistance + GetArcCost(smallestDistCell.GridCoordinate, neighbor);
+                        float newTentativeDistance = 
+                            mNodeMap[smallestDistCell.GridCoordinate.y, smallestDistCell.GridCoordinate.x].TentativeDistance 
+                            + GetArcCost(smallestDistCell.GridCoordinate, neighbor);
 
                         float neighborToGoalEstimate = GetHeuristic(neighbor);
 
                         float estimatedCost = newTentativeDistance + neighborToGoalEstimate;
 
-                        if (estimatedCost < mNodeMap[neighbor.Y, neighbor.X].TentativeDistance)
+                        if (estimatedCost < mNodeMap[neighbor.y, neighbor.x].TentativeDistance)
                         {
 
                             //Console.WriteLine("Updating Dist of Node: " + neighbor);// + " re-adding to OpenList");
-                            mNodeMap[neighbor.Y, neighbor.X].TentativeDistance = newTentativeDistance;
-                            mNodeMap[neighbor.Y, neighbor.X].EstimatedCostPath = estimatedCost;
-                            mNodeMap[neighbor.Y, neighbor.X].Parent = smallestDistCell;
-                            mOpenList.Replace(mNodeMap[neighbor.Y, neighbor.X].PriorityQueueNode, mNodeMap[neighbor.Y, neighbor.X]);
-                            ReachableList.Add(neighbor);
+                            mNodeMap[neighbor.y, neighbor.x].TentativeDistance = newTentativeDistance;
+                            mNodeMap[neighbor.y, neighbor.x].EstimatedCostPath = estimatedCost;
+                            mNodeMap[neighbor.y, neighbor.x].Parent = smallestDistCell;
+                            mOpenList.Replace(mNodeMap[neighbor.y, neighbor.x].PriorityQueueNode, mNodeMap[neighbor.y, neighbor.x]);
+                            if (MaxReachableCost > 0 && newTentativeDistance <= MaxReachableCost)
+                            {
+                                ReachableList.Add(neighbor);
+                            }
                         }
                     }
                 }
@@ -107,15 +115,15 @@ namespace GridPathFinder
             }
         }
 
-        private float GetHeuristic(Point currentNode)
+        private float GetHeuristic(Vector3Int currentNode)
         {
             if (mGoalNodes.Contains(currentNode)) return 0f;
             if (mGoalNodes.Count == 0) return 0f;
 
             float minDist = float.PositiveInfinity;
-            foreach (Point goalNode in mGoalNodes)
+            foreach (Vector3Int goalNode in mGoalNodes)
             {
-                float dist = GetEuclideanDistance(currentNode, goalNode);
+                float dist = (currentNode - goalNode).magnitude;
                 if (dist < minDist)
                     minDist = dist;
             }
@@ -139,10 +147,10 @@ namespace GridPathFinder
             {
                 for (int x = 0; x < mMapWidth; x++)
                 {
-                    Point point = new Point(x,y);
-                    if (mStartNodes.Contains(point))
+                    Vector3Int pos = new Vector3Int(x,y,0);
+                    if (mStartNodes.Contains(pos))
                         output += "*";
-                    else if (mGoalNodes.Contains(point))
+                    else if (mGoalNodes.Contains(pos))
                         output +=("!");
                     else if (mNodeMap[y, x] == null)
                         output +=("#");
@@ -160,33 +168,33 @@ namespace GridPathFinder
             Debug.Log(output);
         }
 
-        public float GetShortestPathDistance(Point goalNode)
+        public float GetShortestPathDistance(Vector3Int goalNode)
         {
-            return mNodeMap[goalNode.Y, goalNode.X].TentativeDistance;
+            return mNodeMap[goalNode.y, goalNode.x].TentativeDistance;
         }
-        private float GetShortestPathDistanceTest(Point goalNode)
+        private float GetShortestPathDistanceTest(Vector3Int goalNode)
         {
             float dist = 0f;
-            List<Point> shortestPath = GetShortestPath(goalNode);
+            List<Vector3Int> shortestPath = GetShortestPath(goalNode);
             for (int index = 1; index < shortestPath.Count; index++)
             {
-                Point firstPoint = shortestPath[index - 1];
-                Point secondPoint = shortestPath[index];
-                dist += GetArcCost(firstPoint, secondPoint);
+                Vector3Int firstVector3Int = shortestPath[index - 1];
+                Vector3Int secondVector3Int = shortestPath[index];
+                dist += GetArcCost(firstVector3Int, secondVector3Int);
             }
             return dist;
         }
-        public List<Point> GetShortestPath(Point goalNode)
+        public List<Vector3Int> GetShortestPath(Vector3Int goalNode)
         {
-            List<Point> path = new List<Point>();
-            DijkstraNode currentCell = mNodeMap[goalNode.Y, goalNode.X];
+            List<Vector3Int> path = new List<Vector3Int>();
+            DijkstraNode currentCell = mNodeMap[goalNode.y, goalNode.x];
             
             if (currentCell.Parent == null) return path;    // goal node is unreachable, so return an empty path
 
             while (currentCell != null)
             {
                 path.Add(currentCell.GridCoordinate);
-                currentCell = mNodeMap[currentCell.GridCoordinate.Y, currentCell.GridCoordinate.X].Parent;
+                currentCell = mNodeMap[currentCell.GridCoordinate.y, currentCell.GridCoordinate.x].Parent;
             }
             path.Reverse();
             return path;
@@ -201,7 +209,7 @@ namespace GridPathFinder
         private bool GetSettledAll()
         {
             if (mGoalNodes.Count == 0) return false;
-            foreach (Point goalNode in mGoalNodes)
+            foreach (Vector3Int goalNode in mGoalNodes)
             {
                 if (!ClosedList.Contains(goalNode))
                     return false;
@@ -209,33 +217,26 @@ namespace GridPathFinder
             return true;
         }
 
-        private float GetArcCost(Point pointOne, Point pointTwo)
+        private float GetArcCost(Vector3Int Vector3IntOne, Vector3Int Vector3IntTwo)
         {
-            int diff = Math.Abs(pointOne.X - pointTwo.X) + Math.Abs(pointOne.Y - pointTwo.Y);
+            int diff = Math.Abs(Vector3IntOne.x - Vector3IntTwo.x) + Math.Abs(Vector3IntOne.y - Vector3IntTwo.y);
             if (diff == 1) return mCardinalCost;
             if (diff == 2) return mDiagonalCost;
             return float.PositiveInfinity;
         }
 
-        private float GetEuclideanDistance(Point pointOne, Point pointTwo)
-        {
-            return (float) Math.Sqrt(Math.Pow((pointOne.X - pointTwo.X), 2) + Math.Pow(pointOne.Y - pointTwo.Y, 2));
-        }
-
-        
-
         private void InitDijkstra()
         {
             mOpenList = new IntervalHeap<DijkstraNode>();
 
-            ClosedList = new System.Collections.Generic.HashSet<Point>();
+            ClosedList = new System.Collections.Generic.HashSet<Vector3Int>();
 
             for (int y = 0; y < mMapHeight; y++)
             {
                 for (int x = 0; x < mMapWidth; x++)
                 {
-                    Point currentCell = new Point(x, y);
-                    //if (mMap.Contains(currentCell.X, currentCell.Y) && mMap.IsWalkable(currentCell.X, currentCell.Y))
+                    Vector3Int currentCell = new Vector3Int(x, y, 0);
+                    //if (mMap.Contains(currentCell.x, currentCell.y) && mMap.IsWalkable(currentCell.x, currentCell.y))
                     {
                         mNodeMap[y, x] = new DijkstraNode(currentCell);
                         mNodeMap[y, x].Parent = null;

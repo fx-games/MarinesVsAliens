@@ -113,7 +113,7 @@ factions:
       - unit: STR_SPIDER_ALIEN
         count: 8
         weapons:
-          - STR_NORMAL_HITTER
+          - STR_LOW_HITTER
           - STR_RIFLE
       - unit: STR_RIFLE_ALIEN
         count: 8
@@ -172,6 +172,10 @@ weapons:
       - [1,2,0,0,0,0]
       - [1,2,0,0,0,0]
       - [1,2,0,0,0,0]
+  - type: STR_LOW_HITTER
+    damage:
+      - [1,2,0,0,0,0]
+    isMelee: true
   - type: STR_NORMAL_HITTER
     damage:
       - [1,2,0,0,0,0]

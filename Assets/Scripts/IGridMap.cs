@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Drawing;
+using UnityEngine;
 
 namespace GridPathFinder.Map
 {
@@ -7,6 +8,6 @@ namespace GridPathFinder.Map
     {
         int Width { get; }
         int Height { get; }
-        List<Point> GetNeighbors(Unit currentUnit, Point cellPosition);
+        void GetNeighbors(List<Vector3Int> neighbors, Unit currentUnit, Vector3Int cellPosition);
     }
 }

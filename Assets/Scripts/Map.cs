@@ -52,7 +52,11 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     public Tile[] spawnFloorMarkerTiles;
 
     protected Dictionary<string, Tilemap> layerMap = new Dictionary<string, Tilemap>();
-    protected Unit[,] unitMap;
+    protected Unit[][] unitMap;
+    protected MapInfo[][] calcMap;
+    protected bool[][] fogMap;
+    
+    
     private Camera gameCamera;
     public GameObject blanktilePrefab;
     private List<GameObject>[] allHighlights = new List<GameObject>[4]{ new List<GameObject>(), new List<GameObject>(), new List<GameObject>(), new List<GameObject>()};
@@ -86,8 +90,15 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         var firstLayerSize = layerMap.First().Value.size;
         Width = firstLayerSize.x;
         Height = firstLayerSize.y;
-        unitMap = new Unit[Width, Height];
-
+        unitMap = new Unit[Width][];
+        calcMap = new MapInfo[Width][];
+        fogMap = new bool[Width][];
+        for (int i = 0; i < Width; i++)
+        {
+            unitMap[i] = new Unit[Height];
+            calcMap[i] = new MapInfo[Height];
+            fogMap[i] = new bool[Height];
+        }
         gameCamera = Camera.main;
         if (gameCamera == null)
         {
@@ -132,9 +143,15 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             layer.size = new Vector3Int(width,height,1);
         }
 
-        Width = width;
-        Height = height;
-        unitMap = new Unit[Width, Height];
+        unitMap = new Unit[Width][];
+        calcMap = new MapInfo[Width][];
+        fogMap = new bool[Width][];
+        for (int i = 0; i < Width; i++)
+        {
+            unitMap[i] = new Unit[Height];
+            calcMap[i] = new MapInfo[Height];
+            fogMap[i] = new bool[Height];
+        }
         FillLayer("Floors");
         //FillLayer("FogOfWar");
     }   
@@ -167,84 +184,109 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             {
                 // door is above
                 layerMap["Doors"].SetTile(offsetPos, null);
+                calcMap[offsetPos.x][offsetPos.y] = MapInfo.Floor;
             }
         }
     }
 
-    public bool IsDoorAt(Vector3Int offsetPos)
+    public bool IsDoorAt(Vector3Int pos)
     {
-        return layerMap["Doors"].HasTile(offsetPos);
+        return calcMap[pos.x][pos.y] == MapInfo.Door;
     }
 
     public bool IsWallAt(int x, int y)
     {
-        return IsWallAt(new Vector3Int(x,y,0));
+        return calcMap[x][y] == MapInfo.Wall;
     }
 
     public bool IsWallAt(Vector3Int pos)
     {
-        return layerMap["Walls"].HasTile(pos);
+        return calcMap[pos.x][pos.y] == MapInfo.Wall;
     }
 
     public bool IsFloorAt(int x, int y)
     {
-        return IsFloorAt(new Vector3Int(x, y, 0));
+        return calcMap[x][y] == MapInfo.Floor;;
     }
     private bool IsFloorAt(Vector3Int pos)
     {
-        return layerMap["Floors"].HasTile(pos);
+        return calcMap[pos.x][pos.y] == MapInfo.Floor;
     }
     public void RemoveDoor(Vector3Int pos)
     {
         layerMap["Doors"].SetTile(pos, null);
+        calcMap[pos.x][pos.y] = MapInfo.Floor;
     }
 
+    private bool IsDoorAt(int x, int y)
+    {
+        return calcMap[x][y] == MapInfo.Door;
+    }
     public void CreateDoor(int x, int y)
     {
         var pos = new Vector3Int(x,y,0);
         layerMap["Doors"].SetTile(pos, doors[0]);
+        calcMap[pos.x][pos.y] = MapInfo.Door;
         RemoveWallAt(pos); // no walls at door tiles
     }
 
 
     public void RemoveWallAt(Vector3Int pos)
     {
+        calcMap[pos.x][pos.y] = MapInfo.Floor;
         layerMap["Walls"].SetTile(pos, null);
     }
 
     public IPlayerUnit GetUnitAt(Vector3Int mapPos)
     {
-        return unitMap[mapPos.x, mapPos.y];
+        return unitMap[mapPos.x][mapPos.y];
     }
 
     public bool IsUnitOn(Vector3Int mapPos)
     {
-        return unitMap[mapPos.x, mapPos.y] != null;
+        return unitMap[mapPos.x][mapPos.y] != null;
     }
 
-
+    public bool IsUnitOn(int x, int y)
+    {
+        return unitMap[x][y] != null;
+    }
+    
     public virtual void ResetFog()
     {
         layerMap["FogOfWar"].ClearAllTiles();
         layerMap["FogOfWar"].FloodFill(new Vector3Int(Width-1,Height-1,0), floorTiles[0]);
+        FillMapArray(fogMap, true);
     }
     public virtual void RemoveAllFog()
     {
         layerMap["FogOfWar"].ClearAllTiles();
+        FillMapArray(fogMap, false);
     }
     protected virtual void RemoveFog(Vector3Int position)
     {
         layerMap["FogOfWar"].SetTile(position, null);
+        fogMap[position.x][position.y] = false;
+    }
+    
+    protected virtual void RemoveFog(int x, int y)
+    {
+        layerMap["FogOfWar"].SetTile(new Vector3Int(x,y,0), null);
+        fogMap[x][y] = false;
     }
 
     public virtual bool IsInFog(Vector3Int position)
     {
-        return layerMap["FogOfWar"].HasTile(position);
+        return fogMap[position.x][position.y];
     }
 
     public virtual void AddWall(Vector3Int pos, int wallIndex = 0)
     {
-        if (Contains(pos.x, pos.y)) layerMap["Walls"].SetTile(pos, walls[wallIndex]);
+        if (Contains(pos.x, pos.y))
+        {
+            calcMap[pos.x][pos.y] = MapInfo.Wall;
+            layerMap["Walls"].SetTile(pos, walls[wallIndex]);
+        }
     }
 
     public void FillLayer(string layerName)
@@ -253,20 +295,37 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         {
             case "Walls":
                 layerMap["Walls"].BoxFill(new Vector3Int(1, 1, 0), walls[0], 0, 0, Width, Height);
+                FillMapArray(calcMap, MapInfo.Wall);
                 break;
             case "Floors":
                 layerMap["Floors"].BoxFill(new Vector3Int(1, 1, 0), floorTiles[0], 0, 0, Width, Height);
+                FillMapArray(calcMap, MapInfo.Floor);
                 break;
             case "FogOfWar":
                 layerMap["FogOfWar"].BoxFill(new Vector3Int(1, 1, 0), floorTiles[0], 0, 0, Width, Height);
+                FillMapArray(fogMap, true);
                 break;
         }
+
         
     }
+
+    private void FillMapArray<T>(T[][] array, T value)
+    {
+        for (int x = 0; x < Width; x++)
+        {
+            for (int y = 0; y < Height; y++)
+            {
+                array[x][y] = value;
+            }
+        }
+    }
+    
 
     public void SetFloor(Vector3Int pos)
     {
         layerMap["Floors"].SetTile(pos, floorTiles[0]);
+        calcMap[pos.x][pos.y] = MapInfo.Floor;
     }
     public virtual Vector3Int GetNeighborInDirection(Vector3Int position, Direction direction)
     {
@@ -296,7 +355,6 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     {
         return layerMap["Floors"].GetCellCenterWorld(position);
     }
-
 
     private Color IntToColor(int regionIndex)
     {
@@ -338,7 +396,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         foreach (var offset in unit.OccupiedTiles)
         {
             var offsetPos = mapPos + offset;
-            unitMap[offsetPos.x, offsetPos.y] = unit;
+            unitMap[offsetPos.x][offsetPos.y] = unit;
         }
 
         return true;
@@ -354,7 +412,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
                 var offsetPos = mapPos + offset;
                 if (IsUnitOn(offsetPos))
                 {
-                    unitMap[offsetPos.x, offsetPos.y] = null;
+                    unitMap[offsetPos.x][offsetPos.y] = null;
                 }
             }
         }
@@ -385,11 +443,8 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     {
         return (x >= 0 && y >= 0) && (x < Width && y < Height);
     }
-    public List<Point> GetNeighbors(Unit currentUnit, Point position)
+    public void GetNeighbors(List<Vector3Int> reachableNeighbors, Unit currentUnit, Vector3Int mapPos)
     {
-        Vector3Int mapPos = new Vector3Int(position.X, position.Y, 0);
-        List<Vector3Int> reachableNeighbors = new List<Vector3Int>();
-        
         var neighbors = GetAllNeighborsForUnit(currentUnit, mapPos);
         foreach (var neighbor in neighbors)
         {
@@ -398,8 +453,6 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
                 reachableNeighbors.Add(neighbor);
             }
         }
-
-        return reachableNeighbors.ConvertAll(elem => new Point(elem.x, elem.y));
     }
 
     public List<Vector3Int> GetAllNeighborsForUnit(Unit currentUnit, Vector3Int mapPos)
@@ -450,7 +503,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     public void RemoveUnit(Unit unit)
     {
         var pos = WorldToCell(unit.transform.position);
-        if (unitMap[pos.x, pos.y] == unit)
+        if (unitMap[pos.x][pos.y] == unit)
         {
             RemoveUnit(pos);
         }
@@ -572,12 +625,16 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         foreach (var offset in unit.OccupiedTiles)
         {
             var offsetPos = mapPos + offset;
-            if (!Contains(offsetPos.x, offsetPos.y) 
-                || IsWallAt(offsetPos.x,offsetPos.y))
+            if (!Contains(offsetPos.x, offsetPos.y))
             {
                 return false;
             }
 
+            if (IsWallAt(offsetPos.x, offsetPos.y))
+            {
+                return false;
+            }
+            
             if (friendlyUnitsAreBlocking)
             {
                 if (IsOtherUnitOn(unit, offsetPos))
@@ -631,6 +688,10 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     public bool IsNeighborReachable(IPlayerUnit unit, Vector3Int oldPos, Vector3Int newPos)
     {
         // handle diagonal cases
+        if (!Contains(newPos.x, newPos.y))
+        {
+            return false;
+        }
         if (oldPos.x != newPos.x && oldPos.y != newPos.y)
         {
             if (!Options.AllowDiagonalMovement) return false;
@@ -650,26 +711,23 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return CanBePlaced(unit, newPos, false, false);
     }
 
-    public bool IsNeighborVisible(Vector3Int oldPos, Vector3Int newPos)
+    public bool IsNeighborVisible(int xOld, int yOld, int xNew, int yNew)
     {
-        if (!Contains(oldPos.x, oldPos.y) || !Contains(newPos.x, newPos.y))
+        if (!Contains(xOld, yOld) || !Contains(xNew, yNew))
         {
             return false;
         }
-        if (IsWallAt(oldPos) || IsWallAt(newPos) ||  IsDoorAt(oldPos) || IsDoorAt(newPos))
+        if (IsWallAt(xOld, yOld) || IsWallAt(xNew, yNew) ||  IsDoorAt(xOld, yOld) || IsDoorAt(xNew, yNew))
         {
             return false;
         }
 
-        if (oldPos.x != newPos.x && oldPos.y != newPos.y)
+        if (xOld != xNew && yOld != yNew)
         {
-            var dx = oldPos.x - newPos.x;
-            var dy = oldPos.y - newPos.y;
+            var dx = xOld - xNew;
+            var dy = xOld - yNew;
             // one is to the top right of two
-            var vertTile = new Vector3Int(newPos.x + dx, newPos.y, 0);
-            var horiTile = new Vector3Int(newPos.x, newPos.y + dy, 0);
-
-            if (IsWallAt(vertTile) || IsWallAt(horiTile)) // no diagonal looking around and through walls
+            if (IsWallAt(xNew + dx, yNew) || IsWallAt(xNew, yNew + dy)) // no diagonal looking around and through walls
             {
                 return false;
             }
@@ -696,7 +754,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         for (int i = 0; i < maxDistance; i++)
         {
             var nextPos = prevPos + rayDirVector;
-            if (!IsNeighborVisible(prevPos, nextPos))
+            if (!IsNeighborVisible(prevPos.x, prevPos.y, nextPos.x, nextPos.y))
             {
                 return linePositions;
             }
@@ -718,7 +776,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         var nextPos = prevPos + rayDirVector;
         while (nextPos != posTwo)
         {
-            if (!IsNeighborVisible(prevPos, nextPos))
+            if (!IsNeighborVisible(prevPos.x, prevPos.y, nextPos.x, nextPos.y))
             {
                 return linePositions;
             }
@@ -786,15 +844,13 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
 
         while (xnext != x1 || ynext != y1) //essentially casting a ray of length radius: (radius^3)
         {
-            var previousTile = new Vector3Int(prevX, prevY, 0);
-            var nextTile = new Vector3Int(xnext, ynext, 0);
-            if (!IsNeighborVisible(previousTile, nextTile))
+            if (!IsNeighborVisible(prevX, prevY, xnext, ynext))
             {
                 //tag_memorised(xnext, ynext); // make a note of the wall
                 return false;
             }
 
-            if (unitsAreBlocking && !(xnext == x0 && ynext == y0) && IsUnitOn(nextTile))
+            if (unitsAreBlocking && !(xnext == x0 && ynext == y0) && IsUnitOn(xnext, ynext))
             {
                 return false;
             }
@@ -803,25 +859,30 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             prevY = ynext;
             // Line-to-point distance formula < 0.5 
             // decide on the direction for the next step; horiz, verti, diag
-            if(Mathf.Abs(dy * (xnext - x0 + sx) - dx * (ynext - y0)) / dist < 0.5f)
+            if (Mathf.Abs(dy * (xnext - x0 + sx) - dx * (ynext - y0)) / dist < 0.5f)
+            {
                 xnext += sx;
-            else if(Mathf.Abs(dy * (xnext - x0) - dx * (ynext - y0 + sy)) / dist < 0.5f)
+            }
+            else if (Mathf.Abs(dy * (xnext - x0) - dx * (ynext - y0 + sy)) / dist < 0.5f)
+            {
                 ynext += sy;
+            }
             else
             {
                 xnext += sx;
                 ynext += sy;
             }
         }
-        if (!IsNeighborVisible(new Vector3Int(prevX, prevY, 0), new Vector3Int(xnext, ynext, 0)))
+        if (!IsNeighborVisible(prevX, prevY,xnext, ynext))
         {
             //tag_memorised(xnext, ynext); // make a note of the wall
             return false;
         }
-        
-        var litTile = new Vector3Int(xnext, ynext, 0);
+
         if (removeFog)
-            RemoveFog(litTile);
+        {
+            RemoveFog(xnext, ynext);
+        }
         return true;
     }
 
@@ -884,6 +945,36 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         }
         cellLabels.Clear();
     }
+
+    public void FromPrefab()
+    {
+        for (int x = 0; x < Width; x++)
+        {
+            for (int y = 0; y < Height; y++)
+            {
+                Vector3Int pos = new Vector3Int(x,y,0);
+                if (layerMap["Doors"].HasTile(pos))
+                {
+                    calcMap[x][y] = MapInfo.Door;
+                }
+                else if (layerMap["Walls"].HasTile(pos))
+                {
+                    calcMap[x][y] = MapInfo.Wall;
+                }
+                else
+                {
+                    calcMap[x][y] = MapInfo.Floor;
+                }
+            }
+        }
+    }
+}
+
+public enum MapInfo
+{
+    Floor,
+    Door,
+    Wall
 }
 
 

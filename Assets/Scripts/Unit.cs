@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using DefaultNamespace;
+using GridPathFinder;
 using UnityEngine;
 using UnityEngine.UI;
 using static Map;
@@ -64,9 +65,17 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public bool CanAct => CanAttack || MovesLeft > 0;
     public RuleUnit Rules => unitRules;
     public List<Vector3Int> OccupiedTiles { get; set; }
-    public HashSet<IPlayerUnit> VisibleEnemies { get; set; }
+    public List<IPlayerUnit> VisibleEnemies { get; set; }
     public HashSet<Vector3Int> FieldOfView { get; set; }
 
+    public List<Vector3Int> ReachablePositions
+    {
+        get => _reachablePositions.Where(p => !_map.IsUnitOn(p)).ToList();
+        private set => _reachablePositions = value;
+    }
+
+    private Pathfinder pathfinder;
+    private List<Vector3Int> _reachablePositions;
     public event UnitEvent FinishedMoving;
     public event UnitEvent StepCompleted;
     // Start is called before the first frame update
@@ -76,8 +85,10 @@ public class Unit : MonoBehaviour, IPlayerUnit
         _map = FindObjectOfType<Map>();
         mod = FindObjectOfType<Mod>();
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        pathfinder = new Pathfinder(_map, 1.0f, 1.41f);
     }
 
+    
     // Update is called once per frame
     void Update()
     {
@@ -142,8 +153,8 @@ public class Unit : MonoBehaviour, IPlayerUnit
     {   
         if (currentPathIndex < currentPath.Count)
         {
-            var lastPos = _map.WorldToCell(transform.position);
-            var nextPos = currentPath[currentPathIndex];
+            Vector3Int lastPos = _map.WorldToCell(transform.position);
+            Vector3Int nextPos = currentPath[currentPathIndex];
             State = UnitState.Moving;
             lastMoveTime = Time.time;
             RepositionUnitInWorld(nextPos);
@@ -156,6 +167,13 @@ public class Unit : MonoBehaviour, IPlayerUnit
             State = UnitState.Idle;
             currentPathIndex = -1;
             currentPath = null;
+
+            if (MovesLeft > 0)
+            {
+                CreateMovementMap();
+            }
+            UpdateValidAttackTargets();
+            
             OnFinishedMoving();
         }
     }
@@ -310,7 +328,11 @@ public class Unit : MonoBehaviour, IPlayerUnit
     {
         MovesLeft = unitRules.Movement;
         CanAttack = true;
+        UpdateValidAttackTargets();
+        CreateMovementMap();
     }
+
+    public HashSet<Vector3Int> ValidTargets { get; private set; }
 
     public void SetVisible(bool isVisible)
     {
@@ -436,11 +458,11 @@ public class Unit : MonoBehaviour, IPlayerUnit
     {
         return CanAttack
                && (HasMeleeWeapon && _map.AreNeighbors(Cell, otherUnit.Cell) ||
-                   HasRangedWeapon && GetValidAttackTargets().Contains(otherUnit.Cell));
+                   HasRangedWeapon && ValidTargets.Contains(otherUnit.Cell));
     }
     
     
-    public HashSet<Vector3Int> GetValidAttackTargets()
+    private void UpdateValidAttackTargets()
     {
         int maxDistance = 20;
         
@@ -491,7 +513,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
             validTargets.Remove(unitPos + Vector3Int.up + Vector3Int.left);
         }
 
-        return validTargets;
+        ValidTargets = validTargets;
     }
     private void AddToValidTargets(ref HashSet<Vector3Int> validTargets, Vector3Int pos)
     {
@@ -504,6 +526,44 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public override string ToString()
     {
         return name + " (M:" + MovesLeft + "/H:"+ CurrentHealth+")@"+Cell;
+    }
+    
+
+    private void CreateMovementMap()
+    {
+        pathfinder.MaxReachableCost = MovesLeft;
+        pathfinder.MaxCost =  -1;
+        pathfinder.CurrentUnit = this;
+        pathfinder.Dijkstra(new HashSet<Vector3Int>(){Cell}, new HashSet<Vector3Int>());
+        ReachablePositions = pathfinder.ReachableList.ToList();
+    }
+    
+    public List<Vector3Int> GetShortestPath(Vector3Int startPosition, Vector3Int goalPosition)
+    {
+        Debug.Log("GetShortestPath(" + startPosition + ", " + goalPosition + ")");
+        //_map.SetTextAt(startPosition, "BGN");
+        //_map.SetTextAt(goalPosition, "END");
+        var shortestPath = pathfinder.GetShortestPath(goalPosition);
+        if (Options.Debug) shortestPath.ForEach(p => _map.SetTextAt(p, "."));
+        return shortestPath;
+    }
+    
+    public List<Vector3Int> GetShortestPath(Vector3Int goalPosition)
+    {
+        return GetShortestPath(Cell, goalPosition);
+    }
+
+    public List<IPlayerUnit> VisibleEnemiesFrom(Vector3Int reachableMapPosition)
+    {
+        var fov = _map.GetFOV(reachableMapPosition, CurrentVisionRange);
+        return fov.Where(pos => _map.IsOtherFactionOn(Faction, pos)).Select(pos => _map.GetUnitAt(pos)).ToList();
+    }
+
+    public void UpdateFoV()
+    {
+        var fov = _map.GetFOV(Cell, CurrentVisionRange);
+        FieldOfView = fov;
+        VisibleEnemies = FieldOfView.Where(pos => _map.IsOtherFactionOn(Faction, pos)).Select(pos => _map.GetUnitAt(pos)).ToList();
     }
 }
 
