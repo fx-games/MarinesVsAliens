@@ -18,7 +18,6 @@ namespace DefaultNamespace
 
     public interface ICombatMechanics
     {
-        event UnitEvent UnitKilled;
         string AttackPreviewInformationFor(Unit unit, Unit attackingUnit);
         int[] AttackValues(bool isMelee, Unit unit, Vector3Int targetedPos);
         int ResolveAttack(int[] attackValues, Vector3Int unitPos, Unit unit, Vector3Int targetedPos, Vector3Int aoePos,
@@ -27,13 +26,6 @@ namespace DefaultNamespace
 
     public abstract class CombatBase
     {
-        public event UnitEvent UnitKilled;
-
-        public void OnUnitKilled(Unit unit)
-        {
-            UnitKilled?.Invoke(this, new UnitEventArgs(){unit = unit});
-        }
-
         protected bool IsMelee(Unit attacker, Unit target)
         {
             return attacker.IsNextTo(target);
@@ -126,14 +118,6 @@ namespace DefaultNamespace
                     // damage to target
                     damage = attackerScore - defenderScore;
                     damageLeft = target.DamageReceived(attacker, weapon, damage);
-                }
-                if (target.CurrentHealth <= 0)
-                {
-                    OnUnitKilled(target);
-                }
-                if (attacker.CurrentHealth <= 0)
-                {
-                    OnUnitKilled(attacker);
                 }
             }
             

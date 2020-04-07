@@ -67,33 +67,32 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public bool CanAct => CanAttack || MovesLeft > 0;
     public RuleUnit Rules => unitRules;
     public List<Vector3Int> OccupiedTiles { get; set; }
-    public List<IPlayerUnit> VisibleEnemies { get; set; } = new List<IPlayerUnit>();
-    public HashSet<Vector3Int> FieldOfView { get; set; }
-
-    public List<Vector3Int> ReachablePositions
-    {
-        get => _reachablePositions.Value.Where(p => !_map.IsUnitOn(p)).ToList();
-    }
+    public List<IPlayerUnit> VisibleEnemies => _visibleEnemies.Value;
+    public HashSet<Vector3Int> FieldOfView => _fieldOfView;
+    public List<Vector3Int> ReachablePositions => _reachablePositions.Value.Where(p => !_map.IsUnitOn(p)).ToList();
+    public HashSet<Vector3Int> ValidTargets => _validTargets.Value;
 
     private Pathfinder pathfinder;
     private Lazy<List<Vector3Int>> _reachablePositions;
     private Lazy<HashSet<Vector3Int>> _validTargets;
+    private Lazy<List<IPlayerUnit>> _visibleEnemies;
+    private HashSet<Vector3Int> _fieldOfView;
     public event UnitEvent FinishedMoving;
     public event UnitEvent StepCompleted;
     // Start is called before the first frame update
-    void Awake()
+    private void Awake()
     {
         gameCamera = Camera.main;
         _map = FindObjectOfType<Map>();
         mod = FindObjectOfType<Mod>();
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
         pathfinder = new Pathfinder(_map, 1.0f, 1.41f);
-        _reachablePositions = new Lazy<List<Vector3Int>>(CreateMovementMap);
+        UpdateReachablePositions();
     }
 
     
     // Update is called once per frame
-    void Update()
+    private void Update()
     {
         if (State == UnitState.Moving && (Time.time - lastMoveTime) > moveDelay)
         {
@@ -103,7 +102,6 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     private void OnDestroy()
     {
-        //Debug.Log("OnDestroy of " + name);
         if (unitLabel != null)
         {
             Destroy(unitLabel);
@@ -171,11 +169,12 @@ public class Unit : MonoBehaviour, IPlayerUnit
             currentPathIndex = -1;
             currentPath = null;
 
-            _reachablePositions = new Lazy<List<Vector3Int>>(CreateMovementMap);
+            UpdateReachablePositions();
             UpdateValidAttackTargets();
             OnFinishedMoving();
         }
     }
+
 
     private void UpdateDirection(Vector3Int lastPos, Vector3Int nextPos)
     {
@@ -239,19 +238,20 @@ public class Unit : MonoBehaviour, IPlayerUnit
         StepCompleted?.Invoke(this, new UnitEventArgs{unit = this, previousPosition = oldPos});
     }
 
-    public void BeginMoving(List<Vector3Int> path)
+    public void Move(List<Vector3Int> path)
     {
         if (State == UnitState.Moving) return;
         var oldMapPos = _map.WorldToCell(transform.position);
-        path.Remove(oldMapPos);
+
+        // TELEPORT INSTANTLY TO THE END OF THE PATH ON THE MAP - BECAUSE OF PATHFINDING OF OTHER UNITS
+        if (!_map.MoveUnit(this, oldMapPos, path.Last())) return;
+        
+        path.Remove(oldMapPos); // remove own position from path
         currentPathIndex = 0;
         currentPath = path;
         State = UnitState.Moving;
-        int steps = path.Count;
-        //Debug.Log("Moving: " + steps);
-        MovesLeft -= steps;
-        // TELEPORT INSTANTLY TO THE END OF THE PATH ON THE MAP - BECAUSE OF PATHFINDING OF OTHER UNITS
-        _map.MoveUnit(this, oldMapPos, path.Last());
+        MovesLeft -= path.Count;
+
         UpdateMarker();
     }
 
@@ -328,12 +328,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
         MovesLeft = unitRules.Movement;
         CanAttack = true;
         UpdateValidAttackTargets();
-        _reachablePositions = new Lazy<List<Vector3Int>>(CreateMovementMap);
-    }
-
-    public HashSet<Vector3Int> ValidTargets
-    {
-        get => _validTargets.Value;
+        UpdateReachablePositions();
     }
 
     public void SetVisible(bool isVisible)
@@ -483,7 +478,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
             }
             else
             {
-                validTargets = _map.GetFOV(mapPos, maxDistance, false, false);
+                validTargets = _map.GetFOV(mapPos, maxDistance, false, false, true);
             }
             
             validTargets.Remove(mapPos);
@@ -515,7 +510,26 @@ public class Unit : MonoBehaviour, IPlayerUnit
         return validTargets;
     }
     
-    private void UpdateValidAttackTargets()
+    public void UpdateFoV(bool removeFogVisually, bool removeFogMechanically)
+    {
+        _fieldOfView = CreateFieldOfView(removeFogVisually, removeFogMechanically);
+        _visibleEnemies = new Lazy<List<IPlayerUnit>>(() =>
+            {
+                return FieldOfView.Where(pos => _map.IsOtherFactionOn(Faction, pos)).Select(pos => _map.GetUnitAt(pos))
+                    .ToList();
+            });
+    }
+
+    private HashSet<Vector3Int> CreateFieldOfView(bool removeFogVisually, bool removeFogMechanically)
+    {
+        return _map.GetFOV(Cell, CurrentVisionRange, removeFogVisually, removeFogMechanically);
+    }
+
+    public void UpdateReachablePositions()
+    {
+        _reachablePositions = new Lazy<List<Vector3Int>>(CreateMovementMap);
+    }
+    public void UpdateValidAttackTargets()
     {
         _validTargets = new Lazy<HashSet<Vector3Int>>(() => GetValidAttackTargetsAt(Cell));
     }
@@ -535,11 +549,11 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     private List<Vector3Int> CreateMovementMap()
     {
-        pathfinder.MaxReachableCost = MovesLeft;
+        pathfinder.MaxReachableCost = MovesLeft + 1f;
         pathfinder.MaxCost =  -1;
         pathfinder.CurrentUnit = this;
         pathfinder.Dijkstra(new HashSet<Vector3Int>(){Cell}, new HashSet<Vector3Int>());
-        return pathfinder.ReachableList.ToList();
+        return MovesLeft == 0 ? new List<Vector3Int>() : pathfinder.ReachableList.ToList();
     }
     
     public List<Vector3Int> GetShortestPath(Vector3Int startPosition, Vector3Int goalPosition)
@@ -563,12 +577,6 @@ public class Unit : MonoBehaviour, IPlayerUnit
         return fov.Where(pos => _map.IsOtherFactionOn(Faction, pos)).Select(pos => _map.GetUnitAt(pos)).ToList();
     }
 
-    public void UpdateFoV(bool removeFogVisually, bool removeFogMechanically)
-    {
-        var fov = _map.GetFOV(Cell, CurrentVisionRange, removeFogVisually, removeFogMechanically);
-        FieldOfView = fov;
-        VisibleEnemies = FieldOfView.Where(pos => _map.IsOtherFactionOn(Faction, pos)).Select(pos => _map.GetUnitAt(pos)).ToList();
-    }
 }
 
 public class Weapon

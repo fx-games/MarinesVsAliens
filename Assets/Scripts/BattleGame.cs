@@ -54,6 +54,10 @@ public class BattleGame : MonoBehaviour, IGame
     private Coroutine currentAiCoroutine;
     private RuleFaction singlePlayerFaction;
     private Vector3Int movePreConfirmedAt;
+    private List<GameObject> uiButtons = new List<GameObject>();
+    public GameObject endTurnButton;
+    public GameObject openDoorButton;
+    public GameObject attackButton;
 
     private void Awake()
     {
@@ -64,8 +68,6 @@ public class BattleGame : MonoBehaviour, IGame
         {
             throw new Exception("Game needs camera.");
         }
-
-        Options.CombatMechanics.UnitKilled += (sender, args) => KillUnit(args.unit);
     }
 
     void Start()
@@ -218,6 +220,7 @@ public class BattleGame : MonoBehaviour, IGame
         selectedUnit = null;
         _map.HideUnitMarker();
         ToDefaultState();
+        UpdateUIButtons();
     }
 
     private void PreviewMovement(Unit unit, Vector3Int targetPos)
@@ -360,6 +363,22 @@ public class BattleGame : MonoBehaviour, IGame
         }
         
         multipleTargets.Clear();
+
+        CheckForDeadUnits();
+        UpdateUIButtons();
+    }
+
+    private void CheckForDeadUnits()
+    {
+        for (var index = allUnits.Count - 1; index >= 0; index--)
+        {
+            Unit unit = allUnits[index];
+            if (unit.CurrentHealth <= 0)
+            {
+                KillUnit(unit);
+            }
+        }
+        GlobalPathfindingUpdate();
     }
 
 
@@ -380,6 +399,8 @@ public class BattleGame : MonoBehaviour, IGame
                 selectedUnit.MarkAsSelected();
                 UpdateLabel();
             }
+
+            UpdateUIButtons();
         }
     }
 
@@ -404,7 +425,7 @@ public class BattleGame : MonoBehaviour, IGame
         
         _map.RemoveAllHighlights();
         _map.RemoveAllHighlights(1);
-        unit.BeginMoving(path);
+        unit.Move(path);
         gameState = GameState.Default;
         return true;
     }
@@ -417,6 +438,7 @@ public class BattleGame : MonoBehaviour, IGame
         }
         
         unit.FinishedMoving -= UnitFinishedMoving;
+        unit.StepCompleted -= UnitStepCompleted;
         _map.RemoveUnit(unit);
         allUnits.Remove(unit);
         unit.UnitDeath();
@@ -716,8 +738,14 @@ public class BattleGame : MonoBehaviour, IGame
             gameState = GameState.MoveTargetSelection;
             HighlightTiles(selectedUnit.ReachablePositions, new Color(0, 0.8f, 0, 0.2f));
         }
+        
+        UpdateUIButtons();
     }
 
+    private void GlobalPathfindingUpdate()
+    {
+        allUnits.ForEach(u => u.UpdateReachablePositions());
+    }
     private void GlobalFOVUpdate()
     {
         _map.ResetFog();
@@ -741,6 +769,20 @@ public class BattleGame : MonoBehaviour, IGame
         }
     }
 
+    private void UpdateVisibleUnits(Unit sourceUnit)
+    {
+        foreach (var unit in allUnits)
+        {
+            var unitPos = _map.WorldToCell(unit.transform.position);
+            var shouldBeVisible = unit.Faction == PoVFaction
+                                  || !_map.IsInFogVisually(unitPos);
+            if (shouldBeVisible && unit.Faction != CurrentFaction)
+            {
+                unit.TurnTowards(sourceUnit.Cell);
+            }
+            unit.SetVisible(shouldBeVisible);
+        }
+    }
     private RuleFaction CurrentFaction => factions[phaseFaction];
 
 
@@ -815,7 +857,6 @@ public class BattleGame : MonoBehaviour, IGame
                 }
             }
         }
-        
     }
     
     private bool SpawnUnit(Vector3Int spawnPosition, string unitType, RuleLoadout loadout, RuleFaction ruleFaction)
@@ -892,19 +933,58 @@ public class BattleGame : MonoBehaviour, IGame
         UpdateVisibleUnits(unit);
     }
 
-    private void UpdateVisibleUnits(Unit sourceUnit)
+    private void UpdateUIButtons()
     {
-        foreach (var unit in allUnits)
+        uiButtons.Clear();
+
+        var attackButtonShouldBeVisible = selectedUnit != null && selectedUnit.CanAttack;
+        var openDoorButtonShouldBeVisible = selectedUnit != null && IsNextToDoor(selectedUnit);
+        
+        uiButtons.Add(endTurnButton);
+
+        if (attackButtonShouldBeVisible)
         {
-            var unitPos = _map.WorldToCell(unit.transform.position);
-            var shouldBeVisible = unit.Faction == PoVFaction
-                                  || !_map.IsInFogVisually(unitPos);
-            if (shouldBeVisible && unit.Faction != CurrentFaction)
-            {
-                unit.TurnTowards(sourceUnit.Cell);
-            }
-            unit.SetVisible(shouldBeVisible);
+            uiButtons.Add(attackButton);
         }
+        else
+        {
+            attackButton.SetActive(false);
+        }
+
+        if (openDoorButtonShouldBeVisible)
+        {
+            uiButtons.Add(openDoorButton);
+        }
+        else
+        {
+            openDoorButton.SetActive(false);
+        }
+        
+        int xOffset = 29;
+        int xDist = 45;
+        
+        foreach (var bu in uiButtons)
+        {
+            bu.SetActive(true);
+            var rectTransform = bu.GetComponent<RectTransform>();
+            var anchoredPosition = rectTransform.anchoredPosition;
+            rectTransform.anchoredPosition = new Vector2(xOffset, anchoredPosition.y);
+            xOffset += xDist;
+        }
+    }
+
+    private bool IsNextToDoor(Unit unit)
+    {
+        foreach (var unitOccupiedTile in unit.OccupiedTiles)
+        {
+            var unitPos = unit.Cell + unitOccupiedTile;
+            if (_map.Cardinal.Any(direction => _map.IsDoorAt(unitPos + direction.ToVector())))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private Color ColorFromArray(int[] colorDefinition)

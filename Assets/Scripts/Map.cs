@@ -232,20 +232,6 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         layerMap["Walls"].SetTile(pos, null);
     }
 
-    public IPlayerUnit GetUnitAt(Vector3Int mapPos)
-    {
-        return unitMap[mapPos.x][mapPos.y];
-    }
-
-    public bool IsUnitOn(Vector3Int mapPos)
-    {
-        return unitMap[mapPos.x][mapPos.y] != null;
-    }
-
-    public bool IsUnitOn(int x, int y)
-    {
-        return unitMap[x][y] != null;
-    }
     
     public virtual void ResetFog()
     {
@@ -387,9 +373,26 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         }
         allHighlights[layer].Clear();
     }
-    public bool AddUnit(Unit unit, Vector3Int mapPos)
+    
+    
+    public IPlayerUnit GetUnitAt(Vector3Int mapPos)
     {
-        if (!CanBePlaced(unit, mapPos)) return false;
+        return unitMap[mapPos.x][mapPos.y];
+    }
+
+    public bool IsUnitOn(Vector3Int mapPos)
+    {
+        return unitMap[mapPos.x][mapPos.y] != null;
+    }
+
+    public bool IsUnitOn(int x, int y)
+    {
+        return unitMap[x][y] != null;
+    }
+    
+    public bool AddUnit(Unit unit, Vector3Int mapPos, bool doorsAreBlocking = true)
+    {
+        if (!CanBePlaced(unit, mapPos, doorsAreBlocking)) return false;
         
         foreach (var offset in unit.OccupiedTiles)
         {
@@ -418,13 +421,13 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
 
     public bool MoveUnit(Unit unit, Vector3Int oldMapPos, Vector3Int newMapPos)
     {
-        if (AddUnit(unit, newMapPos))
-        {
-            RemoveUnit(oldMapPos);
-            return true;
-        }
+        if (oldMapPos == newMapPos) return false;
 
-        return false;
+        if (!AddUnit(unit, newMapPos, doorsAreBlocking: false)) return false;
+        
+        RemoveUnit(oldMapPos);
+        
+        return true;
     }
 
 
@@ -611,8 +614,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return thereIsADoor;
     }
 
-    public bool CanBePlaced(Unit unit, Vector3Int mapPos, bool doorsAreBlocking = true,
-        bool friendlyUnitsAreBlocking = true)
+    public bool CanBePlaced(Unit unit, Vector3Int mapPos, bool doorsAreBlocking = true, bool friendlyUnitsAreBlocking = true)
     {
         foreach (var offset in unit.OccupiedTiles)
         {
@@ -627,18 +629,18 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
                 return false;
             }
             
-            if (friendlyUnitsAreBlocking)
-            {
-                if (IsOtherUnitOn(unit, offsetPos))
-                    return false;
-            }
-            else if (IsOtherFactionOn(unit, offsetPos))
-            {
-                return false;
-            }
-            
             if (doorsAreBlocking && IsDoorAt(offsetPos))
+            {
                 return false;
+            }
+
+            if (IsUnitOn(offsetPos))
+            {
+                var unitAtPosition = GetUnitAt(offsetPos);
+                var isFriendlyUnit = unitAtPosition.Faction == unit.Faction;
+                if (friendlyUnitsAreBlocking) return false;
+                if (!isFriendlyUnit) return false;
+            }
         }
         return true;
     }

@@ -102,7 +102,7 @@ namespace GridPathFinder
                             mNodeMap[neighbor.y, neighbor.x].EstimatedCostPath = estimatedCost;
                             mNodeMap[neighbor.y, neighbor.x].Parent = smallestDistCell;
                             mOpenList.Replace(mNodeMap[neighbor.y, neighbor.x].PriorityQueueNode, mNodeMap[neighbor.y, neighbor.x]);
-                            if (MaxReachableCost > 0 && newTentativeDistance <= MaxReachableCost)
+                            if (MaxReachableCost > 0 && newTentativeDistance < MaxReachableCost)
                             {
                                 ReachableList.Add(neighbor);
                             }
