@@ -65,7 +65,6 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     private Mod mod;
     private IMapGenerator generator;
     private Vector3Int lastCursorPosition;
-    private bool spectatorMode = false;
     public GameObject cellLabelPrefab;
     private HashSet<Text> cellLabels = new HashSet<Text>();
     private Transform worldCanvas;
@@ -174,18 +173,14 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         }
     }
     
-    public void RemoveDoor(Unit unit, Vector3Int mapPos)
+    public void RemoveDoor(Unit unit, Vector3Int doorPos)
     {
-        foreach (var offset in unit.OccupiedTiles)
+        Debug.Log("RemoveDoor() FIRED: " + unit + " / " + doorPos);
+        if (IsDoorAt(doorPos))
         {
-            var offsetPos = mapPos + offset;
-            
-            if (IsDoorAt(offsetPos))
-            {
-                // door is above
-                layerMap["Doors"].SetTile(offsetPos, null);
-                calcMap[offsetPos.x][offsetPos.y] = MapInfo.Floor;
-            }
+            // door is above
+            layerMap["Doors"].SetTile(doorPos, null);
+            calcMap[doorPos.x][doorPos.y] = MapInfo.Floor;
         }
     }
 
@@ -263,21 +258,24 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         layerMap["FogOfWar"].ClearAllTiles();
         FillMapArray(fogMap, false);
     }
-    protected virtual void RemoveFog(Vector3Int position)
+    protected virtual void RemoveFogMechanically(int x, int y)
     {
-        layerMap["FogOfWar"].SetTile(position, null);
-        fogMap[position.x][position.y] = false;
-    }
-    
-    protected virtual void RemoveFog(int x, int y)
-    {
-        layerMap["FogOfWar"].SetTile(new Vector3Int(x,y,0), null);
         fogMap[x][y] = false;
     }
+    
+    protected virtual void RemoveFogVisually(int x, int y)
+    {
+        layerMap["FogOfWar"].SetTile(new Vector3Int(x,y,0), null);
+    }
 
-    public virtual bool IsInFog(Vector3Int position)
+    public virtual bool IsInFogMechanically(Vector3Int position)
     {
         return fogMap[position.x][position.y];
+    }
+    
+    public virtual bool IsInFogVisually(Vector3Int position)
+    {
+        return layerMap["FogOfWar"].HasTile(position);
     }
 
     public virtual void AddWall(Vector3Int pos, int wallIndex = 0)
@@ -432,12 +430,6 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
 
     public Vector3Int RandomPosition => new Vector3Int(Random.Range(0, Width), Random.Range(0, Height), 0);
     public List<Vector3Int> AllPositions => RectToList(0, 0, Width, Height).ToList();
-
-    public void EnableSpectatorMode()
-    {
-        spectatorMode = true;
-        //layerMap["FogOfWar"].GetComponent<TilemapRenderer>().enabled = false;
-    }
 
     public virtual bool Contains(int x, int y)
     {
@@ -778,8 +770,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return linePositions;
     }
 
-    public HashSet<Vector3Int> GetFOV(Vector3Int position, int radius, bool removeFog = true,
-        bool unitsAreBlocking = false)
+    public HashSet<Vector3Int> GetFOV(Vector3Int position, int radius, bool removeFogVisually = true, bool removeFogMechanically = true, bool unitsAreBlocking = false)
     {
         var fieldOfView = new HashSet<Vector3Int>();
         radius++;
@@ -790,7 +781,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             {
                 if (i * i + j * j < radius * radius)
                 {
-                    if (LineCast(position.x, position.y, position.x + i, position.y + j, removeFog, unitsAreBlocking))
+                    if (LineCast(position.x, position.y, position.x + i, position.y + j, removeFogVisually, removeFogMechanically, unitsAreBlocking))
                     {
                         fieldOfView.Add(new Vector3Int(position.x + i, position.y + j, 0));
                     }
@@ -814,7 +805,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return LineCast(source.x, source.y, target.x, target.y);
     }
     
-    private bool LineCast(int x0, int y0, int x1, int y1, bool removeFog = false, bool unitsAreBlocking = false)
+    private bool LineCast(int x0, int y0, int x1, int y1, bool removeFogVisually = false, bool removeFogMechanically = false, bool unitsAreBlocking = false)
     {
         int sx, sy, xnext, ynext, dx, dy, prevX, prevY;
         float dist;
@@ -869,9 +860,14 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             return false;
         }
 
-        if (removeFog)
+        if (removeFogVisually)
         {
-            RemoveFog(xnext, ynext);
+            RemoveFogVisually(xnext, ynext);
+        }
+
+        if (removeFogMechanically)
+        {
+            RemoveFogMechanically(xnext, ynext);
         }
         return true;
     }
@@ -915,7 +911,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         var doorHere = IsDoorAt(pos) ? "D" : "";
         var unitHere = IsUnitOn(pos) ? "U" : "";
         var floorHere = IsFloorAt(pos) ? "" : "X";
-        var fogHere = IsInFog(pos) ? "F" : "";
+        var fogHere = IsInFogMechanically(pos) ? "F" : "";
         return wallHere + doorHere + unitHere + floorHere + fogHere;
     }
 

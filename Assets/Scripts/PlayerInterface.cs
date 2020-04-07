@@ -31,7 +31,7 @@ namespace DefaultNamespace
         bool IsOtherFactionOn(IPlayerUnit unit, Vector3Int pos);
         bool CanBePlaced(IPlayerUnit unit, Vector3Int mapPos, bool doorsAreBlocking = true, bool friendlyUnitsAreBlocking = true);
         bool IsOtherUnitOn(IPlayerUnit unit, Vector3Int mapPos);
-        bool IsInFog(Vector3Int mapPos);
+        bool IsInFogMechanically(Vector3Int mapPos);
         bool IsWallAt(Vector3Int mapPos);
         bool IsOtherFactionOn(Mod.RuleFaction faction, Vector3Int mapPos);
         bool IsLineOfFireBetween(Vector3Int source, Vector3Int target);

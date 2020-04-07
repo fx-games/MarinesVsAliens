@@ -483,7 +483,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
             }
             else
             {
-                validTargets = _map.GetFOV(mapPos, maxDistance, false);
+                validTargets = _map.GetFOV(mapPos, maxDistance, false, false);
             }
             
             validTargets.Remove(mapPos);
@@ -559,13 +559,13 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     public List<IPlayerUnit> VisibleEnemiesFrom(Vector3Int reachableMapPosition)
     {
-        var fov = _map.GetFOV(reachableMapPosition, CurrentVisionRange, false);
+        var fov = _map.GetFOV(reachableMapPosition, CurrentVisionRange, false, false);
         return fov.Where(pos => _map.IsOtherFactionOn(Faction, pos)).Select(pos => _map.GetUnitAt(pos)).ToList();
     }
 
-    public void UpdateFoV(bool removeFog)
+    public void UpdateFoV(bool removeFogVisually, bool removeFogMechanically)
     {
-        var fov = _map.GetFOV(Cell, CurrentVisionRange, removeFog);
+        var fov = _map.GetFOV(Cell, CurrentVisionRange, removeFogVisually, removeFogMechanically);
         FieldOfView = fov;
         VisibleEnemies = FieldOfView.Where(pos => _map.IsOtherFactionOn(Faction, pos)).Select(pos => _map.GetUnitAt(pos)).ToList();
     }

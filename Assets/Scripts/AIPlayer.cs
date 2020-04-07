@@ -72,7 +72,7 @@ public class AIPlayer
         foreach (var mapPos in map.AllPositions)
         {
             var alreadySeen = mapKnowledge[mapPos.x, mapPos.y] != MapTileInfo.Unknown;
-            var notVisible = map.IsInFog(mapPos);
+            var notVisible = map.IsInFogMechanically(mapPos);
             if (alreadySeen || notVisible) continue;
             if (map.IsWallAt(mapPos))
             {
