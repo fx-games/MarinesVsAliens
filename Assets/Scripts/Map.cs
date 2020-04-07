@@ -778,7 +778,8 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return linePositions;
     }
 
-    public HashSet<Vector3Int> GetFOV(Vector3Int position, int radius, bool unitsAreBlocking = false)
+    public HashSet<Vector3Int> GetFOV(Vector3Int position, int radius, bool removeFog = true,
+        bool unitsAreBlocking = false)
     {
         var fieldOfView = new HashSet<Vector3Int>();
         radius++;
@@ -789,7 +790,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             {
                 if (i * i + j * j < radius * radius)
                 {
-                    if (LineCast(position.x, position.y, position.x + i, position.y + j, true, unitsAreBlocking))
+                    if (LineCast(position.x, position.y, position.x + i, position.y + j, removeFog, unitsAreBlocking))
                     {
                         fieldOfView.Add(new Vector3Int(position.x + i, position.y + j, 0));
                     }

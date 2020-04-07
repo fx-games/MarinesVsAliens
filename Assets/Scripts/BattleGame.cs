@@ -14,7 +14,7 @@ using static Mod.RuleFaction;
 using static Unit;
 using Color = UnityEngine.Color;
 
-public class Game : MonoBehaviour, IGame
+public class BattleGame : MonoBehaviour, IGame
 {
     public enum GameState
     {
@@ -38,7 +38,7 @@ public class Game : MonoBehaviour, IGame
     private Camera gameCamera;
     public Text topLeftLabel;
     public Text centerOfScreenLabel;
-    private GameState gameState = GameState.Default;
+    private GameState gameState = GameState.WaitForHotSeatPlayer;
     private Mod mod;
     private List<RuleFaction> factions;
     private int phaseFaction;
@@ -52,6 +52,7 @@ public class Game : MonoBehaviour, IGame
     private double aiCommandDelay = 0.8f;
     private bool spectatorMode = false;
     private Coroutine currentAiCoroutine;
+    private RuleFaction singlePlayerFaction;
 
     private void Awake()
     {
@@ -98,6 +99,11 @@ public class Game : MonoBehaviour, IGame
 
     public void AfterMapLoad()
     {
+        if (GameController.ChosenMode == GameController.GameMode.AgainstAI)
+        {
+            singlePlayerFaction = CurrentFaction;
+        }
+        
         SpawnUnits();
         
         phaseFaction = -1;
@@ -105,10 +111,15 @@ public class Game : MonoBehaviour, IGame
         NewTurn();
         PrepareNextPhase();
 
-        CreateAIPlayers();
-        
-        //DEBUG
-        EnableSpectatorMode();
+        if (GameController.ChosenMode != GameController.GameMode.HotSeat)
+        {
+            CreateAIPlayers();
+        }
+
+        if (GameController.ChosenMode == GameController.GameMode.WatchAI)
+        {
+            EnableSpectatorMode();
+        }
     }
 
     void EnableSpectatorMode()
@@ -131,7 +142,7 @@ public class Game : MonoBehaviour, IGame
         if (factions.Count <= 1) return;
         /* Automatic AI moves disabled */
         if (gameState != GameState.WaitForHotSeatPlayer 
-            && aiPlayers.ContainsKey(CurrentFaction) && spectatorMode)
+            && (spectatorMode || (GameController.ChosenMode == GameController.GameMode.AgainstAI && CurrentFaction != singlePlayerFaction)))
         {
             if (aiPlayers[CurrentFaction].State == AIState.Idle && currentAiCoroutine != null)
             {
@@ -210,7 +221,6 @@ public class Game : MonoBehaviour, IGame
 
     private void PreviewMovement(Unit unit, Vector3Int targetPos)
     {
-        _map.RemoveAllHighlights(1);
         var path = unit.GetShortestPath(targetPos);
         HashSet<Vector3Int> previewTiles = new HashSet<Vector3Int>();
             
@@ -223,13 +233,10 @@ public class Game : MonoBehaviour, IGame
                     previewTiles.Add(pathPos + offset);
                 }
             }
-
-            foreach (var tile in previewTiles)
-            {
-                _map.HighlightTile(tile, new Color(0.4f,0.3f,0.7f,0.6f), 1);
-            }
+            HighlightTiles(previewTiles.ToList(), new Color(0.4f,0.3f,0.7f,0.6f), 1);
         }
     }
+
 
     private void InputReleasedOnMap(Vector3Int mapPos)
     {
@@ -334,7 +341,7 @@ public class Game : MonoBehaviour, IGame
                 
                 damageLeft = Options.CombatMechanics.ResolveAttack(attackValues, unitPos,unit, multiHitPosition, aoePos, hitUnit);
             
-                if (attackScore > 0 && isMelee && Options.CombatMechanics is DiceBasedCombat)
+                if (attackScore > 0 && isMelee && Options.CombatMechanics is DiceBasedCombat && CurrentFaction == PoVFaction)
                 {
                     var defense = ((DiceBasedCombat) Options.CombatMechanics).LastMeleeDefense;
                     hitUnit.SetLabelText(defense.ToString());
@@ -344,8 +351,11 @@ public class Game : MonoBehaviour, IGame
         
 
         unit.HasAttacked();
-        
-        unit.SetLabelText(scoreForLabel);
+
+        if (CurrentFaction == PoVFaction)
+        {
+            unit.SetLabelText(scoreForLabel);
+        }
         
         multipleTargets.Clear();
     }
@@ -356,14 +366,18 @@ public class Game : MonoBehaviour, IGame
         if (_map.IsUnitOn(mapPos))
         {
             selectedUnit = (Unit) _map.GetUnitAt(mapPos);
-            selectedUnit.MarkAsSelected();
-            HighlightTiles(selectedUnit.ReachablePositions);
+            
             if (selectedUnit.MovesLeft > 0)
             {
                 gameState = GameState.MoveTargetSelection;
             }
-
-            UpdateLabel();
+            HighlightTiles(selectedUnit.ReachablePositions, new Color(0, 0.8f, 0, 0.2f));
+            
+            if (CurrentFaction == PoVFaction)
+            {
+                selectedUnit.MarkAsSelected();
+                UpdateLabel();
+            }
         }
     }
 
@@ -413,7 +427,7 @@ public class Game : MonoBehaviour, IGame
 
     public void OpenDoorButtonClicked()
     {
-        if (aiPlayers.ContainsKey(CurrentFaction)) return;
+        if (CurrentFaction != PoVFaction) return;
         if (selectedUnit != null)
         {
             OpenDoor(selectedUnit, selectedUnit.Cell);
@@ -428,8 +442,8 @@ public class Game : MonoBehaviour, IGame
             if (_map.IsDoorAt(neighborPos))
             {
                 _map.RemoveDoor(unit, neighborPos);
-                
-                unit.UpdateFoV();
+
+                unit.UpdateFoV(unit.Faction == PoVFaction);
                 
                 UpdateVisibleUnits(unit);
 
@@ -439,6 +453,12 @@ public class Game : MonoBehaviour, IGame
     }
 
     public void EndTurnButtonClicked()
+    {
+        if (CurrentFaction != PoVFaction) return;
+        EndPhase();
+    }
+
+    private void EndPhase()
     {
         if (gameState == GameState.WaitForHotSeatPlayer)
         {
@@ -452,15 +472,22 @@ public class Game : MonoBehaviour, IGame
             }
         }
     }
+    
+    public void EndPhase(AIPlayer aiPlayer)
+    {
+        if (aiPlayer.Faction == CurrentFaction)
+        {
+            EndPhase();
+        }
+    }
 
     private void StartWaitingForHeatSeatPlayer(RuleFaction faction)
     {
-        
         selectedUnit = null;
         _map.HideUnitMarker();
         allUnits.ForEach(unit => { unit.SetVisible(false); unit.Deselect(); });
 
-        if (spectatorMode)
+        if (spectatorMode || CurrentFaction != PoVFaction)
         {
             gameState = GameState.Default;
             StartNextPhase();
@@ -526,21 +553,35 @@ public class Game : MonoBehaviour, IGame
             NewTurn();
         }
         
+        PoVFaction = CurrentFaction;
+        if (GameController.ChosenMode == GameController.GameMode.AgainstAI)
+        {
+            PoVFaction = singlePlayerFaction;
+        }
+        
         StartWaitingForHeatSeatPlayer(CurrentFaction);
     }
+
+    public RuleFaction PoVFaction { get; set; }
 
     private void StartNextPhase()
     {
         gameState = GameState.Default;
         centerOfScreenLabel.enabled = false;
-            
+
+        if (CurrentFaction != PoVFaction)
+        {
+            centerOfScreenLabel.text = "HIDDEN MOVEMENT";
+            centerOfScreenLabel.enabled = true;
+        }
+        
         bool firstUnitFound = false;
         foreach (var unit in allUnits)
         {
             if (unit.Faction != CurrentFaction) continue;
             unit.PrepareNewPhase();
             
-            if (firstUnitFound || spectatorMode) continue;
+            if (firstUnitFound || spectatorMode || (GameController.ChosenMode == GameController.GameMode.AgainstAI && CurrentFaction != singlePlayerFaction)) continue;
             firstUnitFound = true;            
             UnitSelected(unit.Cell);
             CenterCameraOn(unit);
@@ -548,7 +589,7 @@ public class Game : MonoBehaviour, IGame
 
         GlobalFOVUpdate();
         
-        if (aiPlayers.ContainsKey(CurrentFaction))
+        if (aiPlayers.ContainsKey(CurrentFaction) && CurrentFaction != singlePlayerFaction)
         {
             aiPlayers[CurrentFaction].NextPhase();
         }
@@ -573,6 +614,7 @@ public class Game : MonoBehaviour, IGame
     public void AttackButtonClicked()
     {
         if (selectedUnit == null) return;
+        if (CurrentFaction != PoVFaction) return;
         
         //if (aiPlayers.ContainsKey(CurrentFaction) ) return;
 
@@ -600,10 +642,13 @@ public class Game : MonoBehaviour, IGame
             ShowValidTargets(selectedUnit);
             var unitsInRange = selectedUnit.ValidTargets.Where(pos => _map.IsOtherFactionOn(selectedUnit, pos))
                 .Select(pos => _map.GetUnitAt(pos));
-            foreach (var unit in unitsInRange)
+            if (CurrentFaction == PoVFaction)
             {
-                string info = Options.CombatMechanics.AttackPreviewInformationFor((Unit) unit, selectedUnit);
-                ((Unit)unit).SetLabelText(info);
+                foreach (var unit in unitsInRange)
+                {
+                    string info = Options.CombatMechanics.AttackPreviewInformationFor((Unit) unit, selectedUnit);
+                    ((Unit) unit).SetLabelText(info);
+                }
             }
 
             if (selectedUnit.ValidTargets.Count > 0)
@@ -620,19 +665,19 @@ public class Game : MonoBehaviour, IGame
 
     private void ShowValidTargets(Unit unit)
     {
-        foreach (var tile in unit.ValidTargets)
-        {
-            _map.HighlightTile(tile, new Color(0.6f, 0f, 0, 0.5f));
-        }
+        HighlightTiles(unit.ValidTargets.ToList(), new Color(0.6f, 0f, 0, 0.5f));
     }
 
 
-    private void HighlightTiles(List<Vector3Int> positions)
+    private void HighlightTiles(List<Vector3Int> positions, Color color, int layer = 0)
     {
-        _map.RemoveAllHighlights();
-        foreach (var pos in positions)
+        _map.RemoveAllHighlights(layer);
+        if (CurrentFaction == PoVFaction)
         {
-            _map.HighlightTile(pos, new Color(0, 0.8f, 0, 0.2f));
+            foreach (var pos in positions)
+            {
+                _map.HighlightTile(pos, color, layer);
+            }
         }
     }
 
@@ -659,31 +704,36 @@ public class Game : MonoBehaviour, IGame
     {
         if (gameState == GameState.WaitForHotSeatPlayer) return;
         
-        
         GlobalFOVUpdate();
         
         if (selectedUnit == args.unit && selectedUnit.MovesLeft > 0)
         {
             gameState = GameState.MoveTargetSelection;
-            HighlightTiles(selectedUnit.ReachablePositions);
+            HighlightTiles(selectedUnit.ReachablePositions, new Color(0, 0.8f, 0, 0.2f));
         }
     }
 
     private void GlobalFOVUpdate()
     {
         _map.ResetFog();
+        
         foreach (var unit in allUnits)
         {
             unit.SetVisible(false);
-            if (unit.Faction == CurrentFaction)
+
+            if (unit.Faction == PoVFaction)
             {
                 unit.SetVisible(true);
-                unit.UpdateFoV();
+                unit.UpdateFoV(true);
+            }
+            else
+            {
+                unit.UpdateFoV(false);
             }
         }
         foreach (var unit in allUnits)
         {
-            if (unit.Faction != CurrentFaction && !_map.IsInFog(unit.Cell))
+            if (unit.Faction != PoVFaction && !_map.IsInFog(unit.Cell))
             {
                 unit.SetVisible(true);
             }
@@ -836,7 +886,7 @@ public class Game : MonoBehaviour, IGame
 
         if (gameState == GameState.WaitForHotSeatPlayer) return;
         
-        unit.UpdateFoV();
+        unit.UpdateFoV(unit.Faction == PoVFaction);
         
         UpdateVisibleUnits(unit);
     }
@@ -846,7 +896,7 @@ public class Game : MonoBehaviour, IGame
         foreach (var unit in allUnits)
         {
             var unitPos = _map.WorldToCell(unit.transform.position);
-            var shouldBeVisible = unit.Faction == CurrentFaction
+            var shouldBeVisible = unit.Faction == PoVFaction
                                   || !_map.IsInFog(unitPos);
             if (shouldBeVisible && unit.Faction != CurrentFaction)
             {
@@ -922,13 +972,6 @@ public class Game : MonoBehaviour, IGame
         return output;
     }
 
-    public void EndPhase(AIPlayer aiPlayer)
-    {
-        if (aiPlayer.Faction == CurrentFaction)
-        {
-            EndTurnButtonClicked();
-        }
-    }
 
     public void MoveUnit(Unit unit, Vector3Int targetPos)
     {
