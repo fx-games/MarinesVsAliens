@@ -336,14 +336,14 @@ public class Unit : MonoBehaviour, IPlayerUnit
         spriteRenderer.enabled = isVisible;
     }
     
-    public void MarkAsSelected()
+    public void Mark(bool asTarget = false)
     {
         var unitMarker = _map.GetUnitMarker();
         
         markerRenderer = unitMarker.GetComponent<SpriteRenderer>();
         markerRenderer.enabled = true;
         SetMarkerSize(unitMarker);
-        UpdateMarker();
+        UpdateMarker(asTarget);
     }
 
     public void Deselect()
@@ -381,11 +381,15 @@ public class Unit : MonoBehaviour, IPlayerUnit
         unitMarker.transform.SetParent(transform);
     }
 
-    public void UpdateMarker()
+    private void UpdateMarker(bool asTarget = false)
     {
         if (markerRenderer != null && markerRenderer.transform.IsChildOf(transform))
         {
-            if (MovesLeft > 0 && CanAttack)
+            if (asTarget)
+            {
+                markerRenderer.color = new Color(1.0f, 0.64f, 0.0f);
+            }
+            else if (MovesLeft > 0 && CanAttack)
             {
                 markerRenderer.color = Color.green;
             }

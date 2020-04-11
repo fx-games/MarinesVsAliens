@@ -219,8 +219,18 @@ public class BattleGame : MonoBehaviour, IGame
     {
         selectedUnit = null;
         _map.HideUnitMarker();
+        _map.RemoveAllTileMarker();
         ToDefaultState();
         UpdateUIButtons();
+        
+    }
+
+    private void ToDefaultState()
+    {
+        _map.RemoveAllHighlights();
+        _map.RemoveAllHighlights(1);
+        allUnits.ForEach(unit => unit.RemoveLabel());
+        gameState = GameState.Default;
     }
 
     private void PreviewMovement(Unit unit, Vector3Int targetPos)
@@ -289,6 +299,7 @@ public class BattleGame : MonoBehaviour, IGame
 
         if (weapon.Rules.MultipleTargets && !isMultipleTargetConfirmation)
         {
+            _map.MarkTile(targetedPos);
             multipleTargets.Add(targetedPos);
             return;
         }
@@ -364,6 +375,7 @@ public class BattleGame : MonoBehaviour, IGame
         
         multipleTargets.Clear();
 
+        _map.RemoveAllTileMarker();
         CheckForDeadUnits();
         UpdateUIButtons();
     }
@@ -396,21 +408,12 @@ public class BattleGame : MonoBehaviour, IGame
             
             if (CurrentFaction == PoVFaction)
             {
-                selectedUnit.MarkAsSelected();
+                selectedUnit.Mark();
                 UpdateLabel();
             }
 
             UpdateUIButtons();
         }
-    }
-
-
-    private void ToDefaultState()
-    {
-        _map.RemoveAllHighlights();
-        _map.RemoveAllHighlights(1);
-        allUnits.ForEach(unit => unit.RemoveLabel());
-        gameState = GameState.Default;
     }
 
     private bool TryMoveWithUnit(IPlayerUnit playerUnit, Vector3Int mapPos)
@@ -673,7 +676,7 @@ public class BattleGame : MonoBehaviour, IGame
             {
                 foreach (var unit in unitsInRange)
                 {
-                    string info = Options.CombatMechanics.AttackPreviewInformationFor((Unit) unit, selectedUnit);
+                    string info = Options.CombatMechanics.AttackPreviewInformationFor(selectedUnit, (Unit) unit);
                     ((Unit) unit).SetLabelText(info);
                 }
             }

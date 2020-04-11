@@ -10,8 +10,14 @@ PrefabInstance:
     - target: {fileID: 7611691132212880480, guid: d1fe88e0659b2491886d42c3b4e1efe1,
         type: 3}
       propertyPath: m_Name
-      value: StationBlock01
+      value: StationBlock01 Variant
       objectReference: {fileID: 0}
+    - target: {fileID: 7611691132212880483, guid: d1fe88e0659b2491886d42c3b4e1efe1,
+        type: 3}
+      propertyPath: explosionParticleSystemPrefab
+      value: 
+      objectReference: {fileID: 1724087812403698760, guid: 372d6297eb34c48abbbba5c0782dfc10,
+        type: 3}
     - target: {fileID: 7611691132212880485, guid: d1fe88e0659b2491886d42c3b4e1efe1,
         type: 3}
       propertyPath: m_LocalPosition.x

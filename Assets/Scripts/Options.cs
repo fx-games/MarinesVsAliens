@@ -18,9 +18,9 @@ namespace DefaultNamespace
 
     public interface ICombatMechanics
     {
-        string AttackPreviewInformationFor(Unit unit, Unit attackingUnit);
-        int[] AttackValues(bool isMelee, Unit unit, Vector3Int targetedPos);
-        int ResolveAttack(int[] attackValues, Vector3Int unitPos, Unit unit, Vector3Int targetedPos, Vector3Int aoePos,
+        string AttackPreviewInformationFor(Unit attackingUnit, Unit targetUnit);
+        int[] AttackValues(bool isMelee, Unit attackingUnit, Vector3Int targetedPos);
+        int ResolveAttack(int[] attackValues, Vector3Int unitPos, Unit attackingUnit, Vector3Int targetedPos, Vector3Int aoePos,
             Unit hitUnit);
     }
 
@@ -34,12 +34,12 @@ namespace DefaultNamespace
 
     public class DiceBasedCombat : CombatBase, ICombatMechanics
     {
-        public string AttackPreviewInformationFor(Unit unit, Unit attackingUnit)
+        public string AttackPreviewInformationFor(Unit attackingUnit, Unit targetUnit)
         {
-            if (IsMelee(attackingUnit, unit))
+            if (IsMelee(attackingUnit, targetUnit))
             {
-                int maxMeleeDef = unit.MeleeWeapon.Rules.Damage.Sum(die => die.Max());
-                int minMeleeDef = unit.MeleeWeapon.Rules.Damage.Sum(die => die.Min());
+                int maxMeleeDef = targetUnit.MeleeWeapon.Rules.Damage.Sum(die => die.Max());
+                int minMeleeDef = targetUnit.MeleeWeapon.Rules.Damage.Sum(die => die.Min());
             
                 int maxMeleeAtt = attackingUnit.MeleeWeapon.Rules.Damage.Sum(die => die.Max());
                 int minMeleeAtt = attackingUnit.MeleeWeapon.Rules.Damage.Sum(die => die.Min());
@@ -51,38 +51,38 @@ namespace DefaultNamespace
                 int maxRangedAtt = attackingUnit.RangedWeapon.Rules.Damage.Sum(die => die.Max());
                 int minRangedAtt = attackingUnit.RangedWeapon.Rules.Damage.Sum(die => die.Min());
             
-                int armor = unit.CurrentArmor;
+                int armor = targetUnit.CurrentArmor;
 
                 return minRangedAtt + "-" + maxRangedAtt + ":" + armor;
             }
         }
 
-        public int[] AttackValues(bool isMelee, Unit unit, Vector3Int targetedPos)
+        public int[] AttackValues(bool isMelee, Unit attackingUnit, Vector3Int targetedPos)
         {
-            return isMelee ? unit.MeleeWeapon.RollDamage() : unit.RangedWeapon.RollDamage();
+            return isMelee ? attackingUnit.MeleeWeapon.RollDamage() : attackingUnit.RangedWeapon.RollDamage();
         }
         
-        public int ResolveAttack(int[] attackerDice, Vector3Int attackerPos, Unit attacker, Vector3Int targetPos,
+        public int ResolveAttack(int[] attackerDice, Vector3Int attackerPos, Unit attackingUnit, Vector3Int targetPos,
             Vector3Int aoePos, Unit target)
         {
             int damageLeft = -1;
             
-            var isMelee = IsMelee(attacker, target);
+            var isMelee = IsMelee(attackingUnit, target);
             
-            if (isMelee && !attacker.HasMeleeWeapon)
+            if (isMelee && !attackingUnit.HasMeleeWeapon)
             {
                 return damageLeft; // No melee weapon for melee attack
             }
 
-            if (!isMelee && !attacker.HasRangedWeapon)
+            if (!isMelee && !attackingUnit.HasRangedWeapon)
                 return damageLeft; // No ranged weapon
         
             var isAoEPosition = targetPos != aoePos;
         
-            var weapon = attacker.RangedWeapon;
+            var weapon = attackingUnit.RangedWeapon;
             if (isMelee)
             {
-                weapon = attacker.MeleeWeapon;
+                weapon = attackingUnit.MeleeWeapon;
             }
 
             var isExplosion = weapon.Rules.Radius > 0;
@@ -110,18 +110,18 @@ namespace DefaultNamespace
                     {
                         // damage to attacker
                         int returnedMeleeDamage = defenderScore - attackerScore;
-                        attacker.DamageReceived(target, target.MeleeWeapon, returnedMeleeDamage);
+                        attackingUnit.DamageReceived(target, target.MeleeWeapon, returnedMeleeDamage);
                     }
                 }
                 else
                 {
                     // damage to target
                     damage = attackerScore - defenderScore;
-                    damageLeft = target.DamageReceived(attacker, weapon, damage);
+                    damageLeft = target.DamageReceived(attackingUnit, weapon, damage);
                 }
             }
             
-            Debug.Log("ATT:" + attacker + "(" + attackerScore + ") -> " + target + "("+defenderScore+") => Dmg: " + damage);
+            Debug.Log("ATT:" + attackingUnit + "(" + attackerScore + ") -> " + target + "("+defenderScore+") => Dmg: " + damage);
             
             return damageLeft;
         }
@@ -132,20 +132,18 @@ namespace DefaultNamespace
     public class PercentageBasedCombat : CombatBase, ICombatMechanics
     {
 
-        public string AttackPreviewInformationFor(Unit unit, Unit attackingUnit)
+        public string AttackPreviewInformationFor(Unit attackingUnit, Unit targetUnit)
         {
-            int chanceToHit = CalculateChanceToHit(attackingUnit, unit);
+            int chanceToHit = CalculateChanceToHit(attackingUnit, targetUnit);
             return chanceToHit.ToString();
         }
 
-        public int[] AttackValues(bool isMelee, Unit unit, Vector3Int targetedPos)
+        public int[] AttackValues(bool isMelee, Unit attackingUnit, Vector3Int targetedPos)
         {
             throw new NotImplementedException();
         }
 
-        public int ResolveAttack(int[] attackValues, Vector3Int unitPos, Unit unit, Vector3Int targetedPos,
-            Vector3Int aoePos,
-            Unit hitUnit)
+        public int ResolveAttack(int[] attackValues, Vector3Int unitPos, Unit attackingUnit, Vector3Int targetedPos, Vector3Int aoePos, Unit hitUnit)
         {
             throw new NotImplementedException();
         }

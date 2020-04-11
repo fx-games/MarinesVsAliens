@@ -122,30 +122,42 @@ factions:
           - STR_RIFLE
 units:
   - type: STR_SQUADDIE
+    accuracy: 65
+    defense: 0
     movement: 4
     health: 1
     armor: 2
   - type: STR_SQUAD_LEADER
+    accuracy: 70
+    defense: 0
     unitSprite: Commander
     movement: 6
     health: 6
     armor: 2
   - type: STR_SPIDER_ALIEN
+    accuracy: 60
+    defense: 10
     unitSprite: Spider
     movement: 8
     health: 1
     armor: 0
   - type: STR_ANDROID_ALIEN
+    defense: 10
+    accuracy: 60
     unitSprite: Android
     movement: 4
     health: 1
     armor: 2
   - type: STR_RIFLE_ALIEN
+    defense: 10
+    accuracy: 65  
     unitSprite: Rifle
     movement: 6
     health: 1
     armor: 1
   - type: STR_BIG_ALIEN
+    defense: 20
+    accuracy: 70  
     unitSprite: Rocket
     movement: 4
     health: 3

@@ -49,7 +49,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     public Tile[] floorTiles;
     public Tile[] walls;  // ORDER: NESW
     public Tile[] doors;
-    public Tile[] spawnFloorMarkerTiles;
+    
 
     protected Dictionary<string, Tilemap> layerMap = new Dictionary<string, Tilemap>();
     protected Unit[][] unitMap;
@@ -59,6 +59,8 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     
     private Camera gameCamera;
     public GameObject blanktilePrefab;
+    public Tile glowtile;
+
     private List<GameObject>[] allHighlights = new List<GameObject>[4]{ new List<GameObject>(), new List<GameObject>(), new List<GameObject>(), new List<GameObject>()};
     public Vector3Int CurrentCursorPosition { get; private set; }
     private HashSet<Vector3Int> visibleTiles = new HashSet<Vector3Int>();
@@ -68,6 +70,14 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     public GameObject cellLabelPrefab;
     private HashSet<Text> cellLabels = new HashSet<Text>();
     private Transform worldCanvas;
+    private List<GameObject> allTileMarker = new List<GameObject>();
+    private List<ParticleSystem> activeParticleSystems = new List<ParticleSystem>();
+    private List<ParticleSystem.Particle[]> systemParticles = new List<ParticleSystem.Particle[]>();
+    private Dictionary<Vector3Int, Color> particleTiles = new Dictionary<Vector3Int, Color>();
+
+    public Tile[] spawnFloorMarkerTiles;
+    private CellParticleSystem cellParticleSystem;
+    private Dictionary<Color, Tile> glowTiles = new Dictionary<Color, Tile>();
 
     // Start is called before the first frame update
     void Awake()
@@ -103,14 +113,24 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         {
             throw new Exception("Game needs camera.");
         }
+        cellParticleSystem = new CellParticleSystem(this);
     }
     
     
     public void DebugAction()
     {
-        ((CavernGenerator) generator).MakeCaverns(0);
+        //CreateParticleEffect(CurrentCursorPosition);
+        cellParticleSystem.AddParticle(new CircleParticle()
+        {
+            Position = gameCamera.ScreenToWorldPoint(Input.mousePosition),
+            Velocity = Vector3.zero,
+            Lifetime = 6000,
+            Color = Random.value > 0.5f ? Color.red : Color.green,
+            Radius = 0,
+            DeltaRadius = 0.04f
+        });
     }
-    
+
     public void DebugActionTwo()
     {
         ((CavernGenerator) generator).MakeCaverns(1);
@@ -163,6 +183,14 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     // Update is called once per frame
     void Update()
     {
+        // debug
+
+        if (Input.GetKeyDown(KeyCode.F))
+        {
+            DebugAction();
+        }
+        
+        // update mouse
         Vector3 pos = gameCamera.ScreenToWorldPoint(Input.mousePosition);
         var mapPos = WorldToCell(pos);
         if (Contains(mapPos.x, mapPos.y) && mapPos != lastCursorPosition)
@@ -171,8 +199,46 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             selectionRect.transform.position = CellToWorld(mapPos);
             lastCursorPosition = mapPos;
         }
+        
+        // update & synch particlesystems
+        SynchParticles();
     }
-    
+
+    private void SynchParticles()
+    {
+        cellParticleSystem.Update();
+        // reset the affected tiles
+        foreach (var particleTile in cellParticleSystem.TilesAffectedInLastFrame)
+        {
+            if (Contains(particleTile.x, particleTile.y))
+            {
+                layerMap["Effects"].SetTile(particleTile, null);
+            }
+        }
+        
+        foreach (var kvp in cellParticleSystem.TileColoring)
+        {
+            if (Contains(kvp.Key.x, kvp.Key.y))
+            {
+                layerMap["Effects"].SetTile(kvp.Key, GlowtileByColor(kvp.Value));
+            }
+        }
+    }
+
+    private TileBase GlowtileByColor(Color color)
+    {
+        if (!glowTiles.ContainsKey(color))
+        {
+            Tile colorTile = ScriptableObject.CreateInstance<Tile>();
+            colorTile.sprite = glowtile.sprite;
+            colorTile.color = color;
+
+            glowTiles[color] = colorTile;
+        }
+        
+        return glowTiles[color];
+    }
+
     public void RemoveDoor(Unit unit, Vector3Int doorPos)
     {
         Debug.Log("RemoveDoor() FIRED: " + unit + " / " + doorPos);
@@ -350,7 +416,14 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return layerMap["Floors"].WorldToCell(pos);
     }
     
-    
+    private void SetTileColor(Vector3Int pos, Color color)
+    {
+        // Flag the tile, indicating that it can change colour.
+        // By default it's set to "Lock Colour".
+        layerMap["Floors"].SetTileFlags(pos, TileFlags.None);
+        // Set the colour.
+        layerMap["Floors"].SetColor(pos, color);
+    }
     public void SetHighlightColor(Color color, int layer = 0)
     {
         foreach (var highlight in allHighlights[layer])
@@ -593,6 +666,18 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     public void HideUnitMarker()
     {
         unitSelectedMarker.GetComponent<SpriteRenderer>().enabled = false;
+    }
+    
+    public void MarkTile(Vector3Int mapPos)
+    {
+        var marker = Instantiate(selectionRectPrefab, CellToWorld(mapPos), Quaternion.identity);
+        allTileMarker.Add(marker);
+    }
+
+    public void RemoveAllTileMarker()
+    {
+        allTileMarker.ForEach(Destroy);
+        allTileMarker.Clear();
     }
 
     public bool IsStandingOnDoor(Unit unit, bool openDoor = false)
@@ -880,7 +965,10 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         foreach (var pos in RectToList(0,0,Width,Height))
         {
             if (!IsFloorAt(pos)) continue;
-            int faction = spawnFloorMarkerTiles.ToList().IndexOf(layerMap["Floors"].GetTile<Tile>(pos));
+            var floorTile = layerMap["Floors"].GetTile<Tile>(pos);
+            if (floorTile == null) continue;
+            
+            int faction = spawnFloorMarkerTiles.ToList().IndexOf(floorTile);
                 
             if (faction > -1)
             {
@@ -956,6 +1044,11 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             }
         }
     }
+    
+	
+	// Implementing Mid-Point Circle 
+	// Drawing Algorithm 
+	
 }
 
 public enum MapInfo

@@ -6,15 +6,11 @@ using UnityEngine.Tilemaps;
 public class FloorTile : Tile
 {
     public Sprite[] m_Sprites;
-    public Sprite m_Preview;
-    public Color tileColor;
-    
-    
+
     public override void GetTileData(Vector3Int location, ITilemap tilemap, ref TileData tileData)
     {
         tileData.sprite = m_Sprites[0];
-        tileData.color = color;
-        tileData.flags = TileFlags.LockAll;
+        tileData.flags = TileFlags.None;
         tileData.colliderType = ColliderType.Grid;
     }
 
