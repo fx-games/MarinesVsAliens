@@ -143,9 +143,10 @@ public class BattleGame : MonoBehaviour, IGame
     void Update()
     {
         if (factions.Count <= 1) return;
-        /* Automatic AI moves disabled */
-        if (gameState != GameState.WaitForHotSeatPlayer 
-            && (spectatorMode || (GameController.ChosenMode == GameController.GameMode.AgainstAI && CurrentFaction != singlePlayerFaction)))
+        if (gameState == GameState.WaitForHotSeatPlayer) return;
+        
+        /* Automatic AI moves */
+        if ((spectatorMode || (GameController.ChosenMode == GameController.GameMode.AgainstAI && CurrentFaction != singlePlayerFaction)))
         {
             Debug.Log("CurrentFaction (AI Move): " + CurrentFaction);
             if (aiPlayers[CurrentFaction].State == AIState.Idle && currentAiCoroutine != null)
@@ -217,9 +218,7 @@ public class BattleGame : MonoBehaviour, IGame
 
     private void DeselectAll()
     {
-        selectedUnit = null;
-        _map.HideUnitMarker();
-        _map.RemoveAllTileMarker();
+        selectedUnit = null;        
         ToDefaultState();
         UpdateUIButtons();
     }
@@ -229,6 +228,8 @@ public class BattleGame : MonoBehaviour, IGame
         _map.RemoveAllLines();
         _map.RemoveAllHighlights();
         _map.RemoveAllHighlights(1);
+        _map.RemoveAllTileMarker();        
+        _map.HideUnitMarker();
         allUnits.ForEach(unit =>
         {
             unit.RemoveLabel();
@@ -255,13 +256,21 @@ public class BattleGame : MonoBehaviour, IGame
         }
     }
 
+    private void ShowAllHealthBars()
+    {
+        allUnits.ForEach(unit =>
+        {
+            unit.IsHealthBarVisible = unit.IsVisible;
+        });
+    }
+
 
     private void InputReleasedOnMap(Vector3Int mapPos)
     {
         if (cameraController.ActiveTouchCameraMovement)
             return;
         
-        if (_map.IsUnitOn(mapPos) && _map.GetUnitAt(mapPos).Faction == CurrentFaction)
+        if (gameState != GameState.AttackTargetSelection && _map.IsUnitOn(mapPos))
         {
             ToDefaultState();
             UnitSelected(mapPos);
@@ -273,7 +282,7 @@ public class BattleGame : MonoBehaviour, IGame
                 case GameState.AttackTargetSelection when selectedUnit.ValidTargets.Contains(mapPos):
                     TryAttackWithUnit(selectedUnit, mapPos);
                     break;
-                case GameState.MoveTargetSelection when !_map.IsUnitOn(mapPos):
+                case GameState.MoveTargetSelection when selectedUnit.ReachablePositions.Contains(mapPos) && !_map.IsUnitOn(mapPos):
                     MovementPreviewLockedIn(selectedUnit, mapPos);
                     break;
                 case GameState.MovementSelectedPreConfirmation when movePreConfirmedAt == mapPos:
@@ -348,7 +357,7 @@ public class BattleGame : MonoBehaviour, IGame
         {
             if (firstPos || !weapon.Rules.DamageDistribution)
             {
-                attackValues = Options.CombatMechanics.AttackValues(isMelee, unit, multiHitPosition);
+                attackValues = Options.CombatMechanics.AttackValues(unit, multiHitPosition, isMelee);
                 attackScore = attackValues.Sum();    // set on first pos for distributed and everytime else
                 scoreForLabel = attackScore.ToString();
                 firstPos = false;
@@ -422,9 +431,11 @@ public class BattleGame : MonoBehaviour, IGame
 
     private void UnitSelected(Vector3Int mapPos)
     {
-        if (_map.IsUnitOn(mapPos))
+        var clickedUnit = _map.GetUnitAt(mapPos);
+        
+        if (clickedUnit.Faction == CurrentFaction)
         {
-            selectedUnit = (Unit) _map.GetUnitAt(mapPos);
+            selectedUnit = (Unit) clickedUnit;
             Debug.Log("UnitSelected: " + selectedUnit);
             if (selectedUnit.MovesLeft > 0)
             {
@@ -440,8 +451,10 @@ public class BattleGame : MonoBehaviour, IGame
 
             UpdateUIButtons();
             
-            _map.FlashEffect(mapPos);
+            _map.FlashEffect(mapPos, Color.cyan);
         }
+        
+        ShowAllHealthBars();
     }
 
     private bool TryMoveWithUnit(IPlayerUnit playerUnit, Vector3Int mapPos)
@@ -456,8 +469,11 @@ public class BattleGame : MonoBehaviour, IGame
         
         _map.RemoveAllHighlights();
         _map.RemoveAllHighlights(1);
+        _map.RemoveAllLines();
+
         unit.Move(path);
         gameState = GameState.Default;
+        
         return true;
     }
     
@@ -543,7 +559,7 @@ public class BattleGame : MonoBehaviour, IGame
     {
         selectedUnit = null;
         _map.HideUnitMarker();
-        allUnits.ForEach(unit => { unit.SetVisible(false); unit.Deselect(); });
+        allUnits.ForEach(unit => { unit.IsVisible = false; unit.Deselect(); });
 
         if (spectatorMode || CurrentFaction != PoVFaction)
         {
@@ -597,7 +613,7 @@ public class BattleGame : MonoBehaviour, IGame
     private void MissionDebriefing()
     {
         _map.RemoveAllFog();
-        allUnits.ForEach(u => u.SetVisible(true));
+        allUnits.ForEach(u => u.IsVisible = true);
         Debug.Log("Mission is over!");
     }
 
@@ -633,6 +649,8 @@ public class BattleGame : MonoBehaviour, IGame
             centerOfScreenLabel.enabled = true;
         }
         
+        GlobalFOVUpdate();
+        
         bool firstUnitFound = false;
         foreach (var unit in allUnits)
         {
@@ -644,9 +662,6 @@ public class BattleGame : MonoBehaviour, IGame
             UnitSelected(unit.Cell);
             CenterCameraOn(unit);
         }
-
-        GlobalFOVUpdate();
-        
         if (aiPlayers.ContainsKey(CurrentFaction) && CurrentFaction != singlePlayerFaction)
         {
             aiPlayers[CurrentFaction].NextPhase();
@@ -779,11 +794,11 @@ public class BattleGame : MonoBehaviour, IGame
         
         foreach (var unit in allUnits)
         {
-            unit.SetVisible(false);
+            unit.IsVisible = false;
 
             if (unit.Faction == PoVFaction)
             {
-                unit.SetVisible(true);
+                unit.IsVisible = true;
             }
             unit.UpdateFoV(unit.Faction == PoVFaction, unit.Faction == PoVFaction);
         }
@@ -791,7 +806,7 @@ public class BattleGame : MonoBehaviour, IGame
         {
             if (unit.Faction != PoVFaction && !_map.IsInFogVisually(unit.Cell))
             {
-                unit.SetVisible(true);
+                unit.IsVisible = true;
             }
         }
     }
@@ -803,11 +818,12 @@ public class BattleGame : MonoBehaviour, IGame
             var unitPos = _map.WorldToCell(unit.transform.position);
             var shouldBeVisible = unit.Faction == PoVFaction
                                   || !_map.IsInFogVisually(unitPos);
+            
             if (shouldBeVisible && unit.Faction != CurrentFaction)
             {
                 unit.TurnTowards(sourceUnit.Cell);
             }
-            unit.SetVisible(shouldBeVisible);
+            unit.IsVisible = shouldBeVisible;
         }
     }
     private RuleFaction CurrentFaction => factions[phaseFaction];
@@ -955,9 +971,22 @@ public class BattleGame : MonoBehaviour, IGame
 
         if (gameState == GameState.WaitForHotSeatPlayer) return;
         
-        unit.UpdateFoV(unit.Faction == PoVFaction, unit.Faction == PoVFaction);
+        var unitsBecameVisible = unit.UpdateFoV(unit.Faction == PoVFaction, unit.Faction == PoVFaction);
         
         UpdateVisibleUnits(unit);
+
+        if (unitsBecameVisible.Count > 0)
+        {
+            if (_map.GetUnitAt(unit.Cell) == unit) // cannot end movement on the same tile as another unit
+            {
+                unit.EndMovement();
+            }
+            
+            foreach (var enemyUnit in unitsBecameVisible)
+            {
+                _map.FlashEffect(enemyUnit.Cell, Color.red);
+            }
+        }
     }
 
     private void UpdateUIButtons()

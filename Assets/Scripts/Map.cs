@@ -135,13 +135,13 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         activeLines.ForEach(l => Destroy(l.gameObject));
         activeLines.Clear();
     }
-    public void FlashEffect(Vector3Int mapPos)
+    public void FlashEffect(Vector3Int mapPos, Color color)
     {
         var selectionFlash = new Gradient(){
                 colorKeys = new[]
                 {
-                    new GradientColorKey(Color.cyan, 0.0f),
-                    new GradientColorKey(Color.cyan, 1.0f),
+                    new GradientColorKey(color, 0.0f),
+                    new GradientColorKey(color, 1.0f),
                 },
                 alphaKeys = new[]
                 {
@@ -152,8 +152,8 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         var selectionSlow = new Gradient(){
             colorKeys = new[]
             {
-                new GradientColorKey(Color.cyan, 0.0f),
-                new GradientColorKey(Color.cyan, 1.0f),
+                new GradientColorKey(color, 0.0f),
+                new GradientColorKey(color, 1.0f),
             },
             alphaKeys = new[]
             {
@@ -564,6 +564,12 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return unitMap[x][y] != null;
     }
     
+    public bool IsFriendlyUnitOn(Unit unit, Vector3Int mapPos)
+    {
+        if (!IsUnitOn(mapPos)) return false;
+        var unitAtPos = GetUnitAt(mapPos);
+        return unitAtPos.Faction == unit.Faction;
+    }
     public bool AddUnit(Unit unit, Vector3Int mapPos, bool doorsAreBlocking = true)
     {
         if (!CanBePlaced(unit, mapPos, doorsAreBlocking)) return false;
@@ -1130,6 +1136,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
 
         return mapOne == mapTwo;
     }
+
 }
 
 public enum MapInfo

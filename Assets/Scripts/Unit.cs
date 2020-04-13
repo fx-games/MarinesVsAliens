@@ -33,7 +33,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     private RuleUnit unitRules;
 
     private Map _map;
-    private int currentPathIndex;
+    private int visualPathIndex;
     private List<Vector3Int> currentPath;
     private SpriteRenderer spriteRenderer;
     private SpriteRenderer markerRenderer;
@@ -67,7 +67,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public bool CanAct => CanAttack || MovesLeft > 0;
     public RuleUnit Rules => unitRules;
     public List<Vector3Int> OccupiedTiles { get; set; }
-    public List<IPlayerUnit> VisibleEnemies => _visibleEnemies.Value;
+    public HashSet<IPlayerUnit> VisibleEnemies => _visibleEnemies;
     public HashSet<Vector3Int> FieldOfView => _fieldOfView;
     public List<Vector3Int> ReachablePositions => _reachablePositions.Value.Where(p => !_map.IsUnitOn(p)).ToList();
     public HashSet<Vector3Int> ValidTargets => _validTargets.Value;
@@ -75,9 +75,10 @@ public class Unit : MonoBehaviour, IPlayerUnit
     private Pathfinder pathfinder;
     private Lazy<List<Vector3Int>> _reachablePositions;
     private Lazy<HashSet<Vector3Int>> _validTargets;
-    private Lazy<List<IPlayerUnit>> _visibleEnemies;
+    private HashSet<IPlayerUnit> _visibleEnemies = new HashSet<IPlayerUnit>();
     private HashSet<Vector3Int> _fieldOfView;
     private LineRenderer healthBar;
+    private int currentMapPathIndex = -1;
     public event UnitEvent FinishedMoving;
     public event UnitEvent StepCompleted;
     // Start is called before the first frame update
@@ -97,6 +98,8 @@ public class Unit : MonoBehaviour, IPlayerUnit
         get => healthBar.enabled;
         set => healthBar.enabled = value;
     }
+
+    
 
     // Update is called once per frame
     private void Update()
@@ -158,28 +161,67 @@ public class Unit : MonoBehaviour, IPlayerUnit
         }
     }    
     private void NextMove()
-    {   
-        if (currentPathIndex < currentPath.Count)
+    {
+        if (visualPathIndex + 1 < currentPath.Count)
         {
-            Vector3Int lastPos = _map.WorldToCell(transform.position);
-            Vector3Int nextPos = currentPath[currentPathIndex];
+            Vector3Int currVisPos = currentPath[visualPathIndex];
+            Vector3Int nextVisPos = currentPath[visualPathIndex + 1];
+            Vector3Int currMapPos = currVisPos;
+
+            if (currentMapPathIndex > -1 && currentMapPathIndex < currentPath.Count)
+            {
+                currMapPos = currentPath[currentMapPathIndex];
+            }
+                
+            if (_map.IsFriendlyUnitOn(this, nextVisPos)) // we could walk through friendly units
+            {
+                // store the index were we could not go on.. but only once
+                if (currentMapPathIndex == -1)
+                {
+                    currentMapPathIndex = visualPathIndex;
+                }
+            }
+            else // normal walkable tile
+            {
+                // WE MOVE THE UNIT ON THE MAP HERE
+                if (!_map.MoveUnit(this, currMapPos, nextVisPos))
+                {
+                    // should only trigger on mutual surprise later on
+                    EndMovement();
+                    return;
+                }
+                else // we were able to move on, reset the map index, we are in sync again
+                {
+                    currentMapPathIndex = -1;
+                }
+            }
+            
             State = UnitState.Moving;
             lastMoveTime = Time.time;
-            RepositionUnitInWorld(nextPos);
-            UpdateDirection(lastPos, nextPos);
-            OnStepCompleted(lastPos);
-            currentPathIndex++;
+
+            MovesLeft--;
+            
+            // WE VISUALLY MOVE THE UNIT HERE
+            RepositionUnitInWorld(nextVisPos);
+            UpdateDirection(currVisPos, nextVisPos);
+            OnStepCompleted(currVisPos);
+            visualPathIndex++;
         }
         else
         {
-            State = UnitState.Idle;
-            currentPathIndex = -1;
-            currentPath = null;
-
-            UpdateReachablePositions();
-            UpdateValidAttackTargets();
-            OnFinishedMoving();
+            EndMovement();
         }
+    }
+
+    public void EndMovement()
+    {
+        State = UnitState.Idle;
+        visualPathIndex = 0;
+        currentPath = null;
+
+        UpdateReachablePositions();
+        UpdateValidAttackTargets();
+        OnFinishedMoving();
     }
 
     private void UpdateHealthBar()
@@ -255,16 +297,10 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public void Move(List<Vector3Int> path)
     {
         if (State == UnitState.Moving) return;
-        var oldMapPos = _map.WorldToCell(transform.position);
 
-        // TELEPORT INSTANTLY TO THE END OF THE PATH ON THE MAP - BECAUSE OF PATHFINDING OF OTHER UNITS
-        if (!_map.MoveUnit(this, oldMapPos, path.Last())) return;
-        
-        path.Remove(oldMapPos); // remove own position from path
-        currentPathIndex = 0;
+        visualPathIndex = 0;
         currentPath = path;
         State = UnitState.Moving;
-        MovesLeft -= path.Count;
 
         UpdateMarker();
     }
@@ -345,9 +381,10 @@ public class Unit : MonoBehaviour, IPlayerUnit
         UpdateReachablePositions();
     }
 
-    public void SetVisible(bool isVisible)
+    public bool IsVisible
     {
-        spriteRenderer.enabled = isVisible;
+        get => spriteRenderer.enabled;
+        set => spriteRenderer.enabled = value;
     }
     
     public void Mark(bool asTarget = false)
@@ -422,16 +459,6 @@ public class Unit : MonoBehaviour, IPlayerUnit
         }
     }
 
-    public int GetDefense(bool isMelee)
-    {
-        if (isMelee)
-        {
-            return HasMeleeWeapon ? MeleeWeapon.RollDamage().Sum() : 0;
-        }
-
-        return CurrentArmor;
-    }
-
     public int DamageReceived(Unit source, Weapon weaponUsed, int damage)
     {
         //Debug.Log(name + " received " + damage + " damage");
@@ -480,11 +507,11 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     public HashSet<Vector3Int> GetValidAttackTargetsAt(Vector3Int mapPos)
     {
-        int maxDistance = 20;
         HashSet<Vector3Int> validTargets = new HashSet<Vector3Int>();
         if (HasRangedWeapon)
         {
-            var weaponRules = RangedWeapon.Rules;
+            var weaponRules = RangedWeapon.Rules;            
+            var maxDistance = weaponRules.EffectiveRange;
             if (weaponRules.StraightLineOnly)
             {
                 validTargets.UnionWith(_map.GetStraightLine(mapPos, Direction.North, maxDistance));
@@ -530,14 +557,15 @@ public class Unit : MonoBehaviour, IPlayerUnit
         return validTargets;
     }
     
-    public void UpdateFoV(bool removeFogVisually, bool removeFogMechanically)
+    public HashSet<IPlayerUnit> UpdateFoV(bool removeFogVisually, bool removeFogMechanically)
     {
+        var previouslyVisibleEnemies = _visibleEnemies;
         _fieldOfView = CreateFieldOfView(removeFogVisually, removeFogMechanically);
-        _visibleEnemies = new Lazy<List<IPlayerUnit>>(() =>
-            {
-                return FieldOfView.Where(pos => _map.IsOtherFactionOn(Faction, pos)).Select(pos => _map.GetUnitAt(pos))
-                    .ToList();
-            });
+        _visibleEnemies = new HashSet<IPlayerUnit>(FieldOfView.Where(pos => _map.IsOtherFactionOn(Faction, pos)).Select(pos => _map.GetUnitAt(pos)));
+
+        var becameVisible = new HashSet<IPlayerUnit>(_visibleEnemies);
+        becameVisible.ExceptWith(previouslyVisibleEnemies);
+        return becameVisible;
     }
 
     private HashSet<Vector3Int> CreateFieldOfView(bool removeFogVisually, bool removeFogMechanically)
@@ -618,30 +646,6 @@ public class Weapon
 
     public RuleWeapon Rules => weaponRules;
 
-    public int[] RollDamage()
-    {
-        int[] results = new int[weaponRules.Damage.Count];
-        int diceCount = 0;
-        foreach (var damageRoll in weaponRules.Damage)
-        {
-            if (damageRoll.Length == 1)
-            {
-                results[diceCount] = damageRoll[0];
-            }
-            else if (damageRoll.Length == 2)
-            {
-                results[diceCount] = Random.Range(damageRoll[0], damageRoll[1] + 1);
-            }
-            else if (damageRoll.Length > 2)
-            {
-                results[diceCount] = damageRoll[Random.Range(0, damageRoll.Length)];
-            }
-
-            diceCount++;
-        }
-
-        return results;
-    }
     public override string ToString()
     {
         return mod.Tr(weaponRules.Type);

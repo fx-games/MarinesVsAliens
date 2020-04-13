@@ -174,11 +174,18 @@ weapons:
       - [1,2,3,0,0,0]
     isMelee: true
   - type: STR_RIFLE
+    range: 10
+    dropOff: 5
     weaponSprite: Rifle
     damage:
       - [1,2,0,0,0,0]
       - [1,2,0,0,0,0]
   - type: STR_ANDROID_RIFLE
+    maxRange: 20
+    maxDropOff: 10
+    minRange: 6
+    minDropOff: 10
+    accuracyModifier: 10
     weaponSprite: Rifle
     damage:
       - [1,2,0,0,0,0]

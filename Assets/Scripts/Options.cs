@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 namespace DefaultNamespace
 {
@@ -11,7 +12,7 @@ namespace DefaultNamespace
         public static bool AllowDiagonalMovement { get; set; } = true;
         public static bool AllowDiagonalAdjacentAttacks { get; set; } = false;
 
-        public static ICombatMechanics CombatMechanics { get; set; } = new DiceBasedCombat();
+        public static ICombatMechanics CombatMechanics { get; set; } = new PercentageBasedCombat();
 
         public static bool Debug { get; set; } = false;
     }
@@ -19,7 +20,7 @@ namespace DefaultNamespace
     public interface ICombatMechanics
     {
         string AttackPreviewInformationFor(Unit attackingUnit, Unit targetUnit);
-        int[] AttackValues(bool isMelee, Unit attackingUnit, Vector3Int targetedPos);
+        int[] AttackValues(Unit attackingUnit, Vector3Int targetedPos, bool isMelee);
         int ResolveAttack(int[] attackValues, Vector3Int unitPos, Unit attackingUnit, Vector3Int targetedPos, Vector3Int aoePos,
             Unit hitUnit);
     }
@@ -57,9 +58,9 @@ namespace DefaultNamespace
             }
         }
 
-        public int[] AttackValues(bool isMelee, Unit attackingUnit, Vector3Int targetedPos)
+        public int[] AttackValues(Unit attackingUnit, Vector3Int targetedPos, bool isMelee)
         {
-            return isMelee ? attackingUnit.MeleeWeapon.RollDamage() : attackingUnit.RangedWeapon.RollDamage();
+            return isMelee ? RollDamage(attackingUnit.MeleeWeapon.Rules) : RollDamage(attackingUnit.RangedWeapon.Rules);
         }
         
         public int ResolveAttack(int[] attackerDice, Vector3Int attackerPos, Unit attackingUnit, Vector3Int targetPos,
@@ -98,7 +99,7 @@ namespace DefaultNamespace
             int defenderScore = -1;
             if (attackerScore > 0)
             {
-                defenderScore = target.GetDefense(isMelee);
+                defenderScore = GetDefense(target, isMelee);
                 //Debug.Log("Defense: " + defenderScore);
                 LastMeleeDefense = defenderScore;
                 //target.AttackedWith(attack, isMelee);
@@ -126,6 +127,40 @@ namespace DefaultNamespace
             return damageLeft;
         }
 
+        private int GetDefense(Unit target, bool isMelee)
+        {
+            if (isMelee)
+            {
+                return target.HasMeleeWeapon ? RollDamage(target.MeleeWeapon.Rules).Sum() : 0;
+            }
+
+            return target.CurrentArmor;
+        }
+
+        private int[] RollDamage(Mod.RuleWeapon weaponRules)
+        {
+            int[] results = new int[weaponRules.Damage.Count];
+            int diceCount = 0;
+            foreach (var damageRoll in weaponRules.Damage)
+            {
+                if (damageRoll.Length == 1)
+                {
+                    results[diceCount] = damageRoll[0];
+                }
+                else if (damageRoll.Length == 2)
+                {
+                    results[diceCount] = Random.Range(damageRoll[0], damageRoll[1] + 1);
+                }
+                else if (damageRoll.Length > 2)
+                {
+                    results[diceCount] = damageRoll[Random.Range(0, damageRoll.Length)];
+                }
+
+                diceCount++;
+            }
+
+            return results;
+        }
         public int LastMeleeDefense { get; private set; }
     }
 
@@ -134,28 +169,118 @@ namespace DefaultNamespace
 
         public string AttackPreviewInformationFor(Unit attackingUnit, Unit targetUnit)
         {
-            int chanceToHit = CalculateChanceToHit(attackingUnit, targetUnit);
-            return chanceToHit.ToString();
+            int chanceToHit = CalculateChanceToHit(attackingUnit, targetUnit, attackingUnit.IsNextTo(targetUnit));
+            return chanceToHit == -1 ? "" : chanceToHit.ToString();
         }
 
-        public int[] AttackValues(bool isMelee, Unit attackingUnit, Vector3Int targetedPos)
+        public int[] AttackValues(Unit attackingUnit, Vector3Int targetedPos, bool isMelee)
         {
-            throw new NotImplementedException();
+            return new[] { Random.Range(0,100)}; // 0-99
         }
 
         public int ResolveAttack(int[] attackValues, Vector3Int unitPos, Unit attackingUnit, Vector3Int targetedPos, Vector3Int aoePos, Unit hitUnit)
         {
-            throw new NotImplementedException();
+            int randomAttackValue = attackValues[0];
+            var isAoEPosition = targetedPos != aoePos;
+            var isMelee = attackingUnit.IsNextTo(hitUnit);
+
+            var weapon = attackingUnit.RangedWeapon;
+            if (isMelee)
+            {
+                weapon = attackingUnit.MeleeWeapon;
+            }
+            var isExplosion = weapon.Rules.Radius > 0;
+            
+            int chanceToHit = CalculateChanceToHit(attackingUnit, hitUnit, isMelee);
+            if (randomAttackValue < chanceToHit || (isExplosion && isAoEPosition))
+            {
+                // HIT
+                var damage = RollDamage(weapon.Rules)[0];
+                
+                damage -= hitUnit.CurrentArmor;
+                if (damage > 0)
+                {
+                    return hitUnit.DamageReceived(attackingUnit, weapon, damage);
+                }
+            }
+            else
+            {
+                // MISS
+            }
+
+            return -1;
         }
 
-        private int CalculateChanceToHit(Unit attackingUnit, Unit targetUnit)
+        private int[] RollDamage(Mod.RuleWeapon weaponRules)
         {
-            int baseAccuracy = 70;
+            int[] results = new int[weaponRules.Damage.Count];
+            int diceCount = 0;
+            foreach (var damageRoll in weaponRules.Damage)
+            {
+                if (damageRoll.Length == 1)
+                {
+                    results[diceCount] = damageRoll[0];
+                }
+                else if (damageRoll.Length == 2)
+                {
+                    results[diceCount] = Random.Range(damageRoll[0], damageRoll[1] + 1);
+                }
+                else if (damageRoll.Length > 2)
+                {
+                    results[diceCount] = damageRoll[Random.Range(0, damageRoll.Length)];
+                }
+
+                diceCount++;
+            }
+
+            return results;
+        }
+
+
+        // should return an integer between 0 and 100
+        private int CalculateChanceToHit(Unit attackingUnit, Unit targetUnit, bool isMelee)
+        {
+            float baseAccuracy = attackingUnit.Rules.Accuracy;
+            var weapon = isMelee ? attackingUnit.MeleeWeapon : attackingUnit.RangedWeapon;
+
+            if (weapon == null) return -1;
+            
+            float weaponModifier = weapon.Rules.AccuracyModifier;
+
+            float modifiedAccuracy = baseAccuracy + weaponModifier;
+            
             float distance = (attackingUnit.Cell - targetUnit.Cell).magnitude;
 
-            int accuracy = (int) Math.Max(baseAccuracy - (distance * 7.5f), 0);
+            float delta;
+            float penalty = 0;
+            if (distance < weapon.Rules.MinRange)
+            {
+                delta = weapon.Rules.MinRange - distance;
+                penalty = delta * weapon.Rules.MinDropOff;
+            }
+            if (distance > weapon.Rules.MaxRange)
+            {
+                delta = distance - weapon.Rules.MaxRange;
+                penalty = delta * weapon.Rules.MaxDropOff;
+            }
 
-            return accuracy;
+            if (distance > weapon.Rules.EffectiveRange)
+            {
+                penalty = modifiedAccuracy;
+            }
+
+            float distanceModifiedAccuracy = modifiedAccuracy - penalty;
+
+            if (distanceModifiedAccuracy < 0.0f)
+            {
+                distanceModifiedAccuracy = 0.0f;
+            }
+            else if (distanceModifiedAccuracy > 100.0f)
+            {
+                distanceModifiedAccuracy = 100.0f;
+            }
+            
+            return (int)distanceModifiedAccuracy;
         }
 
     }

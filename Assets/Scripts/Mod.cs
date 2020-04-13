@@ -93,6 +93,8 @@ public class Mod : MonoBehaviour
         [DefaultValue(6)] public int Movement { get; set; } = 6;
         [DefaultValue(1)] public int Health { get; set; } = 1;
         [DefaultValue(0)] public int Armor { get; set; } = 0;
+        public int Accuracy { get; set; } = 50;
+        public int Defense { get; set; } = 0;
         public List<int[]> OccupiedTiles { get; set; } = new List<int[]> {new []{0,0}};
         public bool CanMoveDiagonally { get; set; } = true;
         public string UnitSprite { get; set; } = "";
@@ -102,6 +104,12 @@ public class Mod : MonoBehaviour
     {
         public string Type { get; set; }
         public List<int[]> Damage { get; set; }
+        public int MinRange { get; set; } = 0;
+        public int MaxRange { get; set; } = 20;
+        public int MinDropOff { get; set; } = 5;
+        public int MaxDropOff { get; set; } = 5;
+        public int EffectiveRange { get; set; } = 40;
+        public int AccuracyModifier { get; set; } = 0;
         [DefaultValue(0)] public int Radius { get; set; } = 0;
         [DefaultValue(false)] public bool IsMelee { get; set; } = false;
         [DefaultValue(false)] public bool StraightLineOnly { get; set; } = false;
@@ -109,6 +117,7 @@ public class Mod : MonoBehaviour
         [DefaultValue(false)] public bool DamageDistribution { get; set; } = false;
         public bool MultipleTargets { get; set; } = false;
         public string WeaponSprite { get; set; } = "";
+        
     }
     private Dictionary<string, RuleFaction> factionRules = new Dictionary<string, RuleFaction>();
     private Dictionary<string, RuleUnit> unitRules = new Dictionary<string, RuleUnit>();
@@ -196,7 +205,7 @@ public class Mod : MonoBehaviour
     }
     private void ReadRules()
     {
-        var unitsFile = Path.Combine(Application.streamingAssetsPath, "core.rul");
+        var unitsFile = Path.Combine(Application.streamingAssetsPath, "percent.rul");
         ReadTextFile(unitsFile);
     }
 
