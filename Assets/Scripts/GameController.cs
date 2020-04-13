@@ -10,6 +10,6 @@ namespace DefaultNamespace
             WatchAI
         }
 
-        public static GameMode ChosenMode { get; set; } = GameMode.None;
+        public static GameMode ChosenMode { get; set; } = GameMode.HotSeat;
     }
 }

@@ -131,69 +131,6 @@ namespace AI
             }
             
         }
-
-        private IEnumerator GetScoreMap(Unit unit, List<Vector3Int> reachableMapPositions, Unit targetEnemy, Action<Dictionary<Vector3Int, int>> callback)
-        {
-            var scoreMap = new Dictionary<Vector3Int, int>();
-            foreach (var reachableMapPosition in reachableMapPositions)
-            {
-                int posScore = AssignScore(unit, reachableMapPosition, targetEnemy);
-                scoreMap[reachableMapPosition] = posScore;
-                yield return null;
-            }
-            callback(scoreMap);
-            yield break;
-        }
-
-        private int AssignScore(Unit unit, Vector3Int reachableMapPosition, Unit targetEnemy)
-        {
-            int positionScore = 0;
-
-            int visibleEnemies = unit.VisibleEnemiesFrom(reachableMapPosition).Count;
-            
-            var isAttackPos = false;
-            
-            if (unit.HasRangedWeapon)
-            {
-                isAttackPos = map.IsLineOfFireBetween(reachableMapPosition, targetEnemy.Cell);
-            }
-            else if (unit.HasMeleeWeapon)
-            {
-                isAttackPos = map.AreNeighbors(reachableMapPosition, targetEnemy.Cell);
-            }
-            
-            if (isAttackPos)
-                positionScore += 100;
-
-            if (visibleEnemies == 1)
-            {
-                positionScore += 100;
-            }
-            else if (visibleEnemies > 1)
-            {
-                positionScore += 10 - (visibleEnemies * 2);
-            }
-            else if (visibleEnemies == 0 && !isAttackPos)
-            {
-                var cellsNextToEnemy = map.GetAllNeighborsForUnit(unit, targetEnemy.Cell);
-                var freeCells = cellsNextToEnemy.Where(p => map.CanBePlaced(unit, p, false, false)).ToList();
-                if (freeCells.Any())
-                {
-                    var targetPos = freeCells.First();
-                    var shortestPath = unit.GetShortestPath(reachableMapPosition, targetPos);
-                    if (shortestPath.Count > 0)
-                    {
-                        positionScore += 20 - shortestPath.Count;
-                    }
-                }
-            }
-            
-            //map.SetTextAt(reachableMapPosition, visibleEnemies + (isAttackPos ? "F" : ""));
-            var dbgInfo = positionScore == 0 ? "_" : positionScore.ToString();
-            if (Options.Debug) map.SetTextAt(reachableMapPosition, dbgInfo);            
-            return positionScore;
-        }
-
         private Vector3Int FindExplorationTarget(MapTileInfo[,] mapKnowledge)
         {
             foreach (var mapPos in map.AllPositions)

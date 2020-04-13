@@ -187,16 +187,14 @@ MonoBehaviour:
   - {fileID: 11400000, guid: ace5116d39a4740dd90b345f8539f127, type: 2}
   doors:
   - {fileID: 11400000, guid: 95fd55758655e48989c48ab4d4901748, type: 2}
-  spawnFloorMarkerTiles:
-  - {fileID: 11400000, guid: bd296a95b30b7425983c2ec18e429f63, type: 2}
-  - {fileID: 11400000, guid: 661fa98a002a24cd3a1e87afc8c2cd06, type: 2}
-  - {fileID: 11400000, guid: 85d1ad0d052cc4224994095a79c21ff1, type: 2}
-  - {fileID: 11400000, guid: 2761cb4ca438e4f90a51615ff12b6f1f, type: 2}
   blanktilePrefab: {fileID: 3202311177981434715, guid: 2d339a0b1eb8141b3baa5266c83ddf08,
     type: 3}
+  glowtile: {fileID: 0}
   cellLabelPrefab: {fileID: 4860974059615001587, guid: 4e4b815aad9d347d69c6d2dae5a0bd75,
     type: 3}
-  worldCanvas: {fileID: 0}
+  spawnFloorMarkerTiles: []
+  linePrefab: {fileID: 6013640105871712037, guid: a7f6b603354c54693b3fdd6a0dbdc99e,
+    type: 3}
 --- !u!1 &7611691132727075929
 GameObject:
   m_ObjectHideFlags: 0

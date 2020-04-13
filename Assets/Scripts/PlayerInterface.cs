@@ -34,7 +34,7 @@ namespace DefaultNamespace
         bool IsInFogMechanically(Vector3Int mapPos);
         bool IsWallAt(Vector3Int mapPos);
         bool IsOtherFactionOn(Mod.RuleFaction faction, Vector3Int mapPos);
-        bool IsLineOfFireBetween(Vector3Int source, Vector3Int target);
+        bool IsLineOfFireBetween(Unit attacker, Vector3Int source, Vector3Int target);
         bool IsLineOfSightBetween(Vector3Int source, Vector3Int target);
         string GetPosDebugInfo(Vector3Int pos);
         void SetTextAt(Vector3Int mapPos, string text);

@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Linq;
 using C5;
-using GridPathFinder.Map;
+using Default;
 using UnityEngine;
 
 namespace GridPathFinder

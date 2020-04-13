@@ -5,7 +5,6 @@ using UnityEngine;
 public class UnitAnimator : MonoBehaviour
 {
     public Sprite[] frames;
-    public bool DestroyOnFinish = true;
     private int currentFrame = 0;
     private int frameCount;
     private float delay = 0.5f;

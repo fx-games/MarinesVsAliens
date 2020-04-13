@@ -3,17 +3,14 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Security.Cryptography;
+using Default;
 using DefaultNamespace;
-using GridPathFinder.Map;
 using UnityEngine;
-using UnityEngine.Serialization;
 using UnityEngine.Tilemaps;
 using UnityEngine.UI;
-using UnityEngine.Video;
 using static Map;
 using static Mod;
 using Color = UnityEngine.Color;
-using Object = UnityEngine.Object;
 using Random = UnityEngine.Random;
 
 public interface IMapGenerator
@@ -78,6 +75,9 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     public Tile[] spawnFloorMarkerTiles;
     private CellParticleSystem cellParticleSystem;
     private Dictionary<Color, Tile> glowTiles = new Dictionary<Color, Tile>();
+    private List<LineRenderer> activeLines = new List<LineRenderer>();
+    public GameObject linePrefab;
+    private Raycaster raycaster;
 
     // Start is called before the first frame update
     void Awake()
@@ -114,22 +114,117 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             throw new Exception("Game needs camera.");
         }
         cellParticleSystem = new CellParticleSystem(this);
+        raycaster = new Raycaster(this);
+    }
+
+    public void DrawLine(Vector3Int start, Vector3Int end, Color color)
+    {
+        var line = Instantiate(linePrefab, CellToWorld(start), Quaternion.identity).GetComponent<LineRenderer>();
+        line.SetPositions(new[]
+        {
+            CellToWorld(start),
+            CellToWorld(end)
+        });
+        line.startColor = color;
+        line.endColor = color;
+        activeLines.Add(line);
+    }
+
+    public void RemoveAllLines()
+    {
+        activeLines.ForEach(l => Destroy(l.gameObject));
+        activeLines.Clear();
+    }
+    public void FlashEffect(Vector3Int mapPos)
+    {
+        var selectionFlash = new Gradient(){
+                colorKeys = new[]
+                {
+                    new GradientColorKey(Color.cyan, 0.0f),
+                    new GradientColorKey(Color.cyan, 1.0f),
+                },
+                alphaKeys = new[]
+                {
+                    new GradientAlphaKey(0.2f, 0.0f), 
+                    new GradientAlphaKey(1.0f, 1.0f), 
+                }};
+        
+        var selectionSlow = new Gradient(){
+            colorKeys = new[]
+            {
+                new GradientColorKey(Color.cyan, 0.0f),
+                new GradientColorKey(Color.cyan, 1.0f),
+            },
+            alphaKeys = new[]
+            {
+                new GradientAlphaKey(0.0f, 0.0f),
+                new GradientAlphaKey(0.7f, 0.0f),
+                new GradientAlphaKey(1.0f, 1.0f), 
+            }};
+        
+        //CreateParticleEffect(CurrentCursorPosition);
+        var mouseInWorld = CellToWorld(mapPos);
+        
+        cellParticleSystem.AddParticle(new WorldParticleBase(this)
+        {
+            Lifetime = 0.5f,
+            Gradient = selectionSlow,
+            Position = mouseInWorld
+        });
+        
+        cellParticleSystem.AddParticle(new LineParticle(this)
+        {
+            Lifetime = 20,
+            Speed = 35,
+            Gradient = selectionFlash,
+            Direction = Vector3.down,
+            Length = 5,
+            EndLength = 1,
+            Position = mouseInWorld + Vector3.down * 10,
+            EndPosition = mouseInWorld,
+        });
+        cellParticleSystem.AddParticle(new LineParticle(this)
+        {
+            Lifetime = 20,
+            Speed = 35,
+            Gradient = selectionFlash,
+            Direction = Vector3.up,
+            Length = 5,
+            EndLength = 1,
+            Position = mouseInWorld + Vector3.up * 10,
+            EndPosition = mouseInWorld,
+        });
+        cellParticleSystem.AddParticle(new LineParticle(this)
+        {
+            Lifetime = 20,
+            Speed = 35,
+            Gradient = selectionFlash,
+            Direction = Vector3.left,
+            Length = 5,
+            EndLength = 1,
+            Position = mouseInWorld + Vector3.left * 10,
+            EndPosition = mouseInWorld,
+        });
+        cellParticleSystem.AddParticle(new LineParticle(this)
+        {
+            Lifetime = 20,
+            Speed = 35,
+            Gradient = selectionFlash,
+            Direction = Vector3.right,
+            Length = 5,
+            EndLength = 1,
+            Position = mouseInWorld + Vector3.right * 10,
+            EndPosition = mouseInWorld,
+        });
     }
     
     
     public void DebugAction()
     {
-        //CreateParticleEffect(CurrentCursorPosition);
-        cellParticleSystem.AddParticle(new CircleParticle()
-        {
-            Position = gameCamera.ScreenToWorldPoint(Input.mousePosition),
-            Velocity = Vector3.zero,
-            Lifetime = 6000,
-            Color = Random.value > 0.5f ? Color.red : Color.green,
-            Radius = 0,
-            DeltaRadius = 0.04f
-        });
+        
     }
+    
+    
 
     public void DebugActionTwo()
     {
@@ -218,9 +313,10 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         
         foreach (var kvp in cellParticleSystem.TileColoring)
         {
-            if (Contains(kvp.Key.x, kvp.Key.y))
+            var mapPos = kvp.Key;
+            if (Contains(mapPos.x, mapPos.y))
             {
-                layerMap["Effects"].SetTile(kvp.Key, GlowtileByColor(kvp.Value));
+                layerMap["Effects"].SetTile(mapPos, GlowtileByColor(kvp.Value));
             }
         }
     }
@@ -452,6 +548,11 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     {
         return unitMap[mapPos.x][mapPos.y];
     }
+    
+    public IPlayerUnit GetUnitAt(int x, int y)
+    {
+        return unitMap[x][y];
+    }
 
     public bool IsUnitOn(Vector3Int mapPos)
     {
@@ -629,7 +730,9 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         if (weapon.HasAreaOfEffect)
         {
             // affectedPos may be one of the aoe tiles
-            var hasLos = LineCast(mapPos.x, mapPos.y, affectedPos.x, affectedPos.y);
+            raycaster.ObservingUnit = attacker;
+            raycaster.UnitsAreBlocking = false;
+            var hasLos = raycaster.LineCast(mapPos.x, mapPos.y, affectedPos.x, affectedPos.y);
             return hasLos;
         }
         else
@@ -729,7 +832,16 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         }
         return true;
     }
+    
+    public bool IsOtherUnitOn(Unit unit, int x, int y)
+    {
+        if (!IsUnitOn(x,y))
+        {
+            return false;
+        }
 
+        return GetUnitAt(x,y) != unit;
+    }
     public bool IsOtherUnitOn(Unit unit, Vector3Int mapPos)
     {
         if (!IsUnitOn(mapPos))
@@ -857,8 +969,10 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return linePositions;
     }
 
-    public HashSet<Vector3Int> GetFOV(Vector3Int position, int radius, bool removeFogVisually = true, bool removeFogMechanically = true, bool unitsAreBlocking = false)
+    public HashSet<Vector3Int> GetFOV(Unit unit, Vector3Int position, int radius, bool removeFogVisually = true, bool removeFogMechanically = true, bool unitsAreBlocking = false)
     {
+        raycaster.ObservingUnit = unit;
+        raycaster.UnitsAreBlocking = unitsAreBlocking;
         var fieldOfView = new HashSet<Vector3Int>();
         radius++;
         int i, j;
@@ -868,9 +982,20 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             {
                 if (i * i + j * j < radius * radius)
                 {
-                    if (LineCast(position.x, position.y, position.x + i, position.y + j, removeFogVisually, removeFogMechanically, unitsAreBlocking))
-                    {
-                        fieldOfView.Add(new Vector3Int(position.x + i, position.y + j, 0));
+                    if (raycaster.LineCast(position.x, position.y, position.x + i, position.y + j))
+                    {   
+                        var checkedMapPos = new Vector3Int(position.x + i, position.y + j, 0);
+                        if (removeFogVisually)
+                        {
+                            RemoveFogVisually(checkedMapPos.x, checkedMapPos.y);
+                        }
+
+                        if (removeFogMechanically)
+                        {
+                            RemoveFogMechanically(checkedMapPos.x, checkedMapPos.y);
+                        }
+
+                        fieldOfView.Add(checkedMapPos);
                     }
                 }
             }
@@ -878,85 +1003,23 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return fieldOfView;
     }
 
-    public bool IsLineOfFireBetween(Vector3Int source, Vector3Int target)
+    public bool IsLineOfFireBetween(Unit attacker, Vector3Int source, Vector3Int target)
     {
         if (!Options.AllowDiagonalAdjacentAttacks && AreDiagonalNeighbors(source, target))
         {
             return false;
         }
-        return LineCast(source.x, source.y, target.x, target.y, false, true);
+
+        raycaster.ObservingUnit = attacker;
+        raycaster.UnitsAreBlocking = true;
+        return raycaster.LineCast(source.x, source.y, target.x, target.y);
     }
     
     public bool IsLineOfSightBetween(Vector3Int source, Vector3Int target)
     {
-        return LineCast(source.x, source.y, target.x, target.y);
-    }
-    
-    private bool LineCast(int x0, int y0, int x1, int y1, bool removeFogVisually = false, bool removeFogMechanically = false, bool unitsAreBlocking = false)
-    {
-        int sx, sy, xnext, ynext, dx, dy, prevX, prevY;
-        float dist;
-
-        dx = x1 - x0;
-        dy = y1 - y0;
-
-        //determine which quadrant to we're calculating: we climb in these two directions
-        sx = (x0 < x1) ? 1 : -1;
-        sy = (y0 < y1) ? 1 : -1;
-
-        xnext = prevX = x0;
-        ynext = prevY = y0;
-    
-        //calculate length of line to cast (distance from start to final tile)
-        dist = Mathf.Sqrt(dx * dx + dy * dy);
-
-        while (xnext != x1 || ynext != y1) //essentially casting a ray of length radius: (radius^3)
-        {
-            if (!IsNeighborVisible(prevX, prevY, xnext, ynext))
-            {
-                //tag_memorised(xnext, ynext); // make a note of the wall
-                return false;
-            }
-            
-            if (unitsAreBlocking && !(xnext == x0 && ynext == y0) && IsUnitOn(xnext, ynext))
-            {
-                return false;
-            }
-            
-            prevX = xnext;
-            prevY = ynext;
-            // Line-to-point distance formula < 0.5 
-            // decide on the direction for the next step; horiz, verti, diag
-            if (Mathf.Abs(dy * (xnext - x0 + sx) - dx * (ynext - y0)) / dist < 0.5f)
-            {
-                xnext += sx;
-            }
-            else if (Mathf.Abs(dy * (xnext - x0) - dx * (ynext - y0 + sy)) / dist < 0.5f)
-            {
-                ynext += sy;
-            }
-            else
-            {
-                xnext += sx;
-                ynext += sy;
-            }
-        }
-        if (!IsNeighborVisible(prevX, prevY,xnext, ynext))
-        {
-            //tag_memorised(xnext, ynext); // make a note of the wall
-            return false;
-        }
-
-        if (removeFogVisually)
-        {
-            RemoveFogVisually(xnext, ynext);
-        }
-
-        if (removeFogMechanically)
-        {
-            RemoveFogMechanically(xnext, ynext);
-        }
-        return true;
+        raycaster.ObservingUnit = null;
+        raycaster.UnitsAreBlocking = false;
+        return raycaster.LineCast(source.x, source.y, target.x, target.y);
     }
 
     public List<List<Vector3Int>> GetSpawnPoints()
@@ -1048,7 +1111,25 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
 	
 	// Implementing Mid-Point Circle 
 	// Drawing Algorithm 
-	
+
+    public bool AreWorldPositionsOnSameTile(Vector3 positionOne, Vector3 positionTwo)
+    {
+        if (!ContainsWorldPos(positionOne))
+        {
+            return !ContainsWorldPos(positionTwo);
+        }
+
+        if (!ContainsWorldPos(positionTwo))
+        {
+            return !ContainsWorldPos(positionOne);
+        }
+
+        // both inside
+        var mapOne = WorldToCell(positionOne);
+        var mapTwo = WorldToCell(positionTwo);
+
+        return mapOne == mapTwo;
+    }
 }
 
 public enum MapInfo

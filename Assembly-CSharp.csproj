@@ -87,6 +87,7 @@
     <Compile Include="Assets\Scripts\Pathfinder.cs" />
     <Compile Include="Assets\Scripts\PlayerInterface.cs" />
     <Compile Include="Assets\Scripts\RandomSprite.cs" />
+    <Compile Include="Assets\Scripts\Raycaster.cs" />
     <Compile Include="Assets\Scripts\SimpleAnimation.cs" />
     <Compile Include="Assets\Scripts\Unit.cs" />
     <Compile Include="Assets\Scripts\UnitAnimator.cs" />

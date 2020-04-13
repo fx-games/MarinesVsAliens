@@ -77,11 +77,13 @@ public class Unit : MonoBehaviour, IPlayerUnit
     private Lazy<HashSet<Vector3Int>> _validTargets;
     private Lazy<List<IPlayerUnit>> _visibleEnemies;
     private HashSet<Vector3Int> _fieldOfView;
+    private LineRenderer healthBar;
     public event UnitEvent FinishedMoving;
     public event UnitEvent StepCompleted;
     // Start is called before the first frame update
     private void Awake()
     {
+        healthBar = GetComponentInChildren<LineRenderer>();
         gameCamera = Camera.main;
         _map = FindObjectOfType<Map>();
         mod = FindObjectOfType<Mod>();
@@ -90,7 +92,12 @@ public class Unit : MonoBehaviour, IPlayerUnit
         UpdateReachablePositions();
     }
 
-    
+    public bool IsHealthBarVisible
+    {
+        get => healthBar.enabled;
+        set => healthBar.enabled = value;
+    }
+
     // Update is called once per frame
     private void Update()
     {
@@ -173,6 +180,13 @@ public class Unit : MonoBehaviour, IPlayerUnit
             UpdateValidAttackTargets();
             OnFinishedMoving();
         }
+    }
+
+    private void UpdateHealthBar()
+    {
+        var healthInPercent = CurrentHealth / (float)Rules.Health;
+        var leftPoint = healthBar.GetPosition(0);
+        healthBar.SetPosition(1, new Vector3(leftPoint.x + healthInPercent, leftPoint.y, leftPoint.z));
     }
 
 
@@ -423,6 +437,8 @@ public class Unit : MonoBehaviour, IPlayerUnit
         //Debug.Log(name + " received " + damage + " damage");
         var oldHealth = CurrentHealth;
         CurrentHealth -= damage;
+
+        UpdateHealthBar();
         
         if (damage > oldHealth)
         {
@@ -482,7 +498,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
             }
             else
             {
-                validTargets = _map.GetFOV(mapPos, maxDistance, false, false, true);
+                validTargets = _map.GetFOV(this, mapPos, maxDistance, false, false, true);
             }
             
             validTargets.Remove(mapPos);
@@ -526,7 +542,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     private HashSet<Vector3Int> CreateFieldOfView(bool removeFogVisually, bool removeFogMechanically)
     {
-        return _map.GetFOV(Cell, CurrentVisionRange, removeFogVisually, removeFogMechanically);
+        return _map.GetFOV(this, Cell, CurrentVisionRange, removeFogVisually, removeFogMechanically);
     }
 
     public void UpdateReachablePositions()
@@ -575,9 +591,10 @@ public class Unit : MonoBehaviour, IPlayerUnit
         return GetShortestPath(Cell, goalPosition);
     }
 
+    
     public List<IPlayerUnit> VisibleEnemiesFrom(Vector3Int reachableMapPosition)
     {
-        var fov = _map.GetFOV(reachableMapPosition, CurrentVisionRange, false, false);
+        var fov = _map.GetFOV(this, reachableMapPosition, CurrentVisionRange, false, false);
         return fov.Where(pos => _map.IsOtherFactionOn(Faction, pos)).Select(pos => _map.GetUnitAt(pos)).ToList();
     }
 
