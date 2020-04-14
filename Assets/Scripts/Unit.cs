@@ -650,7 +650,16 @@ public class Weapon
     {
         return mod.Tr(weaponRules.Type);
     }
-    
+
+    public int DamageToTile()
+    {
+        return Options.CombatMechanics.ResolveDamageToTile(this);
+    }
+
+    public int AoEDamageToTile()
+    {
+        return DamageToTile();
+    }
 }
 
 public delegate void UnitEvent(object sender, UnitEventArgs args);

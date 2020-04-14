@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
-using System.Security.Cryptography;
 using Default;
 using DefaultNamespace;
 using UnityEngine;
@@ -52,7 +51,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     protected Unit[][] unitMap;
     protected MapInfo[][] calcMap;
     protected bool[][] fogMap;
-    
+    protected int[][] damageMap;
     
     private Camera gameCamera;
     public GameObject blanktilePrefab;
@@ -102,11 +101,13 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         unitMap = new Unit[Width][];
         calcMap = new MapInfo[Width][];
         fogMap = new bool[Width][];
+        damageMap = new int[Width][];
         for (int i = 0; i < Width; i++)
         {
             unitMap[i] = new Unit[Height];
             calcMap[i] = new MapInfo[Height];
             fogMap[i] = new bool[Height];
+            damageMap[i] = new int[Height];
         }
         gameCamera = Camera.main;
         if (gameCamera == null)
@@ -115,6 +116,8 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         }
         cellParticleSystem = new CellParticleSystem(this);
         raycaster = new Raycaster(this);
+
+        ((WallTile) walls[0]).Map = this;
     }
 
     public void DrawLine(Vector3Int start, Vector3Int end, Color color)
@@ -260,11 +263,13 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         unitMap = new Unit[Width][];
         calcMap = new MapInfo[Width][];
         fogMap = new bool[Width][];
+        damageMap = new int[Width][];
         for (int i = 0; i < Width; i++)
         {
             unitMap[i] = new Unit[Height];
             calcMap[i] = new MapInfo[Height];
             fogMap[i] = new bool[Height];
+            damageMap[i] = new int[Height];
         }
         FillLayer("Floors");
         //FillLayer("FogOfWar");
@@ -358,7 +363,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
 
     public bool IsWallAt(Vector3Int pos)
     {
-        return calcMap[pos.x][pos.y] == MapInfo.Wall;
+        return IsWallAt(pos.x, pos.y);
     }
 
     public bool IsFloorAt(int x, int y)
@@ -387,7 +392,37 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         RemoveWallAt(pos); // no walls at door tiles
     }
 
+    // returns true if wall is destroyed and fov update needed
+    public bool AddDamageToTile(Vector3Int mapPos, int damage)
+    {
+        Debug.Log(damage + " damage to " + mapPos);
+        damageMap[mapPos.x][mapPos.y] += damage;
+        if (layerMap["Walls"].HasTile(mapPos))
+        {
+            //layerMap["Walls"].RefreshTile(mapPos);
+            layerMap["Walls"].RefreshAllTiles();
+            if (IsWallAt(mapPos))
+            {
+                var wallTile = layerMap["Walls"].GetTile<WallTile>(mapPos);
+                var hasWallDamagedSprite = wallTile.HasWallDamagedSprite(layerMap["Walls"], mapPos);
+                if (hasWallDamagedSprite)
+                {
+                    calcMap[mapPos.x][mapPos.y] = MapInfo.Floor;
+                    FieldOfViewHasChanged = true;
+                    return true;
+                }
+            }
+        }
 
+        return false;
+    }
+
+    public bool FieldOfViewHasChanged { get; set; }
+
+    public int GetDamageFromTile(int x, int y)
+    {
+        return damageMap[x][y];
+    }
     public void RemoveWallAt(Vector3Int pos)
     {
         calcMap[pos.x][pos.y] = MapInfo.Floor;
@@ -730,15 +765,35 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return IsOtherUnitOn((Unit) unit, mapPos);
     }
 
-    public bool AoEAllowed(Unit attacker, Weapon weapon, Vector3Int mapPos, Vector3Int affectedPos)
+    public void RefreshWalls()
     {
-        if (mapPos == affectedPos) return true;
+        
+    }
+
+    public bool AoEAllowed(Unit attacker, Weapon weapon, Vector3Int mapPos, Vector3Int affectedPos, int[] attackValues)
+    {
+        int damage = attackValues.Sum();
+        if (mapPos == affectedPos)
+        {
+            AddDamageToTile(mapPos, weapon.DamageToTile());
+            return true;
+        }
         if (weapon.HasAreaOfEffect)
         {
             // affectedPos may be one of the aoe tiles
             raycaster.ObservingUnit = attacker;
             raycaster.UnitsAreBlocking = false;
             var hasLos = raycaster.LineCast(mapPos.x, mapPos.y, affectedPos.x, affectedPos.y);
+
+            if (hasLos)
+            {
+                AddDamageToTile(affectedPos,  weapon.AoEDamageToTile());
+            }
+            else
+            {
+                AddDamageToTile(raycaster.FirstObstaclePosition, weapon.AoEDamageToTile());
+            }
+                
             return hasLos;
         }
         else

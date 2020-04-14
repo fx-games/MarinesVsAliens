@@ -11,7 +11,8 @@ namespace DefaultNamespace
         }
         public bool UnitsAreBlocking { get; set; }
         public Unit ObservingUnit { get; set; }
-        
+        public Vector3Int FirstObstaclePosition { get; set; }
+
         private IGridMap map;
 
         public bool LineCast(int x0, int y0, int x1, int y1)
@@ -37,11 +38,13 @@ namespace DefaultNamespace
                 if (!map.IsNeighborVisible(prevX, prevY, xnext, ynext))
                 {
                     //tag_memorised(xnext, ynext); // make a note of the wall
+                    FirstObstaclePosition = new Vector3Int(xnext, ynext, 0);
                     return false;
                 }
                 
                 if (UnitsAreBlocking && !(xnext == x0 && ynext == y0) && map.IsOtherUnitOn(ObservingUnit, xnext, ynext))
                 {
+                    FirstObstaclePosition = new Vector3Int(xnext, ynext, 0);
                     return false;
                 }
                 
@@ -65,7 +68,7 @@ namespace DefaultNamespace
             }
             if (!map.IsNeighborVisible(prevX, prevY,xnext, ynext))
             {
-                //tag_memorised(xnext, ynext); // make a note of the wall
+                FirstObstaclePosition = new Vector3Int(xnext, ynext, 0);
                 return false;
             }
             return true;

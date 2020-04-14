@@ -380,10 +380,11 @@ public class BattleGame : MonoBehaviour, IGame
         
             foreach (var aoePos in areaOfEffect)
             {
-                if (!_map.AoEAllowed(unit, weapon, multiHitPosition, aoePos)) continue;
+                // the following call will add damage to map tiles automatically
+                if (!_map.AoEAllowed(unit, weapon, multiHitPosition, aoePos, attackValues)) continue;
         
                 CreateExplosion(aoePos);
-        
+                
                 if (!_map.IsUnitOn(aoePos)) continue;
         
                 var hitUnit = (Unit)_map.GetUnitAt(aoePos);
@@ -413,6 +414,11 @@ public class BattleGame : MonoBehaviour, IGame
         _map.RemoveAllTileMarker();
         CheckForDeadUnits();
         UpdateUIButtons();
+
+        if (!_map.FieldOfViewHasChanged) return;
+        
+        GlobalFOVUpdate();
+        _map.FieldOfViewHasChanged = false;
     }
 
     private void CheckForDeadUnits()

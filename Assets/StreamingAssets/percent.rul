@@ -125,42 +125,42 @@ units:
     accuracy: 65
     defense: 0
     movement: 4
-    health: 1
-    armor: 2
+    health: 5
+    armor: 0
   - type: STR_SQUAD_LEADER
     accuracy: 70
     defense: 0
     unitSprite: Commander
     movement: 6
     health: 6
-    armor: 2
+    armor: 1
   - type: STR_SPIDER_ALIEN
     accuracy: 60
     defense: 10
     unitSprite: Spider
     movement: 8
-    health: 1
+    health: 3
     armor: 0
   - type: STR_ANDROID_ALIEN
     defense: 10
     accuracy: 60
     unitSprite: Android
     movement: 4
-    health: 1
+    health: 5
     armor: 2
   - type: STR_RIFLE_ALIEN
     defense: 10
     accuracy: 65  
     unitSprite: Rifle
     movement: 6
-    health: 1
+    health: 4
     armor: 1
   - type: STR_BIG_ALIEN
     defense: 20
     accuracy: 70  
     unitSprite: Rocket
     movement: 4
-    health: 3
+    health: 8
     armor: 4
 #    occupiedTiles: [[0,0],[0,1],[1,0],[1,1]]
 #    canMoveDiagonally: false
@@ -168,18 +168,14 @@ units:
 weapons:
   - type: STR_HARD_HITTER
     damage:
-      - [1,2,0,0,0,0]
-      - [1,2,0,0,0,0]
-      - [1,2,3,0,0,0]
-      - [1,2,3,0,0,0]
+      - [6,7]
     isMelee: true
   - type: STR_RIFLE
-    range: 10
-    dropOff: 5
+    minRange: 1
+    maxRange: 8
     weaponSprite: Rifle
     damage:
-      - [1,2,0,0,0,0]
-      - [1,2,0,0,0,0]
+      - [2,4]
   - type: STR_ANDROID_RIFLE
     maxRange: 20
     maxDropOff: 10
@@ -188,41 +184,35 @@ weapons:
     accuracyModifier: 10
     weaponSprite: Rifle
     damage:
-      - [1,2,0,0,0,0]
-      - [1,2,0,0,0,0]
-      - [1,2,0,0,0,0]
+      - [2,5]
   - type: STR_LOW_HITTER
     damage:
-      - [1,2,0,0,0,0]
+      - [1,2]
     isMelee: true
   - type: STR_NORMAL_HITTER
     damage:
-      - [1,2,0,0,0,0]
-      - [1,2,0,0,0,0]
+      - [2,3]
     isMelee: true
   - type: STR_HEAVY_HITTER
     damage:
-      - [1,2,3,0,0,0]
-      - [1,2,3,0,0,0]
+      - [5,6]
     isMelee: true
   - type: STR_ROCKET_LAUNCHER
+    accuracyModifier: -10
     weaponSprite: Rocket
     damage:
-      - [1,2,3,0,0,0]
-      - [1,2,3,0,0,0]
+      - [6]
     radius: 1
   - type: STR_HEAVY_ASSAULT_CANNON
     weaponSprite: Heavy
     damage:
-      - [1,2,3,0,0,0]
-      - [1,2,3,0,0,0]
+      - [3,5]
     multipleTargets: true
     damageDistribution: true
   - type: STR_PLASMA_GUN
     weaponSprite: Heavy
     damage:
-      - [1,2,3,0,0,0]
-      - [1,2,3,0,0,0]
+      - [2,4]
     straightLineOnly: true
     damageLineOfFire: true
 

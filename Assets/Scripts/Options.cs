@@ -23,6 +23,8 @@ namespace DefaultNamespace
         int[] AttackValues(Unit attackingUnit, Vector3Int targetedPos, bool isMelee);
         int ResolveAttack(int[] attackValues, Vector3Int unitPos, Unit attackingUnit, Vector3Int targetedPos, Vector3Int aoePos,
             Unit hitUnit);
+
+        int ResolveDamageToTile(Weapon weapon);
     }
 
     public abstract class CombatBase
@@ -127,6 +129,11 @@ namespace DefaultNamespace
             return damageLeft;
         }
 
+        public int ResolveDamageToTile(Weapon weapon)
+        {
+            return RollDamage(weapon.Rules).Sum();
+        }
+
         private int GetDefense(Unit target, bool isMelee)
         {
             if (isMelee)
@@ -209,6 +216,11 @@ namespace DefaultNamespace
             }
 
             return -1;
+        }
+
+        public int ResolveDamageToTile(Weapon weapon)
+        {
+            return RollDamage(weapon.Rules).Sum();
         }
 
         private int[] RollDamage(Mod.RuleWeapon weaponRules)

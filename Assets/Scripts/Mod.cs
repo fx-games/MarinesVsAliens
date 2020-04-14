@@ -104,7 +104,7 @@ public class Mod : MonoBehaviour
     {
         public string Type { get; set; }
         public List<int[]> Damage { get; set; }
-        public int MinRange { get; set; } = 0;
+        public int MinRange { get; set; } = 1;
         public int MaxRange { get; set; } = 20;
         public int MinDropOff { get; set; } = 5;
         public int MaxDropOff { get; set; } = 5;
