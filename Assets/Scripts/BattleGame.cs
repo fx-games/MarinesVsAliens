@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using DefaultNamespace;
+using DefaultNamespace.Units.UnitActions;
 using GridPathFinder;
 using UnityEngine;
 using UnityEngine.Assertions.Comparers;
@@ -45,7 +46,7 @@ public class BattleGame : MonoBehaviour, IGame
     private CameraControls cameraController;
     private Vector3Int lastCursorLocation;
     private int currentMapIndex;
-    private int currentTurn = 0;
+    public int CurrentTurn { get; private set; } = 0;
     private HashSet<Vector3Int> multipleTargets = new HashSet<Vector3Int>();
     private Dictionary<RuleFaction, AIPlayer> aiPlayers = new Dictionary<RuleFaction, AIPlayer>();
     private double lastAiCommandTime;
@@ -102,6 +103,12 @@ public class BattleGame : MonoBehaviour, IGame
 
     public void AfterMapLoad()
     {
+        UnitActionFactory.Map = _map;
+        UnitActionFactory.Game = this;
+
+        WorldEffectFactory.Map = _map;
+        WorldEffectFactory.Game = this;
+        
         if (GameController.ChosenMode == GameController.GameMode.AgainstAI)
         {
             singlePlayerFaction = CurrentFaction;
@@ -509,26 +516,18 @@ public class BattleGame : MonoBehaviour, IGame
         Debug.Log("SelectedUnit: " + selectedUnit);
         if (selectedUnit != null)
         {
-            OpenDoor(selectedUnit);
+            var openDoorAction = UnitActionFactory.CreateUnitAction<UnitAction>("OpenDoor", selectedUnit);
+            ExecuteUnitAction(openDoorAction);
         }
     }
 
-    private void OpenDoor(Unit unit)
+    private void ExecuteUnitAction(UnitAction action)
     {
-        Debug.Log("OpenDoor() FIRED: " + unit);
-        foreach (var direction in _map.Cardinal)
+        foreach (var lazyEffect in action.EffectsOnTheWorld)
         {
-            var neighborPos = unit.Cell + direction.ToVector();
-            if (_map.IsDoorAt(neighborPos))
-            {
-                _map.RemoveDoor(unit, neighborPos);
-
-                unit.UpdateFoV(unit.Faction == PoVFaction, unit.Faction == PoVFaction);
-                
-                UpdateVisibleUnits(unit);
-
-                break;
-            }
+            var effect = lazyEffect.Value;
+            effect.Source = action.ActingUnit;
+            effect.Execute();
         }
     }
 
@@ -676,8 +675,8 @@ public class BattleGame : MonoBehaviour, IGame
 
     private void NextTurn()
     {
-        currentTurn++;
-        Debug.Log("Turn :" + currentTurn);
+        CurrentTurn++;
+        Debug.Log("Turn :" + CurrentTurn);
     }
 
     private void CenterCameraOn(Unit unit)
@@ -817,7 +816,7 @@ public class BattleGame : MonoBehaviour, IGame
         }
     }
 
-    private void UpdateVisibleUnits(Unit sourceUnit)
+    public void UpdateVisibleUnits(Unit sourceUnit)
     {
         foreach (var unit in allUnits)
         {
@@ -832,7 +831,8 @@ public class BattleGame : MonoBehaviour, IGame
             unit.IsVisible = shouldBeVisible;
         }
     }
-    private RuleFaction CurrentFaction => factions[phaseFaction];
+
+    public RuleFaction CurrentFaction => factions[phaseFaction];
 
 
     public void SetLabel(string text)

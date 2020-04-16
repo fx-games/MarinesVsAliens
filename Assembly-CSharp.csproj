@@ -71,29 +71,37 @@
     <Compile Include="Assets\Scripts\AI\SubsumptionBehavior.cs" />
     <Compile Include="Assets\Scripts\AI\SubsumptionScheduler.cs" />
     <Compile Include="Assets\Scripts\AIPlayer.cs" />
+    <Compile Include="Assets\Scripts\Algorithms\Pathfinder.cs" />
+    <Compile Include="Assets\Scripts\Algorithms\Raycaster.cs" />
     <Compile Include="Assets\Scripts\BattleGame.cs" />
     <Compile Include="Assets\Scripts\CameraControls.cs" />
-    <Compile Include="Assets\Scripts\CavernGenerator.cs" />
-    <Compile Include="Assets\Scripts\CellParticleSystem.cs" />
-    <Compile Include="Assets\Scripts\DungeonGenerator.cs" />
-    <Compile Include="Assets\Scripts\FloorTile.cs" />
+    <Compile Include="Assets\Scripts\Effects\RandomSprite.cs" />
+    <Compile Include="Assets\Scripts\Effects\SimpleAnimation.cs" />
+    <Compile Include="Assets\Scripts\Effects\UnitAnimator.cs" />
     <Compile Include="Assets\Scripts\GameController.cs" />
-    <Compile Include="Assets\Scripts\IGridMap.cs" />
     <Compile Include="Assets\Scripts\MainMenu.cs" />
-    <Compile Include="Assets\Scripts\Map.cs" />
-    <Compile Include="Assets\Scripts\MapFromScript.cs" />
+    <Compile Include="Assets\Scripts\Maps\CavernGenerator.cs" />
+    <Compile Include="Assets\Scripts\Maps\CellParticleSystem.cs" />
+    <Compile Include="Assets\Scripts\Maps\DungeonGenerator.cs" />
+    <Compile Include="Assets\Scripts\Maps\FloorTile.cs" />
+    <Compile Include="Assets\Scripts\Maps\IGridMap.cs" />
+    <Compile Include="Assets\Scripts\Maps\Map.cs" />
+    <Compile Include="Assets\Scripts\Maps\MapFromScript.cs" />
+    <Compile Include="Assets\Scripts\Maps\WallTile.cs" />
     <Compile Include="Assets\Scripts\Mod.cs" />
     <Compile Include="Assets\Scripts\Options.cs" />
-    <Compile Include="Assets\Scripts\Pathfinder.cs" />
     <Compile Include="Assets\Scripts\PlayerInterface.cs" />
-    <Compile Include="Assets\Scripts\RandomSprite.cs" />
-    <Compile Include="Assets\Scripts\Raycaster.cs" />
-    <Compile Include="Assets\Scripts\SimpleAnimation.cs" />
-    <Compile Include="Assets\Scripts\Unit.cs" />
-    <Compile Include="Assets\Scripts\UnitAnimator.cs" />
-    <Compile Include="Assets\Scripts\WallTile.cs" />
+    <Compile Include="Assets\Scripts\Units\Unit.cs" />
+    <Compile Include="Assets\Scripts\Units\UnitActions\OpenDoorEffect.cs" />
+    <Compile Include="Assets\Scripts\Units\UnitActions\UnitAction.cs" />
+    <Compile Include="Assets\Scripts\Units\UnitActions\UnitActionFactory.cs" />
+    <Compile Include="Assets\Scripts\Units\UnitActions\WorldEffect.cs" />
+    <Compile Include="Assets\Scripts\Units\UnitActions\WorldEffectFactory.cs" />
     <None Include="Assets\Packages\C5.2.5.3\lib\netstandard1.0\C5.xml" />
     <None Include="Assets\PaidAssets\BitmapFonts\Pixel\_PixelCharLimits.txt" />
+    <Reference Include="Unity.RenderPipeline.Universal.ShaderLibrary">
+      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.RenderPipeline.Universal.ShaderLibrary.dll</HintPath>
+    </Reference>
     <Reference Include="Unity.Timeline.Editor">
       <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.Timeline.Editor.dll</HintPath>
     </Reference>
@@ -106,11 +114,26 @@
     <Reference Include="Unity.2D.PixelPerfect.Editor">
       <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.2D.PixelPerfect.Editor.dll</HintPath>
     </Reference>
+    <Reference Include="Unity.RenderPipelines.Universal.Shaders">
+      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.RenderPipelines.Universal.Shaders.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.RenderPipelines.Core.Editor">
+      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.RenderPipelines.Core.Editor.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.RenderPipelines.Core.Runtime">
+      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.RenderPipelines.Core.Runtime.dll</HintPath>
+    </Reference>
     <Reference Include="Unity.TextMeshPro.Editor">
       <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.TextMeshPro.Editor.dll</HintPath>
     </Reference>
     <Reference Include="Unity.ResourceManager">
       <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.ResourceManager.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.RenderPipelines.Universal.Runtime">
+      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.RenderPipelines.Universal.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.RenderPipelines.Universal.Editor">
+      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.RenderPipelines.Universal.Editor.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.UI">
       <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/UnityEngine.UI.dll</HintPath>
@@ -121,11 +144,20 @@
     <Reference Include="Unity.Addressables.Editor">
       <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.Addressables.Editor.dll</HintPath>
     </Reference>
+    <Reference Include="Unity.Postprocessing.Editor">
+      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.Postprocessing.Editor.dll</HintPath>
+    </Reference>
     <Reference Include="Unity.Rider.Editor">
       <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.Rider.Editor.dll</HintPath>
     </Reference>
+    <Reference Include="Unity.RenderPipelines.ShaderGraph.ShaderGraphLibrary">
+      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.RenderPipelines.ShaderGraph.ShaderGraphLibrary.dll</HintPath>
+    </Reference>
     <Reference Include="Unity.2D.Sprite.Editor">
       <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.2D.Sprite.Editor.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Postprocessing.Runtime">
+      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.Postprocessing.Runtime.dll</HintPath>
     </Reference>
     <Reference Include="Unity.2D.Tilemap.Editor">
       <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.2D.Tilemap.Editor.dll</HintPath>
@@ -139,44 +171,17 @@
     <Reference Include="Unity.ScriptableBuildPipeline">
       <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.ScriptableBuildPipeline.dll</HintPath>
     </Reference>
-    <Reference Include="Unity.TextMeshPro">
-      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.TextMeshPro.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEditor.UI">
-      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/UnityEditor.UI.dll</HintPath>
-    </Reference>
-    <Reference Include="Unity.RenderPipeline.Universal.ShaderLibrary">
-      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.RenderPipeline.Universal.ShaderLibrary.dll</HintPath>
-    </Reference>
-    <Reference Include="Unity.RenderPipelines.Universal.Shaders">
-      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.RenderPipelines.Universal.Shaders.dll</HintPath>
-    </Reference>
-    <Reference Include="Unity.RenderPipelines.Core.Editor">
-      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.RenderPipelines.Core.Editor.dll</HintPath>
-    </Reference>
-    <Reference Include="Unity.RenderPipelines.Core.Runtime">
-      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.RenderPipelines.Core.Runtime.dll</HintPath>
-    </Reference>
-    <Reference Include="Unity.RenderPipelines.Universal.Runtime">
-      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.RenderPipelines.Universal.Runtime.dll</HintPath>
-    </Reference>
-    <Reference Include="Unity.RenderPipelines.Universal.Editor">
-      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.RenderPipelines.Universal.Editor.dll</HintPath>
-    </Reference>
-    <Reference Include="Unity.Postprocessing.Editor">
-      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.Postprocessing.Editor.dll</HintPath>
-    </Reference>
-    <Reference Include="Unity.RenderPipelines.ShaderGraph.ShaderGraphLibrary">
-      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.RenderPipelines.ShaderGraph.ShaderGraphLibrary.dll</HintPath>
-    </Reference>
-    <Reference Include="Unity.Postprocessing.Runtime">
-      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.Postprocessing.Runtime.dll</HintPath>
-    </Reference>
     <Reference Include="Unity.ShaderGraph.Editor">
       <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.ShaderGraph.Editor.dll</HintPath>
     </Reference>
     <Reference Include="Unity.RenderPipelines.Core.ShaderLibrary">
       <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.RenderPipelines.Core.ShaderLibrary.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.TextMeshPro.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEditor.UI">
+      <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/UnityEditor.UI.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.AIModule">
       <HintPath>/Applications/Unity/Hub/Editor/2019.3.6f1/Unity.app/Contents/Managed/UnityEngine/UnityEngine.AIModule.dll</HintPath>
