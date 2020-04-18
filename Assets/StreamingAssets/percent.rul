@@ -11,6 +11,45 @@ maps:
           - [0, 0]
 
 
+# TargetModeType:     0=Self, 1=Single, 2=Multiple
+# TargetTypes(flags): 0=None, 1=Floor, 2=Wall, 4=Enemies, 8=Friendlies
+# TargetPresets:      0=None, 1=CardinalMelee, 2=RangedAttack, 3=VisibleTiles, 4=ReachableTiles
+# AffectedPreset:     0=None, 1=Explosion, 2=Straight Line
+
+skills:
+  - name: OpenDoor
+    targetMode:
+      type: 0
+    effects:
+      - OpenDoorEffect
+  - name: MeleeAttack
+    targetMode:
+      type: 1
+      allowedTargetTypes: 12
+      allowedTargetPreset: 1
+      affectedTiles: [[0,0]]
+    effects:
+      - Attack
+  - name: RangedAttack
+    targetMode:
+      type: 1
+      allowedTargetTypes: 12
+      allowedTargetPreset: 2
+      affectedTiles: [[0,0]]
+    effects:
+      - Attack
+  - name: RocketLauncher
+    targetMode:
+      type: 1
+      allowedTargetTypes: 13
+      allowedTargetPreset: 2
+      activeAffectedPreset: 1
+      affectedTiles: [[0,0]]
+      affectedRange: 1
+    effects:
+      - Attack
+
+
 mapBlocks:
   - type: QUADRANT_ONE
     size: [12,12]

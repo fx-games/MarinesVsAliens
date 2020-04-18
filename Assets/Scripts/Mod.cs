@@ -1,8 +1,10 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using DefaultNamespace.Units.UnitActions;
 using UnityEngine;
 using UnityEngine.Networking;
 using YamlDotNet.RepresentationModel;
@@ -19,10 +21,9 @@ public class Mod : MonoBehaviour
         public List<RuleWeapon> Weapons { get; set; }
         public List<RuleMapBlock> MapBlocks { get; set; }
         public List<RuleMap> Maps { get; set; }
-        public List<RuleSpawn> Spawns { get; set; }
-        
-        public List<Translation> Translations { get; set; }
-
+        public List<RuleSpawn> Spawns { get; set; }        
+        public List<RuleSkill> Skills { get; set; }
+        public List<Translation> Translations { get; set; }        
     }
     
     public class Translation
@@ -87,6 +88,7 @@ public class Mod : MonoBehaviour
             return Mod.Tr(Type);
         }
     }
+    
     public class RuleUnit
     {
         public string Type { get; set; }
@@ -100,6 +102,23 @@ public class Mod : MonoBehaviour
         public string UnitSprite { get; set; } = "";
     }
     
+    public class RuleSkill
+    {
+        public string Name { get; set; }
+        public List<string> Effects { get; set; } = new List<string>();
+        public RuleTargeting TargetMode { get; set; }
+    }
+    public class RuleTargeting
+    {
+        public TargetModeType Type { get; set; }
+        public TargetType AllowedTargetTypes { get; set; }
+        public TargetPreset AllowedTargetPreset { get; set; }
+        public AffectedPreset ActiveAffectedPreset { get; set; }
+        public List<int[]> AllowedTargets { get; set; } = new List<int[]>();
+        public List<int[]> AffectedTiles { get; set; } = new List<int[]>();
+        public int AffectedRange { get; set; }
+    }
+
     public class RuleWeapon
     {
         public string Type { get; set; }
@@ -126,6 +145,7 @@ public class Mod : MonoBehaviour
     private Dictionary<string, RuleMap> mapRules = new Dictionary<string, RuleMap>();
     private Dictionary<string, RuleMapBlock> mapBlockRules = new Dictionary<string, RuleMapBlock>();
     private Dictionary<string, Translation> translations = new Dictionary<string, Translation>();
+    private Dictionary<string, RuleSkill> skillRules = new Dictionary<string, RuleSkill>();
 
     // Start is called before the first frame update
     void Awake()
@@ -184,12 +204,14 @@ public class Mod : MonoBehaviour
         {
             weaponRules[ruleWeapon.Type] = ruleWeapon;
         }
-        
         foreach (var ruleSpawn in rules.Spawns)
         {
             spawnRules[ruleSpawn.Faction] = ruleSpawn;
         }
-        
+        foreach (var ruleSkill in rules.Skills)
+        {
+            skillRules[ruleSkill.Name] = ruleSkill;
+        }
         foreach (var ruleMap in rules.Maps)
         {
             mapRules[ruleMap.Type] = ruleMap;
@@ -245,6 +267,10 @@ public class Mod : MonoBehaviour
         
     }
 
+    public IEnumerable<RuleSkill> GetSkills()
+    {
+        return skillRules.Values;
+    }
     public RuleMap GetMap(string mapName)
     {
         return mapRules[mapName];

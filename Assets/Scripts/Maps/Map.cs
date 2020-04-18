@@ -340,16 +340,6 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return glowTiles[color];
     }
 
-    public void RemoveDoor(Unit unit, Vector3Int doorPos)
-    {
-        Debug.Log("RemoveDoor() FIRED: " + unit + " / " + doorPos);
-        if (IsDoorAt(doorPos))
-        {
-            // door is above
-            layerMap["Doors"].SetTile(doorPos, null);
-            calcMap[doorPos.x][doorPos.y] = MapInfo.Floor;
-        }
-    }
 
     public bool IsDoorAt(Vector3Int pos)
     {
@@ -365,10 +355,13 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     {
         return IsWallAt(pos.x, pos.y);
     }
-
+    public bool IsEmptyFloorTile(Vector3Int mapPos)
+    {
+        return IsFloorAt(mapPos) && !IsUnitOn(mapPos);
+    }
     public bool IsFloorAt(int x, int y)
     {
-        return calcMap[x][y] == MapInfo.Floor;;
+        return calcMap[x][y] == MapInfo.Floor;
     }
     private bool IsFloorAt(Vector3Int pos)
     {
@@ -379,7 +372,6 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         layerMap["Doors"].SetTile(pos, null);
         calcMap[pos.x][pos.y] = MapInfo.Floor;
     }
-
     private bool IsDoorAt(int x, int y)
     {
         return calcMap[x][y] == MapInfo.Door;
@@ -719,36 +711,6 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         }
     }
 
-    public List<Vector3Int> AreaOfEffect(Vector3Int unitPos, Weapon weapon, Vector3Int mapPos)
-    {
-        var rules = weapon.Rules;
-        var radius = rules.Radius;
-        HashSet<Vector3Int> affectedTiles = new HashSet<Vector3Int>(){mapPos};
-        if (rules.DamageLineOfFire)
-        {
-            affectedTiles.UnionWith(GetStraightLine(unitPos, mapPos));
-            affectedTiles.Remove(unitPos);
-            //affectedTiles.RemoveWhere(pos => AreNeighbors(unitPos, pos, true));
-        }
-        
-        if (radius > 0)
-        {
-            for (int i = mapPos.x - radius; i <= mapPos.x + radius; i++)
-            {
-                for (int j = mapPos.y - radius; j <= mapPos.y + radius; j++)
-                {
-                    var nextPos = new Vector3Int(i, j, 0);
-                    var euclideanDistance = (mapPos - nextPos).magnitude;
-                    if (Mathf.Floor(euclideanDistance) <= radius)
-                    {
-                        affectedTiles.Add(nextPos);
-                    }
-                }
-            }
-        }
-
-        return affectedTiles.ToList();
-    }
     public bool IsOtherFactionOn(IPlayerUnit unit, Vector3Int pos)
     {
         return IsOtherFactionOn((Unit) unit, pos);
@@ -764,45 +726,16 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     {
         return IsOtherUnitOn((Unit) unit, mapPos);
     }
-
-    public void RefreshWalls()
+    public bool ExplosionReaches(Vector3Int sourcePos, Vector3Int affectedPos, int damageToTile)
     {
-        
-    }
+        raycaster.ObservingUnit = null;
+        raycaster.UnitsAreBlocking = false;
 
-    public bool AoEAllowed(Unit attacker, Weapon weapon, Vector3Int mapPos, Vector3Int affectedPos, int[] attackValues)
-    {
-        int damage = attackValues.Sum();
-        if (mapPos == affectedPos)
-        {
-            AddDamageToTile(mapPos, weapon.DamageToTile());
-            return true;
-        }
-        if (weapon.HasAreaOfEffect)
-        {
-            // affectedPos may be one of the aoe tiles
-            raycaster.ObservingUnit = attacker;
-            raycaster.UnitsAreBlocking = false;
-            var hasLos = raycaster.LineCast(mapPos.x, mapPos.y, affectedPos.x, affectedPos.y);
+        var hasLos = raycaster.LineCast(sourcePos.x, sourcePos.y, affectedPos.x, affectedPos.y);
 
-            if (hasLos)
-            {
-                AddDamageToTile(affectedPos,  weapon.AoEDamageToTile());
-            }
-            else
-            {
-                AddDamageToTile(raycaster.FirstObstaclePosition, weapon.AoEDamageToTile());
-            }
-                
-            return hasLos;
-        }
-        else
-        {
-            // affectedPos is the tile the user clicked on
-            // since weapon preview should already have handled this, we are done here
-        }
+        AddDamageToTile(hasLos ? affectedPos : raycaster.FirstObstaclePosition, damageToTile);
 
-        return true;
+        return hasLos;
     }
 
     public bool IsOtherFactionOn(Unit unit, Vector3Int pos)
@@ -854,7 +787,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             {
                 if (openDoor)
                 {
-                    RemoveDoor(unit, tileOne);
+                    RemoveDoor(tileOne);
                 }
 
                 thereIsADoor = true;
@@ -987,49 +920,6 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return true;
     }
 
-    public HashSet<Vector3Int> GetStraightLine(Vector3Int unitPos, Direction rayDirection, int maxDistance)
-    {
-        HashSet<Vector3Int> linePositions = new HashSet<Vector3Int>();
-        var prevPos = unitPos;
-        Vector3Int rayDirVector = rayDirection.ToVector();
-        for (int i = 0; i < maxDistance; i++)
-        {
-            var nextPos = prevPos + rayDirVector;
-            if (!IsNeighborVisible(prevPos.x, prevPos.y, nextPos.x, nextPos.y))
-            {
-                return linePositions;
-            }
-
-            linePositions.Add(nextPos);
-            prevPos = nextPos;
-        }
-
-        return linePositions;
-    }
-    
-    public HashSet<Vector3Int> GetStraightLine(Vector3Int posOne, Vector3Int posTwo)
-    {
-        HashSet<Vector3Int> linePositions = new HashSet<Vector3Int>();
-                
-        Vector3Int rayDirVector = posOne.x < posTwo.x ? Vector3Int.right : posOne.x > posTwo.x ? Vector3Int.left : Vector3Int.zero;
-        rayDirVector += posOne.y < posTwo.y ? Vector3Int.up : posOne.y > posTwo.y ? Vector3Int.down : Vector3Int.zero;
-        var prevPos = posOne;
-        var nextPos = prevPos + rayDirVector;
-        while (nextPos != posTwo)
-        {
-            if (!IsNeighborVisible(prevPos.x, prevPos.y, nextPos.x, nextPos.y))
-            {
-                return linePositions;
-            }
-
-            linePositions.Add(nextPos);
-            prevPos = nextPos;
-            nextPos = prevPos + rayDirVector;
-        }
-
-        return linePositions;
-    }
-
     public HashSet<Vector3Int> GetFOV(Unit unit, Vector3Int position, int radius, bool removeFogVisually = true, bool removeFogMechanically = true, bool unitsAreBlocking = false)
     {
         raycaster.ObservingUnit = unit;
@@ -1108,6 +998,26 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         }
 
         return results;
+    }
+    
+    public HashSet<Vector3Int> GetStraightLine(Vector3Int unitPos, Direction rayDirection, int maxDistance)
+    {
+        HashSet<Vector3Int> linePositions = new HashSet<Vector3Int>();
+        var prevPos = unitPos;
+        Vector3Int rayDirVector = rayDirection.ToVector();
+        for (int i = 0; i < maxDistance; i++)
+        {
+            var nextPos = prevPos + rayDirVector;
+            if (!IsNeighborVisible(prevPos.x, prevPos.y, nextPos.x, nextPos.y))
+            {
+                return linePositions;
+            }
+
+            linePositions.Add(nextPos);
+            prevPos = nextPos;
+        }
+
+        return linePositions;
     }
 
     public bool ContainsWorldPos(Vector3 pos)

@@ -25,7 +25,7 @@ namespace AI
 
         public override bool CheckIfFired(Unit unit, MapTileInfo[,] mapKnowledge, List<Unit> visibleEnemies)
         {
-            if (unit.MovesLeft == 0) return false;
+            if (unit.CurrentMovesLeft == 0) return false;
             return true;
         }
 
@@ -85,7 +85,7 @@ namespace AI
 
                 foreach (var mapPosition in reachableMapPositions)
                 {
-                    var validTargets = unit.GetValidAttackTargetsAt(mapPosition);
+                    var validTargets = unit.GetValidRangedAttackTargetsAt(mapPosition);
                     foreach (var visibleEnemy in visibleEnemies)
                     {
                         if (!validTargets.Contains(visibleEnemy.Cell)) continue;

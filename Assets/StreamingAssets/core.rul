@@ -9,8 +9,7 @@ maps:
         blocks: [QUADRANT_ONE]
         rects: 
           - [0, 0]
-
-
+      
 mapBlocks:
   - type: QUADRANT_ONE
     size: [12,12]

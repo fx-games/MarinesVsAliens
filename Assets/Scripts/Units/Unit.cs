@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using DefaultNamespace;
+using DefaultNamespace.Units.UnitActions;
 using GridPathFinder;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering.Universal;
 using UnityEngine.UI;
 using static Map;
 using static Mod;
@@ -15,13 +17,29 @@ public class Unit : MonoBehaviour, IPlayerUnit
 {
     public enum UnitState { Idle, Moving }
 
+    private Dictionary<string, UnitStat> stats = new Dictionary<string, UnitStat>();
+    private List<Buff> activeBuffs = new List<Buff>(); 
     public Weapon RangedWeapon { get; private set; }
     public Weapon MeleeWeapon { get; private set; }
     public GameObject bloodSplatter;
-    public int MovesLeft { get; private set; } = 4;
+    public int CurrentMovesLeft
+    {
+        get => stats["Movement"].CurrentValue;
+        private set => stats["Movement"].CurrentValue = value;
+    }
     public int CurrentVisionRange { get; } = 20;
-    public int CurrentHealth { get; private set; } = 1;
-    public int CurrentArmor { get; set; } = 2;
+
+    public int CurrentHealth
+    {
+        get => stats["Health"].CurrentValue;
+        private set => stats["Health"].CurrentValue = value;
+    }
+
+    public int CurrentArmor
+    {
+        get => stats["Armor"].CurrentValue;
+        private set => stats["Armor"].CurrentValue = value;
+    }
     public bool CanAttack { get; private set; } = true;
     public RuleFaction Faction { get; set; }
     
@@ -64,13 +82,13 @@ public class Unit : MonoBehaviour, IPlayerUnit
         return melee + ranged;
     } }
 
-    public bool CanAct => CanAttack || MovesLeft > 0;
+    public bool CanAct => CanAttack || CurrentMovesLeft > 0;
     public RuleUnit Rules => unitRules;
     public List<Vector3Int> OccupiedTiles { get; set; }
     public HashSet<IPlayerUnit> VisibleEnemies => _visibleEnemies;
     public HashSet<Vector3Int> FieldOfView => _fieldOfView;
     public List<Vector3Int> ReachablePositions => _reachablePositions.Value.Where(p => !_map.IsUnitOn(p)).ToList();
-    public HashSet<Vector3Int> ValidTargets => _validTargets.Value;
+    public HashSet<Vector3Int> ValidRangedTargets => _validTargets.Value;
 
     private Pathfinder pathfinder;
     private Lazy<List<Vector3Int>> _reachablePositions;
@@ -79,6 +97,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     private HashSet<Vector3Int> _fieldOfView;
     private LineRenderer healthBar;
     private int currentMapPathIndex = -1;
+    private Light2D lightSource;
     public event UnitEvent FinishedMoving;
     public event UnitEvent StepCompleted;
     // Start is called before the first frame update
@@ -89,6 +108,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
         _map = FindObjectOfType<Map>();
         mod = FindObjectOfType<Mod>();
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        lightSource = GetComponentInChildren<Light2D>();
         pathfinder = new Pathfinder(_map, 1.0f, 1.41f);
         UpdateReachablePositions();
     }
@@ -199,7 +219,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
             State = UnitState.Moving;
             lastMoveTime = Time.time;
 
-            MovesLeft--;
+            CurrentMovesLeft--;
             
             // WE VISUALLY MOVE THE UNIT HERE
             RepositionUnitInWorld(nextVisPos);
@@ -337,9 +357,10 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
         unitRules = mod.GetUnitRule(unitType);
         name = mod.Tr(unitType);
-        CurrentArmor = unitRules.Armor;
-        CurrentHealth = unitRules.Health;
-        MovesLeft = unitRules.Movement;
+        
+        stats["Health"] = new UnitStat("Health", unitRules.Health);
+        stats["Armor"] = new UnitStat("Armor", unitRules.Armor);
+        stats["Movement"] = new UnitStat("Movement", unitRules.Movement);
 
         OccupiedTiles = unitRules.OccupiedTiles.ConvertAll(elem => new Vector3Int(elem[0], elem[1], 0));
 
@@ -365,9 +386,9 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     public void HasAttacked()
     {
-        if (MovesLeft != unitRules.Movement)
+        if (CurrentMovesLeft != unitRules.Movement)
         {
-            MovesLeft = 0;    // can not move before AND after firing
+            CurrentMovesLeft = 0;    // can not move before AND after firing
         }
         CanAttack = false;
         UpdateMarker();
@@ -375,7 +396,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     public void PrepareNewPhase()
     {
-        MovesLeft = unitRules.Movement;
+        CurrentMovesLeft = unitRules.Movement;
         CanAttack = true;
         UpdateValidAttackTargets();
         UpdateReachablePositions();
@@ -384,9 +405,13 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public bool IsVisible
     {
         get => spriteRenderer.enabled;
-        set => spriteRenderer.enabled = value;
+        set
+        {
+            spriteRenderer.enabled = value;
+            lightSource.enabled = value;
+        }
     }
-    
+
     public void Mark(bool asTarget = false)
     {
         var unitMarker = _map.GetUnitMarker();
@@ -440,15 +465,15 @@ public class Unit : MonoBehaviour, IPlayerUnit
             {
                 markerRenderer.color = new Color(1.0f, 0.64f, 0.0f);
             }
-            else if (MovesLeft > 0 && CanAttack)
+            else if (CurrentMovesLeft > 0 && CanAttack)
             {
                 markerRenderer.color = Color.green;
             }
-            else if (MovesLeft <= 0 && CanAttack)
+            else if (CurrentMovesLeft <= 0 && CanAttack)
             {
                 markerRenderer.color = Color.red;
             }
-            else if (!CanAttack && MovesLeft > 0)
+            else if (!CanAttack && CurrentMovesLeft > 0)
             {
                 markerRenderer.color = Color.yellow;
             }
@@ -502,10 +527,10 @@ public class Unit : MonoBehaviour, IPlayerUnit
     {
         return CanAttack
                && (HasMeleeWeapon && _map.AreNeighbors(Cell, otherUnit.Cell) ||
-                   HasRangedWeapon && ValidTargets.Contains(otherUnit.Cell));
+                   HasRangedWeapon && ValidRangedTargets.Contains(otherUnit.Cell));
     }
 
-    public HashSet<Vector3Int> GetValidAttackTargetsAt(Vector3Int mapPos)
+    public HashSet<Vector3Int> GetValidRangedAttackTargetsAt(Vector3Int mapPos)
     {
         HashSet<Vector3Int> validTargets = new HashSet<Vector3Int>();
         if (HasRangedWeapon)
@@ -531,29 +556,6 @@ public class Unit : MonoBehaviour, IPlayerUnit
             validTargets.Remove(mapPos);
         }
         
-        if (!HasMeleeWeapon) // can only attack these tiles with melee
-        {
-            validTargets.Remove(mapPos + Vector3Int.right);
-            validTargets.Remove(mapPos + Vector3Int.up);
-            validTargets.Remove(mapPos + Vector3Int.down);
-            validTargets.Remove(mapPos + Vector3Int.left);
-        }
-        else
-        {
-            AddToValidTargets(ref validTargets,mapPos + Vector3Int.right);
-            AddToValidTargets(ref validTargets,mapPos + Vector3Int.up);
-            AddToValidTargets(ref validTargets,mapPos + Vector3Int.down);
-            AddToValidTargets(ref validTargets,mapPos + Vector3Int.left);
-        }
-
-        if (!Options.AllowDiagonalAdjacentAttacks)
-        {
-            validTargets.Remove(mapPos + Vector3Int.up + Vector3Int.right);
-            validTargets.Remove(mapPos + Vector3Int.down + Vector3Int.left);
-            validTargets.Remove(mapPos + Vector3Int.down + Vector3Int.right);
-            validTargets.Remove(mapPos + Vector3Int.up + Vector3Int.left);
-        }
-
         return validTargets;
     }
     
@@ -579,7 +581,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     }
     public void UpdateValidAttackTargets()
     {
-        _validTargets = new Lazy<HashSet<Vector3Int>>(() => GetValidAttackTargetsAt(Cell));
+        _validTargets = new Lazy<HashSet<Vector3Int>>(() => GetValidRangedAttackTargetsAt(Cell));
     }
     private void AddToValidTargets(ref HashSet<Vector3Int> validTargets, Vector3Int pos)
     {
@@ -591,17 +593,17 @@ public class Unit : MonoBehaviour, IPlayerUnit
     
     public override string ToString()
     {
-        return name + " (M:" + MovesLeft + "/H:"+ CurrentHealth+")@"+Cell;
+        return name + " (M:" + CurrentMovesLeft + "/H:"+ CurrentHealth+")@"+Cell;
     }
     
 
     private List<Vector3Int> CreateMovementMap()
     {
-        pathfinder.MaxReachableCost = MovesLeft + 1f;
+        pathfinder.MaxReachableCost = CurrentMovesLeft + 1f;
         pathfinder.MaxCost =  -1;
         pathfinder.CurrentUnit = this;
         pathfinder.Dijkstra(new HashSet<Vector3Int>(){Cell}, new HashSet<Vector3Int>());
-        return MovesLeft == 0 ? new List<Vector3Int>() : pathfinder.ReachableList.ToList();
+        return CurrentMovesLeft == 0 ? new List<Vector3Int>() : pathfinder.ReachableList.ToList();
     }
     
     public List<Vector3Int> GetShortestPath(Vector3Int startPosition, Vector3Int goalPosition)
@@ -639,10 +641,7 @@ public class Weapon
         weaponRules = rules;
     }
 
-    public bool HasAreaOfEffect
-    {
-        get { return weaponRules.Radius > 0; }
-    }
+    public bool HasAreaOfEffect => weaponRules.Radius > 0;
 
     public RuleWeapon Rules => weaponRules;
 
@@ -660,6 +659,20 @@ public class Weapon
     {
         return DamageToTile();
     }
+}
+
+public class UnitStat
+{
+    public UnitStat(string name, int maxValue)
+    {
+        Name = name;
+        CurrentValue = maxValue;
+        MaxValue = maxValue;
+    }
+
+    public string Name { get; set; }
+    public int MaxValue { get; set; }
+    public int CurrentValue { get; set; }
 }
 
 public delegate void UnitEvent(object sender, UnitEventArgs args);

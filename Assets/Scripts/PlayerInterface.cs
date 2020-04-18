@@ -27,7 +27,6 @@ namespace DefaultNamespace
         List<Vector3Int> AllPositions { get; }
         bool Contains(int x, int y);
         bool AreNeighbors(Vector3Int posOne, Vector3Int posTwo, bool includeDiagonals = false);
-        List<Vector3Int> AreaOfEffect(Vector3Int unitPos, Weapon weapon, Vector3Int mapPos);
         bool IsOtherFactionOn(IPlayerUnit unit, Vector3Int pos);
         bool CanBePlaced(IPlayerUnit unit, Vector3Int mapPos, bool doorsAreBlocking = true, bool friendlyUnitsAreBlocking = true);
         bool IsOtherUnitOn(IPlayerUnit unit, Vector3Int mapPos);
@@ -46,7 +45,7 @@ namespace DefaultNamespace
     {
         Weapon RangedWeapon { get; }
         Weapon MeleeWeapon { get; }
-        int MovesLeft { get; }
+        int CurrentMovesLeft { get; }
         int CurrentVisionRange { get; }
         int CurrentHealth { get; }
         bool CanAttack { get; }

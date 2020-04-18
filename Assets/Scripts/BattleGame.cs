@@ -1,18 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
 using DefaultNamespace;
 using DefaultNamespace.Units.UnitActions;
-using GridPathFinder;
 using UnityEngine;
-using UnityEngine.Assertions.Comparers;
 using UnityEngine.EventSystems;
-using UnityEngine.Serialization;
 using UnityEngine.UI;
 using static Mod;
 using static Mod.RuleFaction;
-using static Unit;
 using Color = UnityEngine.Color;
 
 public class BattleGame : MonoBehaviour, IGame
@@ -47,7 +42,6 @@ public class BattleGame : MonoBehaviour, IGame
     private Vector3Int lastCursorLocation;
     private int currentMapIndex;
     public int CurrentTurn { get; private set; } = 0;
-    private HashSet<Vector3Int> multipleTargets = new HashSet<Vector3Int>();
     private Dictionary<RuleFaction, AIPlayer> aiPlayers = new Dictionary<RuleFaction, AIPlayer>();
     private double lastAiCommandTime;
     private double aiCommandDelay = 0.8f;
@@ -59,6 +53,7 @@ public class BattleGame : MonoBehaviour, IGame
     public GameObject endTurnButton;
     public GameObject openDoorButton;
     public GameObject attackButton;
+    private UnitAction unitAction;
 
     private void Awake()
     {
@@ -83,7 +78,7 @@ public class BattleGame : MonoBehaviour, IGame
     {
         if (_map != null)
         {
-            Destroy(_map);
+            Destroy(_map.gameObject);
         }
         var mapRules = mod.GetMap(currentMapIndex);
         if (mapRules.Generator == 0)
@@ -103,12 +98,7 @@ public class BattleGame : MonoBehaviour, IGame
 
     public void AfterMapLoad()
     {
-        UnitActionFactory.Map = _map;
-        UnitActionFactory.Game = this;
-
-        WorldEffectFactory.Map = _map;
-        WorldEffectFactory.Game = this;
-        
+        GameFactory.Initialize(this, _map, mod);
         if (GameController.ChosenMode == GameController.GameMode.AgainstAI)
         {
             singlePlayerFaction = CurrentFaction;
@@ -230,7 +220,7 @@ public class BattleGame : MonoBehaviour, IGame
         UpdateUIButtons();
     }
 
-    private void ToDefaultState()
+    public void ToDefaultState()
     {
         _map.RemoveAllLines();
         _map.RemoveAllHighlights();
@@ -286,8 +276,11 @@ public class BattleGame : MonoBehaviour, IGame
         {
             switch (gameState)
             {
-                case GameState.AttackTargetSelection when selectedUnit.ValidTargets.Contains(mapPos):
-                    TryAttackWithUnit(selectedUnit, mapPos);
+                case GameState.AttackTargetSelection when unitAction.IsValidTarget(mapPos):
+                    if (unitAction.TargetSelected(mapPos))
+                    {
+                        if (unitAction.TargetMode.Type == TargetModeType.Single) unitAction.ConfirmTargets();
+                    }
                     break;
                 case GameState.MoveTargetSelection when selectedUnit.ReachablePositions.Contains(mapPos) && !_map.IsUnitOn(mapPos):
                     MovementPreviewLockedIn(selectedUnit, mapPos);
@@ -328,107 +321,8 @@ public class BattleGame : MonoBehaviour, IGame
         }
     }
 
-    private void TryAttackWithUnit(Unit unit, Vector3Int targetedPos, bool isMultipleTargetConfirmation = false)
-    {
-        if (unit == null) return;
 
-        if (!unit.ValidTargets.Contains(targetedPos))
-            return;
-        
-        var unitPos = unit.Cell;
-        var isMelee = _map.AreNeighbors(unitPos,targetedPos);
-        var weapon = isMelee ? unit.MeleeWeapon : unit.RangedWeapon;
-
-        if (weapon.Rules.MultipleTargets && !isMultipleTargetConfirmation)
-        {
-            _map.MarkTile(targetedPos);
-            multipleTargets.Add(targetedPos);
-            return;
-        }
-        
-        ToDefaultState();
-        
-        unit.TurnTowards(targetedPos);
-        var multipleTargetPositions = new HashSet<Vector3Int>(new []{targetedPos});
-        if (weapon.Rules.MultipleTargets && isMultipleTargetConfirmation)
-        {
-            multipleTargetPositions = multipleTargets;
-        }
-
-        bool firstPos = true;
-        int attackScore = -1;
-        int[] attackValues = new int[0];
-        int damageLeft = -1;
-        string scoreForLabel = "";
-        foreach (var multiHitPosition in multipleTargetPositions)
-        {
-            if (firstPos || !weapon.Rules.DamageDistribution)
-            {
-                attackValues = Options.CombatMechanics.AttackValues(unit, multiHitPosition, isMelee);
-                attackScore = attackValues.Sum();    // set on first pos for distributed and everytime else
-                scoreForLabel = attackScore.ToString();
-                firstPos = false;
-            }
-
-            if (weapon.Rules.DamageDistribution & damageLeft != -1)
-            {
-                if (damageLeft == 0)
-                {
-                    break;
-                }
-                else if (damageLeft > 0)
-                {
-                    attackValues = new[] {damageLeft};    // adjust dice left
-                    attackScore = attackValues.Sum();
-                }
-            }
-
-            var areaOfEffect = _map.AreaOfEffect(unitPos, weapon, multiHitPosition);
-        
-            foreach (var aoePos in areaOfEffect)
-            {
-                // the following call will add damage to map tiles automatically
-                if (!_map.AoEAllowed(unit, weapon, multiHitPosition, aoePos, attackValues)) continue;
-        
-                CreateExplosion(aoePos);
-                
-                if (!_map.IsUnitOn(aoePos)) continue;
-        
-                var hitUnit = (Unit)_map.GetUnitAt(aoePos);
-            
-                hitUnit.TurnTowards(unit.Cell);
-                
-                damageLeft = Options.CombatMechanics.ResolveAttack(attackValues, unitPos,unit, multiHitPosition, aoePos, hitUnit);
-            
-                if (attackScore > 0 && isMelee && Options.CombatMechanics is DiceBasedCombat && CurrentFaction == PoVFaction)
-                {
-                    var defense = ((DiceBasedCombat) Options.CombatMechanics).LastMeleeDefense;
-                    hitUnit.SetLabelText(defense.ToString());
-                }
-            }
-        }
-        
-
-        unit.HasAttacked();
-
-        if (CurrentFaction == PoVFaction)
-        {
-            unit.SetLabelText(scoreForLabel);
-        }
-        
-        multipleTargets.Clear();
-
-        _map.RemoveAllTileMarker();
-        CheckForDeadUnits();
-        UpdateUIButtons();
-
-        if (!_map.FieldOfViewHasChanged) return;
-        
-        GlobalFOVUpdate();
-        _map.FieldOfViewHasChanged = false;
-    }
-
-    private void CheckForDeadUnits()
+    public void CheckForDeadUnits()
     {
         for (var index = allUnits.Count - 1; index >= 0; index--)
         {
@@ -450,7 +344,7 @@ public class BattleGame : MonoBehaviour, IGame
         {
             selectedUnit = (Unit) clickedUnit;
             Debug.Log("UnitSelected: " + selectedUnit);
-            if (selectedUnit.MovesLeft > 0)
+            if (selectedUnit.CurrentMovesLeft > 0)
             {
                 gameState = GameState.MoveTargetSelection;
             }
@@ -478,7 +372,7 @@ public class BattleGame : MonoBehaviour, IGame
         
         var path = unit.GetShortestPath(mapPos);
         
-        if (path.Count <= 0 || path.Count - 1 > unit.MovesLeft) return false;
+        if (path.Count <= 0 || path.Count - 1 > unit.CurrentMovesLeft) return false;
         
         _map.RemoveAllHighlights();
         _map.RemoveAllHighlights(1);
@@ -504,7 +398,7 @@ public class BattleGame : MonoBehaviour, IGame
         unit.UnitDeath();
     }
 
-    private void CreateExplosion(Vector3Int mapPos)
+    public void CreateExplosionOnTile(Vector3Int mapPos)
     {
         Instantiate(explosionPrefab, _map.CellToWorld(mapPos), Quaternion.identity);
     }
@@ -513,21 +407,16 @@ public class BattleGame : MonoBehaviour, IGame
     {
         Debug.Log("OpenDoorButtonClicked() FIRED: " + CurrentFaction + " / " + PoVFaction);
         if (CurrentFaction != PoVFaction) return;
-        Debug.Log("SelectedUnit: " + selectedUnit);
-        if (selectedUnit != null)
-        {
-            var openDoorAction = UnitActionFactory.CreateUnitAction<UnitAction>("OpenDoor", selectedUnit);
-            ExecuteUnitAction(openDoorAction);
-        }
+        Debug.Log("SelectedUnit: " + selectedUnit);        
+        StartTargetingForAction("OpenDoor");        
     }
 
-    private void ExecuteUnitAction(UnitAction action)
+    private void StartTargetingForAction(string actionName)
     {
-        foreach (var lazyEffect in action.EffectsOnTheWorld)
+        if (selectedUnit != null)
         {
-            var effect = lazyEffect.Value;
-            effect.Source = action.ActingUnit;
-            effect.Execute();
+            unitAction = GameFactory.CreateUnitAction<UnitAction>(actionName, selectedUnit);
+            unitAction.StartTargeting();
         }
     }
 
@@ -693,57 +582,25 @@ public class BattleGame : MonoBehaviour, IGame
     {
         if (selectedUnit == null) return;
         if (CurrentFaction != PoVFaction) return;
-        
+                
         //if (aiPlayers.ContainsKey(CurrentFaction) ) return;
 
-        if (gameState == GameState.AttackTargetSelection && multipleTargets.Count > 0)
+        if (gameState == GameState.AttackTargetSelection && unitAction.TargetMode.Type == TargetModeType.Multiple)
         {
-            if (selectedUnit.HasMeleeWeapon && selectedUnit.MeleeWeapon.Rules.DamageDistribution)
-            {
-                TryAttackWithUnit(selectedUnit, multipleTargets.First(), true);
-            }
-            else if (selectedUnit.HasRangedWeapon && selectedUnit.RangedWeapon.Rules.DamageDistribution)
-            {
-                TryAttackWithUnit(selectedUnit, multipleTargets.First(), true);
-            }
+            unitAction.ConfirmTargets();
         }
-        if (selectedUnit.State != UnitState.Moving && selectedUnit.CanAttack)
+        else
         {
-            _map.RemoveAllHighlights(0);
-            _map.RemoveAllHighlights(1);
-            ShowValidTargets(selectedUnit);
-            var unitsInRange = selectedUnit.ValidTargets.Where(pos => _map.IsOtherFactionOn(selectedUnit, pos))
-                .Select(pos => _map.GetUnitAt(pos));
-            if (CurrentFaction == PoVFaction)
-            {
-                foreach (var unit in unitsInRange)
-                {
-                    var targetUnit = (Unit) unit;
-                    string info = Options.CombatMechanics.AttackPreviewInformationFor(selectedUnit, targetUnit);
-                    targetUnit.SetLabelText(info);
-                    targetUnit.IsHealthBarVisible = true;
-                }
-            }
-
-            if (selectedUnit.ValidTargets.Count > 0)
-            {
-                gameState = GameState.AttackTargetSelection;
-                multipleTargets.Clear();
-            }
-            else
-            {
-                Debug.Log("No Targets");
-            }
+            StartTargetingForAction("MeleeAttack");
         }
     }
 
-    private void ShowValidTargets(Unit unit)
+    public void ShowValidTargets(IEnumerable<Vector3Int> targetPositions)
     {
-        HighlightTiles(unit.ValidTargets.ToList(), new Color(0.6f, 0f, 0, 0.5f));
+        HighlightTiles(targetPositions, new Color(0.6f, 0f, 0, 0.5f));
     }
 
-
-    private void HighlightTiles(List<Vector3Int> positions, Color color, int layer = 0)
+    private void HighlightTiles(IEnumerable<Vector3Int> positions, Color color, int layer = 0)
     {
         _map.RemoveAllHighlights(layer);
         if (CurrentFaction == PoVFaction)
@@ -763,15 +620,10 @@ public class BattleGame : MonoBehaviour, IGame
         
         foreach (var target in targets)
         {
-            TryAttackWithUnit(unit, target);
+            unitAction.TargetSelected(target);
         }
 
-        var isMelee = targets.TrueForAll(pos => _map.AreNeighbors(unit.Cell, pos));
-        if ((isMelee && unit.HasMeleeWeapon && unit.MeleeWeapon.Rules.DamageDistribution)
-            ||(!isMelee && unit.HasRangedWeapon && unit.RangedWeapon.Rules.DamageDistribution))
-        {
-            TryAttackWithUnit(unit, targets.First(), true);
-        }
+        unitAction.ConfirmTargets();
     }
 
     private void UnitFinishedMoving(object sender, UnitEventArgs args)
@@ -780,7 +632,7 @@ public class BattleGame : MonoBehaviour, IGame
         
         GlobalFOVUpdate();
         
-        if (selectedUnit == args.unit && selectedUnit.MovesLeft > 0)
+        if (selectedUnit == args.unit && selectedUnit.CurrentMovesLeft > 0)
         {
             gameState = GameState.MoveTargetSelection;
             HighlightTiles(selectedUnit.ReachablePositions, new Color(0, 0.8f, 0, 0.2f));
@@ -793,7 +645,8 @@ public class BattleGame : MonoBehaviour, IGame
     {
         allUnits.ForEach(u => u.UpdateReachablePositions());
     }
-    private void GlobalFOVUpdate()
+
+    public void GlobalFOVUpdate()
     {
         _map.ResetFog();
         
@@ -995,7 +848,7 @@ public class BattleGame : MonoBehaviour, IGame
         }
     }
 
-    private void UpdateUIButtons()
+    public void UpdateUIButtons()
     {
         uiButtons.Clear();
 
@@ -1136,5 +989,10 @@ public class BattleGame : MonoBehaviour, IGame
     public List<Unit> GetVisibleEnemies(AIPlayer aiPlayer)
     {
         return allUnits.Where(unit => unit.Faction != aiPlayer.Faction && !_map.IsInFogMechanically(unit.Cell)).ToList();
+    }
+
+    public void ChangeStateTo(GameState nextState)
+    {
+        gameState = nextState;
     }
 }

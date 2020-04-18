@@ -25,6 +25,8 @@ namespace DefaultNamespace
             Unit hitUnit);
 
         int ResolveDamageToTile(Weapon weapon);
+        int[] RollChanceToHit(Unit actingUnit);
+        int[] RollDamage(Unit actingUnit, bool isMelee);
     }
 
     public abstract class CombatBase
@@ -134,6 +136,16 @@ namespace DefaultNamespace
             return RollDamage(weapon.Rules).Sum();
         }
 
+        public int[] RollChanceToHit(Unit actingUnit)
+        {
+            throw new NotImplementedException();
+        }
+
+        public int[] RollDamage(Unit actingUnit, bool isMelee)
+        {
+            throw new NotImplementedException();
+        }
+
         private int GetDefense(Unit target, bool isMelee)
         {
             if (isMelee)
@@ -144,7 +156,7 @@ namespace DefaultNamespace
             return target.CurrentArmor;
         }
 
-        private int[] RollDamage(Mod.RuleWeapon weaponRules)
+        public int[] RollDamage(Mod.RuleWeapon weaponRules)
         {
             int[] results = new int[weaponRules.Damage.Count];
             int diceCount = 0;
@@ -173,7 +185,6 @@ namespace DefaultNamespace
 
     public class PercentageBasedCombat : CombatBase, ICombatMechanics
     {
-
         public string AttackPreviewInformationFor(Unit attackingUnit, Unit targetUnit)
         {
             int chanceToHit = CalculateChanceToHit(attackingUnit, targetUnit, attackingUnit.IsNextTo(targetUnit));
@@ -187,7 +198,7 @@ namespace DefaultNamespace
 
         public int ResolveAttack(int[] attackValues, Vector3Int unitPos, Unit attackingUnit, Vector3Int targetedPos, Vector3Int aoePos, Unit hitUnit)
         {
-            int randomAttackValue = attackValues[0];
+            int randomAttackValue = attackValues.Sum();
             var isAoEPosition = targetedPos != aoePos;
             var isMelee = attackingUnit.IsNextTo(hitUnit);
 
@@ -223,6 +234,16 @@ namespace DefaultNamespace
             return RollDamage(weapon.Rules).Sum();
         }
 
+        public int[] RollChanceToHit(Unit actingUnit)
+        {
+            return new []{Random.Range(0, 100)}; // 100 values, 0-99
+        }
+
+        public int[] RollDamage(Unit actingUnit, bool melee)
+        {
+            return RollDamage(melee ? actingUnit.MeleeWeapon.Rules : actingUnit.RangedWeapon.Rules);
+        }
+
         private int[] RollDamage(Mod.RuleWeapon weaponRules)
         {
             int[] results = new int[weaponRules.Damage.Count];
@@ -250,6 +271,7 @@ namespace DefaultNamespace
 
 
         // should return an integer between 0 and 100
+        // TODO: Add buffs and stuff for accuracy
         private int CalculateChanceToHit(Unit attackingUnit, Unit targetUnit, bool isMelee)
         {
             float baseAccuracy = attackingUnit.Rules.Accuracy;
