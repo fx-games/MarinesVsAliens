@@ -29,7 +29,13 @@ public class BattleGame : MonoBehaviour, IGame
     public Transform uiCanvasTransform;
     public GameObject gridMapPrefab;
     public GameObject[] premadeMapBlocks;
+    public AudioClip soundUnitSelection;
+    public AudioClip soundUiDenied;
+    public AudioClip soundAbortAll;
+    public AudioClip soundUiConfirm;
+    public AudioClip soundButtonPressed;
 
+    public AudioSource globalAudioSource;
     public GameObject[] unitPrefabs;
     public GameObject explosionPrefab;
     private List<Unit> allUnits = new List<Unit>();
@@ -106,6 +112,27 @@ public class BattleGame : MonoBehaviour, IGame
         Invoke(nameof(AfterMapLoad), 0.1f);
     }
 
+    public void PlaySoundEffect(UiSoundEffect effect)
+    {
+        switch (effect)
+        {
+            case UiSoundEffect.AbortOrBack:
+                globalAudioSource.PlayOneShot(soundAbortAll);
+                break;
+            case UiSoundEffect.UnitSelection:
+                globalAudioSource.PlayOneShot(soundUnitSelection);
+                break;
+            case UiSoundEffect.UiConfirm:
+                globalAudioSource.PlayOneShot(soundUiConfirm);
+                break;
+            case UiSoundEffect.UiDeny:
+                globalAudioSource.PlayOneShot(soundUiDenied);
+                break;
+            case UiSoundEffect.ButtonPressed:
+                globalAudioSource.PlayOneShot(soundButtonPressed);
+                break;
+        }
+    }
     private void AfterMapLoad()
     {
         GameFactory.Initialize(this, _map, mod);
@@ -237,6 +264,7 @@ public class BattleGame : MonoBehaviour, IGame
         selectedUnit = null;        
         ToDefaultState();
         UpdateUIButtons();
+        PlaySoundEffect(UiSoundEffect.AbortOrBack);
     }
 
     public void ToDefaultState()
@@ -298,19 +326,26 @@ public class BattleGame : MonoBehaviour, IGame
                 case GameState.AttackTargetSelection when unitAction.IsValidTarget(mapPos):
                     if (unitAction.TargetSelected(mapPos))
                     {
-                        if (unitAction.TargetMode.Type == TargetModeType.Single) unitAction.ConfirmTargets();
+                        if (unitAction.TargetMode.Type == TargetModeType.Single)
+                        {
+                            unitAction.ConfirmTargets();
+                            PlaySoundEffect(UiSoundEffect.UiConfirm);
+                        }
                     }
                     break;
                 case GameState.MoveTargetSelection when selectedUnit.ReachablePositions.Contains(mapPos) && !_map.IsUnitOn(mapPos):
                     MovementPreviewLockedIn(selectedUnit, mapPos);
+                    PlaySoundEffect(UiSoundEffect.UiConfirm);
                     break;
                 case GameState.MovementSelectedPreConfirmation when movePreConfirmedAt == mapPos:
                     TryMoveWithUnit(selectedUnit, mapPos);
+                    PlaySoundEffect(UiSoundEffect.UiConfirm);
                     break;
                 case GameState.MovementSelectedPreConfirmation when movePreConfirmedAt != mapPos:
                     _map.RemoveAllLines();
                     gameState = GameState.MoveTargetSelection;
                     PreviewMovement(selectedUnit, mapPos);
+                    PlaySoundEffect(UiSoundEffect.AbortOrBack);
                     break;
                 default:
                     DeselectAll();
@@ -378,12 +413,14 @@ public class BattleGame : MonoBehaviour, IGame
             UpdateUIButtons();
             
             _map.FlashEffect(mapPos, Color.cyan);
+            
+            PlaySoundEffect(UiSoundEffect.UnitSelection);
         }
         
         ShowAllHealthBars();
     }
 
-    public void CreateProjectile(Vector3 start, Vector3 end, float speed, int selectedSprite)
+    public Projectile CreateProjectile(Vector3 start, Vector3 end, float speed, int selectedSprite)
     {
         var moveDirection = (end - start);
         Debug.Log("Spawning projectile effect (" + start +" -> " + end + ")");
@@ -394,6 +431,7 @@ public class BattleGame : MonoBehaviour, IGame
         projectile.target = end;
         projectile.SelectedSprite = selectedSprite;
         projectile.speed = speed;
+        return projectile;
     }
 
     private bool TryMoveWithUnit(IPlayerUnit playerUnit, Vector3Int mapPos)
@@ -440,6 +478,7 @@ public class BattleGame : MonoBehaviour, IGame
     }
     public void OpenDoorButtonClicked()
     {
+        PlaySoundEffect(UiSoundEffect.ButtonPressed);
         Debug.Log("OpenDoorButtonClicked() FIRED: " + CurrentFaction + " / " + PoVFaction);
         if (CurrentFaction != PoVFaction) return;
         Debug.Log("SelectedUnit: " + selectedUnit);        
@@ -457,6 +496,7 @@ public class BattleGame : MonoBehaviour, IGame
 
     public void EndTurnButtonClicked()
     {
+        PlaySoundEffect(UiSoundEffect.ButtonPressed);
         if (CurrentFaction != PoVFaction) return;
         EndPhase();
     }
@@ -615,6 +655,7 @@ public class BattleGame : MonoBehaviour, IGame
 
     public void MeleeAttackButtonClicked()
     {
+        PlaySoundEffect(UiSoundEffect.ButtonPressed);
         if (selectedUnit == null) return;
         if (CurrentFaction != PoVFaction) return;
                 
@@ -632,6 +673,7 @@ public class BattleGame : MonoBehaviour, IGame
 
     public void RangedAttackButtonClicked()
     {
+        PlaySoundEffect(UiSoundEffect.ButtonPressed);
         if (selectedUnit == null) return;
         if (CurrentFaction != PoVFaction) return;
                 
@@ -649,6 +691,7 @@ public class BattleGame : MonoBehaviour, IGame
     
     public void SkillButtonClicked(int skillIndex)
     {
+        PlaySoundEffect(UiSoundEffect.ButtonPressed);
         if (selectedUnit == null) return;
         if (CurrentFaction != PoVFaction) return;
                 
@@ -1139,4 +1182,13 @@ public class BattleGame : MonoBehaviour, IGame
     }
 
     
+}
+
+public enum UiSoundEffect
+{
+    UnitSelection,
+    AbortOrBack,
+    UiConfirm,
+    UiDeny,
+    ButtonPressed
 }

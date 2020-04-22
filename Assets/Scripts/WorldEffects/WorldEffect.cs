@@ -5,6 +5,8 @@ namespace WorldEffects
 {
     public abstract class WorldEffect
     {
+        public event VoidEvent OnEffectCompleted;
+        
         protected BattleGame _game;
         protected Map _map;
         protected Mod _mod;
@@ -19,6 +21,8 @@ namespace WorldEffects
         public int IntegerTwo { get; set; }
         public int[] DamageRoll { get; set; }
         public int[] ChanceToHitRoll { get; set; }
+        public bool Chained { get; set; }
+
         protected internal void Initialize(BattleGame game, Map map, Mod mod)
         {
             _game = game;
@@ -27,5 +31,12 @@ namespace WorldEffects
         }
 
         public abstract void Execute();
+
+        protected void OnCompleted()
+        {
+            OnEffectCompleted?.Invoke(this);
+        }
     }
+
+    public delegate void VoidEvent(object sender);
 }

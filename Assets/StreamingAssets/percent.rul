@@ -50,14 +50,14 @@ skills:
       allowedTargetTypes: 13
       allowedTargetPreset: 2
       activeAffectedPreset: 1
-      affectedTiles: [[0,0]]
       affectedRange: 1
     effects:
-      - name: Attack
       - name: ProjectileEffect
         integerOne: 4
         integerTwo: 1
         floatOne: 4
+      - name: Explosion
+        chained: true
   - name: StunMelee
     displayName: "Stun\nStrike"
     isMelee: true

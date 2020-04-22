@@ -101,24 +101,40 @@ namespace DefaultNamespace.Units.UnitActions
         {
             int[] chanceToHit = Options.CombatMechanics.RollChanceToHit(ActingUnit);
             int[] damageRoll = Options.CombatMechanics.RollDamage(ActingUnit, IsMelee);
-            
-            foreach (var lazyEffect in Effects)
+
+            bool effectChain = false;
+            WorldEffect chainedEffect = null;
+            for (var index = Effects.Count - 1; index >= 0; index--)
             {
+                Lazy<WorldEffect> lazyEffect = Effects[index];
                 var effect = lazyEffect.Value;
-                
+
                 effect.ActingUnit = ActingUnit;
                 effect.SourcePosition = ActingUnit.Cell;
                 effect.Targets = targets;
                 effect.AffectedTiles = affectedTiles;
-                
+
                 effect.DamageRoll = ReRollDamageForEachEffect
                     ? Options.CombatMechanics.RollDamage(ActingUnit, IsMelee)
                     : damageRoll;
                 effect.ChanceToHitRoll = ReRollChanceToHitForEachEffect
                     ? Options.CombatMechanics.RollChanceToHit(ActingUnit)
                     : chanceToHit;
-                
-                effect.Execute(); // EFFECTS EXECUTED HERE
+
+                if (chainedEffect != null)
+                {
+                    var afterEffect = chainedEffect;
+                    effect.OnEffectCompleted += sender => { afterEffect.Execute(); };
+                    chainedEffect = null;
+                }
+                if (effect.Chained)
+                {
+                    chainedEffect = effect;
+                }
+                else
+                {
+                    effect.Execute(); // EFFECTS EXECUTED HERE
+                }
             }
 
             foreach (var ruleBuff in Buffs)

@@ -21,14 +21,23 @@ namespace WorldEffects
             {
                 for (int i = 0; i < Count; i++)
                 {
-                    _game.Schedule(() => { FireProjectileAt(targetedPos); }, timer);
+                    var index = i;
+                    _game.Schedule(() =>
+                    {
+                        var projectile = FireProjectileAt(targetedPos);
+                        if (index == Count - 1)
+                        {
+                            projectile.OnArrivedAtTarget += sender => OnCompleted();
+                        }
+                        
+                    }, timer);
                     timer += Random.Range(0.001f, 0.201f);
                 }
             }
         }
 
 
-        private void FireProjectileAt(Vector3Int targetedPos)
+        private Projectile FireProjectileAt(Vector3Int targetedPos)
         {
             var targetPos = _map.CellToWorld(targetedPos);
             if (WithDeviation)
@@ -36,7 +45,7 @@ namespace WorldEffects
                 targetPos += new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), 0);
             }
 
-            _game.CreateProjectile(_map.CellToWorld(SourcePosition), targetPos, Speed, SelectedSprite);
+            return _game.CreateProjectile(_map.CellToWorld(SourcePosition), targetPos, Speed, SelectedSprite);            
         }
 
         

@@ -99,6 +99,7 @@ namespace DefaultNamespace.Units.UnitActions
                 FloatOne = effectRules.FloatOne,
                 IntegerOne = effectRules.IntegerOne,
                 IntegerTwo = effectRules.IntegerTwo,
+                Chained = effectRules.Chained
             };
             effect.Initialize(Game, Map, Mod);
             return effect;
