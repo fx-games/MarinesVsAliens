@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Buffs;
 using DefaultNamespace;
 using DefaultNamespace.Units.UnitActions;
 using GridPathFinder;
@@ -24,22 +25,19 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public GameObject bloodSplatter;
     public int CurrentMovesLeft
     {
-        get => stats["Movement"].CurrentValue;
-        private set => stats["Movement"].CurrentValue = value;
+        get => GetCurrentStat("Movement");
+        private set => SetCurrentStat("Movement", value);
     }
-    public int CurrentVisionRange { get; } = 20;
+
+    public int CurrentVisionRange => GetCurrentStat("VisionRange");
 
     public int CurrentHealth
     {
-        get => stats["Health"].CurrentValue;
-        private set => stats["Health"].CurrentValue = value;
+        get => GetCurrentStat("Health");
+        private set => SetCurrentStat("Health", value);
     }
 
-    public int CurrentArmor
-    {
-        get => stats["Armor"].CurrentValue;
-        private set => stats["Armor"].CurrentValue = value;
-    }
+    public int CurrentArmor => GetCurrentStat("Armor");
     public bool CanAttack { get; private set; } = true;
     public RuleFaction Faction { get; set; }
     
@@ -110,6 +108,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
         lightSource = GetComponentInChildren<Light2D>();
         pathfinder = new Pathfinder(_map, 1.0f, 1.41f);
+        Procs = new ProcReceiver(activeBuffs);
         UpdateReachablePositions();
     }
 
@@ -357,10 +356,15 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
         unitRules = mod.GetUnitRule(unitType);
         name = mod.Tr(unitType);
+
+        AvailableSkills = unitRules.UnitSkills;
         
         stats["Health"] = new UnitStat("Health", unitRules.Health);
         stats["Armor"] = new UnitStat("Armor", unitRules.Armor);
         stats["Movement"] = new UnitStat("Movement", unitRules.Movement);
+        stats["Accuracy"] = new UnitStat("Accuracy", unitRules.Accuracy);
+        stats["Defense"] = new UnitStat("Defense", unitRules.Defense);
+        stats["VisionRange"] = new UnitStat("VisionRange", unitRules.VisionRange);
 
         OccupiedTiles = unitRules.OccupiedTiles.ConvertAll(elem => new Vector3Int(elem[0], elem[1], 0));
 
@@ -384,7 +388,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
         spriteRenderer.transform.localPosition = new Vector3(centerX, centerY, 0f);
     }
 
-    public void HasAttacked()
+    public void AllowNoMoreActions()
     {
         if (CurrentMovesLeft != unitRules.Movement)
         {
@@ -400,6 +404,16 @@ public class Unit : MonoBehaviour, IPlayerUnit
         CanAttack = true;
         UpdateValidAttackTargets();
         UpdateReachablePositions();
+
+        Procs.OnNextTurn();
+    }
+
+    public void ApplyBuff(Buff buff)
+    {
+        Debug.Log(buff.DisplayName + " applied to " + this);
+        buff.BuffedUnit = this;
+        activeBuffs.Add(buff);
+        Procs.OnApply(buff);
     }
 
     public bool IsVisible
@@ -411,6 +425,9 @@ public class Unit : MonoBehaviour, IPlayerUnit
             lightSource.enabled = value;
         }
     }
+
+    public List<string> AvailableSkills { get; set; }
+    public ProcReceiver Procs { get; set; }
 
     public void Mark(bool asTarget = false)
     {
@@ -593,7 +610,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     
     public override string ToString()
     {
-        return name + " (M:" + CurrentMovesLeft + "/H:"+ CurrentHealth+")@"+Cell;
+        return name + "\nM:" + CurrentMovesLeft + "/H:" + CurrentHealth + "/A:" + CurrentArmor + "/ACC:" + GetCurrentStat("Accuracy") + "@" + Cell;
     }
     
 
@@ -620,7 +637,6 @@ public class Unit : MonoBehaviour, IPlayerUnit
     {
         return GetShortestPath(Cell, goalPosition);
     }
-
     
     public List<IPlayerUnit> VisibleEnemiesFrom(Vector3Int reachableMapPosition)
     {
@@ -628,7 +644,85 @@ public class Unit : MonoBehaviour, IPlayerUnit
         return fov.Where(pos => _map.IsOtherFactionOn(Faction, pos)).Select(pos => _map.GetUnitAt(pos)).ToList();
     }
 
+    public int GetCurrentStat(string statName)
+    {
+        int statCurrentValue = stats[statName].CurrentValue;
+        
+        foreach (var buff in activeBuffs)
+        {
+            if (buff.Modifiers.ContainsKey(statName))
+            {
+                statCurrentValue += buff.Modifiers[statName].CurrentValue;
+            }
+        }
+
+        return statCurrentValue;
+    }
+    
+    public void SetCurrentStat(string statName, int value)
+    {
+        int rest = stats[statName].Set(value);
+
+        if (rest > 0)
+        {
+            foreach (var buff in activeBuffs)
+            {
+                if (!buff.Modifiers.ContainsKey(statName)) continue;
+                
+                rest = buff.Modifiers[statName].Set(rest);
+                if (rest <= 0)
+                {
+                    break;
+                }
+            }
+        }
+    }
+    
+    public int GetMaxStat(string statName)
+    {
+        int statCurrentValue = stats[statName].MaxValue;
+        
+        foreach (var buff in activeBuffs)
+        {
+            if (buff.Modifiers.ContainsKey(statName))
+            {
+                statCurrentValue += buff.Modifiers[statName].MaxValue;
+            }
+        }
+
+        return statCurrentValue;
+    }
+
+    public void ChangeCurrentStat(string statName, int change)
+    {
+        var absorbed = stats[statName].Change(change);
+        var rest = change - absorbed;
+        if (rest > 0)
+        {
+            foreach (var buff in activeBuffs)
+            {
+                rest = buff.OnCurrentStatChange(statName, rest);
+                if (rest <= 0)
+                {
+                    break;
+                }
+            }
+        }
+    }
+
+    public void DisableAttack()
+    {
+        CanAttack = false;        
+        UpdateMarker();
+    }
+    public void DisableMovement()
+    {
+        SetCurrentStat("Movement", 0);
+        UpdateReachablePositions();
+        UpdateMarker();
+    }
 }
+
 
 public class Weapon
 {
@@ -670,9 +764,34 @@ public class UnitStat
         MaxValue = maxValue;
     }
 
-    public string Name { get; set; }
-    public int MaxValue { get; set; }
-    public int CurrentValue { get; set; }
+    public string Name { get; }
+    public int MaxValue { get; private set; }
+    public int CurrentValue { get; private set; }
+
+    public int Change(int change)
+    {
+        int oldValue = CurrentValue;
+        Set(CurrentValue + change);
+        var absorbed = CurrentValue - oldValue;
+        return absorbed;
+    }
+
+    public int Set(int value)
+    {
+        CurrentValue = value;
+        
+        if (CurrentValue <= 0)
+        {
+            CurrentValue = 0;
+        }
+        else if (CurrentValue > MaxValue)
+        {
+            CurrentValue = MaxValue;
+        }
+
+        var rest = value - CurrentValue;
+        return rest;
+    }
 }
 
 public delegate void UnitEvent(object sender, UnitEventArgs args);

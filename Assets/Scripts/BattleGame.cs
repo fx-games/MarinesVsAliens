@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Buffs;
+using C5;
 using DefaultNamespace;
 using DefaultNamespace.Units.UnitActions;
 using UnityEngine;
@@ -20,17 +22,20 @@ public class BattleGame : MonoBehaviour, IGame
         MovementSelectedPreConfirmation,
         WaitForHotSeatPlayer
     }
+
+    public GameObject projectilePrefab;
     public GameObject unitLabelPrefab;
-    public Transform canvasTransform;
+    public Transform worldCanvasTransform;
+    public Transform uiCanvasTransform;
     public GameObject gridMapPrefab;
     public GameObject[] premadeMapBlocks;
 
     public GameObject[] unitPrefabs;
     public GameObject explosionPrefab;
     private List<Unit> allUnits = new List<Unit>();
-    private HashSet<RuleFaction> eliminatedFactions = new HashSet<RuleFaction>();
+    private System.Collections.Generic.HashSet<RuleFaction> eliminatedFactions = new System.Collections.Generic.HashSet<RuleFaction>();
     private Map _map;
-    public Unit selectedUnit;
+    private Unit selectedUnit;
     private Camera gameCamera;
     public Text topLeftLabel;
     public Text centerOfScreenLabel;
@@ -52,8 +57,13 @@ public class BattleGame : MonoBehaviour, IGame
     private List<GameObject> uiButtons = new List<GameObject>();
     public GameObject endTurnButton;
     public GameObject openDoorButton;
-    public GameObject attackButton;
+    public GameObject rangedAttackButton;
+    public GameObject meleeAttackButton;
+    private List<GameObject> skillButtons = new List<GameObject>();
+
+    public GameObject skillButtonPrefab;
     private UnitAction unitAction;
+    private Queue<Action> scheduledActions = new Queue<Action>();
 
     private void Awake()
     {
@@ -96,7 +106,7 @@ public class BattleGame : MonoBehaviour, IGame
         Invoke(nameof(AfterMapLoad), 0.1f);
     }
 
-    public void AfterMapLoad()
+    private void AfterMapLoad()
     {
         GameFactory.Initialize(this, _map, mod);
         if (GameController.ChosenMode == GameController.GameMode.AgainstAI)
@@ -123,7 +133,7 @@ public class BattleGame : MonoBehaviour, IGame
         PrepareNextPhase();
     }
 
-    void EnableSpectatorMode()
+    private void EnableSpectatorMode()
     {
         spectatorMode = true;
     }
@@ -137,7 +147,7 @@ public class BattleGame : MonoBehaviour, IGame
     }
 
     // Update is called once per frame
-    void Update()
+    private void Update()
     {
         if (factions.Count <= 1) return;
         if (gameState == GameState.WaitForHotSeatPlayer) return;
@@ -199,13 +209,22 @@ public class BattleGame : MonoBehaviour, IGame
 
     public void DebugButtonPressed()
     {
+        if (selectedUnit != null)
+        {
+            selectedUnit.ApplyBuff(new Stun
+            {
+                EndCondition = new TimedCondition(2)
+            });
+        }
         //aiPlayers[CurrentFaction].NextPhase();
+        /*
         if (gameState != GameState.WaitForHotSeatPlayer)
         {
             ToDefaultState();
             currentAiCoroutine = StartCoroutine(aiPlayers[CurrentFaction].ExecuteNextCommand());
             lastAiCommandTime = Time.time;
         }
+        */
     }
     
     public void DebugButtonTwoPressed()
@@ -238,7 +257,7 @@ public class BattleGame : MonoBehaviour, IGame
     private void PreviewMovement(Unit unit, Vector3Int targetPos)
     {
         var path = unit.GetShortestPath(targetPos);
-        HashSet<Vector3Int> previewTiles = new HashSet<Vector3Int>();
+        System.Collections.Generic.HashSet<Vector3Int> previewTiles = new System.Collections.Generic.HashSet<Vector3Int>();
             
         if (path.Count > 0)
         {
@@ -249,7 +268,7 @@ public class BattleGame : MonoBehaviour, IGame
                     previewTiles.Add(pathPos + offset);
                 }
             }
-            HighlightTiles(previewTiles.ToList(), new Color(0.4f,0.3f,0.7f,0.6f), 1);
+            HighlightTiles(previewTiles.ToList(), new Color(227/(float)255, 144/(float)255, 36/(float)255, 0.5f), 1);
         }
     }
 
@@ -364,6 +383,19 @@ public class BattleGame : MonoBehaviour, IGame
         ShowAllHealthBars();
     }
 
+    public void CreateProjectile(Vector3 start, Vector3 end, float speed, int selectedSprite)
+    {
+        var moveDirection = (end - start);
+        Debug.Log("Spawning projectile effect (" + start +" -> " + end + ")");
+        float angle = Mathf.Atan2(moveDirection.y, moveDirection.x) * Mathf.Rad2Deg;
+        var go = Instantiate(projectilePrefab, start, Quaternion.AngleAxis(angle, Vector3.forward));
+        Projectile projectile = go.GetComponent<Projectile>();
+        projectile.Game = this;
+        projectile.target = end;
+        projectile.SelectedSprite = selectedSprite;
+        projectile.speed = speed;
+    }
+
     private bool TryMoveWithUnit(IPlayerUnit playerUnit, Vector3Int mapPos)
     {
         var unit = (Unit) playerUnit;
@@ -402,7 +434,10 @@ public class BattleGame : MonoBehaviour, IGame
     {
         Instantiate(explosionPrefab, _map.CellToWorld(mapPos), Quaternion.identity);
     }
-
+    public void CreateExplosionOnTile(Vector3 worldPos)
+    {
+        CreateExplosionOnTile(_map.WorldToCell(worldPos));
+    }
     public void OpenDoorButtonClicked()
     {
         Debug.Log("OpenDoorButtonClicked() FIRED: " + CurrentFaction + " / " + PoVFaction);
@@ -578,7 +613,7 @@ public class BattleGame : MonoBehaviour, IGame
         gameCamera.GetComponent<CameraControls>().SmoothTransition(_map.CellToWorld(pos));
     }
 
-    public void AttackButtonClicked()
+    public void MeleeAttackButtonClicked()
     {
         if (selectedUnit == null) return;
         if (CurrentFaction != PoVFaction) return;
@@ -592,6 +627,40 @@ public class BattleGame : MonoBehaviour, IGame
         else
         {
             StartTargetingForAction("MeleeAttack");
+        }
+    }
+
+    public void RangedAttackButtonClicked()
+    {
+        if (selectedUnit == null) return;
+        if (CurrentFaction != PoVFaction) return;
+                
+        //if (aiPlayers.ContainsKey(CurrentFaction) ) return;
+
+        if (gameState == GameState.AttackTargetSelection && unitAction.TargetMode.Type == TargetModeType.Multiple)
+        {
+            unitAction.ConfirmTargets();
+        }
+        else
+        {
+            StartTargetingForAction("RangedAttack");
+        }
+    }
+    
+    public void SkillButtonClicked(int skillIndex)
+    {
+        if (selectedUnit == null) return;
+        if (CurrentFaction != PoVFaction) return;
+                
+        //if (aiPlayers.ContainsKey(CurrentFaction) ) return;
+
+        if (gameState == GameState.AttackTargetSelection && unitAction.TargetMode.Type == TargetModeType.Multiple)
+        {
+            unitAction.ConfirmTargets();
+        }
+        else
+        {
+            StartTargetingForAction(selectedUnit.AvailableSkills[skillIndex]);
         }
     }
 
@@ -616,7 +685,7 @@ public class BattleGame : MonoBehaviour, IGame
     {
         UnitSelected(unit.Cell);
         
-        AttackButtonClicked();
+        RangedAttackButtonClicked();
         
         foreach (var target in targets)
         {
@@ -702,12 +771,12 @@ public class BattleGame : MonoBehaviour, IGame
         }
         if (selectedUnit != null)
         {
-            SetLabel(selectedUnit.name + " - HP: " + selectedUnit.CurrentHealth + "\n" + selectedUnit.WeaponDescription);
+            SetLabel(selectedUnit+"\n" + selectedUnit.WeaponDescription);
         }
         else if (_map.IsOtherFactionOn(CurrentFaction, _map.CurrentCursorPosition))
         {
             var enemyUnit = (Unit)_map.GetUnitAt(_map.CurrentCursorPosition);
-            SetLabel(enemyUnit.name + " - HP: " + enemyUnit.CurrentHealth + "\n" + enemyUnit.WeaponDescription);
+            SetLabel(enemyUnit + "\n" + enemyUnit.WeaponDescription);
         }
         else
         {
@@ -748,6 +817,7 @@ public class BattleGame : MonoBehaviour, IGame
                 {
                     for (int i = 0; i < loadOut.Count; i++)
                     {
+                        if (loadOut.DoNotSpawn) continue;
                         if (spawnIndex >= spawnPositions.Count)
                             break;
                         var spawnPosition = spawnPositions[spawnIndex];
@@ -760,8 +830,8 @@ public class BattleGame : MonoBehaviour, IGame
             }
         }
     }
-    
-    private bool SpawnUnit(Vector3Int spawnPosition, string unitType, RuleLoadout loadout, RuleFaction ruleFaction)
+
+    public bool SpawnUnit(Vector3Int spawnPosition, string unitType, RuleLoadout loadout, RuleFaction ruleFaction)
     {
         var unitPrefab = FindPrefab(unitType, loadout, ruleFaction);
         var unit = Instantiate(unitPrefab, _map.CellToWorld(spawnPosition), Quaternion.identity)
@@ -771,13 +841,13 @@ public class BattleGame : MonoBehaviour, IGame
         {
             var spriteRenderer = unit.GetComponentInChildren<SpriteRenderer>();
             //spriteRenderer.color = ColorFromArray(ruleFaction.Color);
-            spriteRenderer.enabled = false; // spawn every unit invisible
+            //spriteRenderer.enabled = false; // spawn every unit invisible
             
             unit.FinishedMoving += UnitFinishedMoving;
             unit.StepCompleted += UnitStepCompleted;
             
             var unitLabel = Instantiate(unitLabelPrefab).GetComponent<Text>();
-            unitLabel.transform.SetParent(canvasTransform);
+            unitLabel.transform.SetParent(worldCanvasTransform);
             unitLabel.enabled = false;
             unit.SetLabel(unitLabel);
             
@@ -794,7 +864,8 @@ public class BattleGame : MonoBehaviour, IGame
 
     private GameObject FindPrefab(string unitType, RuleLoadout loadout, RuleFaction ruleFaction)
     {
-        var unitSprite = mod.GetUnitRule(unitType).UnitSprite;
+        var unitRules = mod.GetUnitRule(unitType);
+        var unitSprite = unitRules.UnitSprite;
         var ruleWeapons = loadout.Weapons.Select(weaponName => mod.GetWeaponRule(weaponName));
         var prefabName = "";
         var weaponRules = ruleWeapons as RuleWeapon[] ?? ruleWeapons.ToArray();
@@ -810,7 +881,14 @@ public class BattleGame : MonoBehaviour, IGame
 
         if (unitSprite.Length > 0)
         {
-            prefabName = ruleFaction.SpritePrefix + unitSprite;
+            if (unitRules.SpriteHasNoFactionPrefix)
+            {
+                prefabName = unitSprite;
+            }
+            else
+            {
+                prefabName = ruleFaction.SpritePrefix + unitSprite;
+            }
         }
 
         if (prefabName == "")
@@ -852,18 +930,29 @@ public class BattleGame : MonoBehaviour, IGame
     {
         uiButtons.Clear();
 
-        var attackButtonShouldBeVisible = selectedUnit != null && selectedUnit.CanAttack;
+        var rangedAttackButtonShouldBeVisible = selectedUnit != null && selectedUnit.CanAttack && selectedUnit.HasRangedWeapon;
+        var meleeAttackButtonShouldBeVisible = selectedUnit != null && selectedUnit.CanAttack && selectedUnit.HasMeleeWeapon;
         var openDoorButtonShouldBeVisible = selectedUnit != null && IsNextToDoor(selectedUnit);
+        var numberOfNeededSkillButtons = selectedUnit != null ? selectedUnit.AvailableSkills.Count : 0;
         
         uiButtons.Add(endTurnButton);
 
-        if (attackButtonShouldBeVisible)
+        if (rangedAttackButtonShouldBeVisible)
         {
-            uiButtons.Add(attackButton);
+            uiButtons.Add(rangedAttackButton);
         }
         else
         {
-            attackButton.SetActive(false);
+            rangedAttackButton.SetActive(false);
+        }
+        
+        if (meleeAttackButtonShouldBeVisible)
+        {
+            uiButtons.Add(meleeAttackButton);
+        }
+        else
+        {
+            meleeAttackButton.SetActive(false);
         }
 
         if (openDoorButtonShouldBeVisible)
@@ -874,7 +963,49 @@ public class BattleGame : MonoBehaviour, IGame
         {
             openDoorButton.SetActive(false);
         }
-        
+
+        int missingSkillButtons = numberOfNeededSkillButtons - skillButtons.Count;
+
+        if (missingSkillButtons > 0)
+        {
+            for (int i = 0; i < missingSkillButtons; i++)
+            {
+                var go = Instantiate(skillButtonPrefab);                
+                go.transform.SetParent(uiCanvasTransform);
+                go.transform.localScale = Vector3.one;
+                skillButtons.Add(go);
+            }
+        }
+
+        if (selectedUnit != null && selectedUnit.CanAttack)
+        {
+            for (int i = 0; i < skillButtons.Count; i++)
+            {
+                var skillButton = skillButtons[i];
+                if (i < numberOfNeededSkillButtons)
+                {
+                    var skillIndex = i;
+                    var skillName = selectedUnit.AvailableSkills[i];
+                    var ruleSkill = mod.GetSkill(skillName);
+                    var buttonComponent = skillButton.GetComponent<Button>();
+
+                    buttonComponent.onClick.RemoveAllListeners();
+                    buttonComponent.onClick.AddListener(() => { SkillButtonClicked(skillIndex); });
+                    skillButton.GetComponentInChildren<Text>().text = ruleSkill.DisplayName;
+
+                    uiButtons.Add(skillButton);
+                }
+                else
+                {
+                    skillButton.SetActive(false);
+                }
+            }
+        }
+        else
+        {
+            skillButtons.ForEach(b => b.SetActive(false));
+        }
+
         int xOffset = 29;
         int xDist = 45;
         
@@ -882,8 +1013,7 @@ public class BattleGame : MonoBehaviour, IGame
         {
             bu.SetActive(true);
             var rectTransform = bu.GetComponent<RectTransform>();
-            var anchoredPosition = rectTransform.anchoredPosition;
-            rectTransform.anchoredPosition = new Vector2(xOffset, anchoredPosition.y);
+            rectTransform.anchoredPosition = new Vector2(xOffset, 24);
             xOffset += xDist;
         }
     }
@@ -995,4 +1125,18 @@ public class BattleGame : MonoBehaviour, IGame
     {
         gameState = nextState;
     }
+
+    public void Schedule(Action action, float timer)
+    {
+        scheduledActions.Enqueue(action);
+        Invoke(nameof(NextScheduledAction), timer);
+    }
+
+    public void NextScheduledAction()
+    {
+        var nextAction = scheduledActions.Dequeue();
+        nextAction.Invoke();
+    }
+
+    
 }

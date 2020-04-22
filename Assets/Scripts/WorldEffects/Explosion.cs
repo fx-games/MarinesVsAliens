@@ -34,7 +34,7 @@ namespace WorldEffects
                 ActingUnit.SetLabelText(ChanceToHitRoll.Sum().ToString());
             }
             
-            ActingUnit.HasAttacked();
+            ActingUnit.AllowNoMoreActions();
         }
     }
 }

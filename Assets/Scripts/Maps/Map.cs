@@ -45,7 +45,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     public Tile[] floorTiles;
     public Tile[] walls;  // ORDER: NESW
     public Tile[] doors;
-    
+    public Tile fogTile;
 
     protected Dictionary<string, Tilemap> layerMap = new Dictionary<string, Tilemap>();
     protected Unit[][] unitMap;
@@ -81,6 +81,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     // Start is called before the first frame update
     void Awake()
     {
+        fogTile.color = Color.black;
         worldCanvas = FindObjectsOfType<Canvas>().First(c => c.name == "WorldCanvas").transform;
         selectionRect = Instantiate(selectionRectPrefab);
         unitSelectedMarker = Instantiate(selectionRectPrefab);
@@ -425,7 +426,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     public virtual void ResetFog()
     {
         layerMap["FogOfWar"].ClearAllTiles();
-        layerMap["FogOfWar"].FloodFill(new Vector3Int(Width-1,Height-1,0), floorTiles[0]);
+        layerMap["FogOfWar"].FloodFill(new Vector3Int(Width-1,Height-1,0), fogTile);
         FillMapArray(fogMap, true);
     }
     public virtual void RemoveAllFog()
@@ -475,7 +476,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
                 FillMapArray(calcMap, MapInfo.Floor);
                 break;
             case "FogOfWar":
-                layerMap["FogOfWar"].BoxFill(new Vector3Int(1, 1, 0), floorTiles[0], 0, 0, Width, Height);
+                layerMap["FogOfWar"].BoxFill(new Vector3Int(1, 1, 0), fogTile, 0, 0, Width, Height);
                 FillMapArray(fogMap, true);
                 break;
         }

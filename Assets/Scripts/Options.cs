@@ -207,14 +207,19 @@ namespace DefaultNamespace
             {
                 weapon = attackingUnit.MeleeWeapon;
             }
+            
             var isExplosion = weapon.Rules.Radius > 0;
             
             int chanceToHit = CalculateChanceToHit(attackingUnit, hitUnit, isMelee);
             if (randomAttackValue < chanceToHit || (isExplosion && isAoEPosition))
             {
                 // HIT
-                var damage = RollDamage(weapon.Rules)[0];
+                Debug.Log("Combat Mechanics registered a hit on " + hitUnit);
                 
+                var damage = RollDamage(weapon.Rules).Sum();
+
+                attackingUnit.Procs.OnHit(hitUnit, weapon);
+                hitUnit.Procs.OnBeingHit(attackingUnit, weapon);
                 damage -= hitUnit.CurrentArmor;
                 if (damage > 0)
                 {
@@ -224,8 +229,10 @@ namespace DefaultNamespace
             else
             {
                 // MISS
+                attackingUnit.Procs.OnMiss(hitUnit, weapon);
+                hitUnit.SetLabelText("mis");
             }
-
+            
             return -1;
         }
 
@@ -274,14 +281,17 @@ namespace DefaultNamespace
         // TODO: Add buffs and stuff for accuracy
         private int CalculateChanceToHit(Unit attackingUnit, Unit targetUnit, bool isMelee)
         {
-            float baseAccuracy = attackingUnit.Rules.Accuracy;
+            float baseAccuracy = attackingUnit.GetCurrentStat("Accuracy");
+            
             var weapon = isMelee ? attackingUnit.MeleeWeapon : attackingUnit.RangedWeapon;
 
             if (weapon == null) return -1;
             
             float weaponModifier = weapon.Rules.AccuracyModifier;
 
-            float modifiedAccuracy = baseAccuracy + weaponModifier;
+            float targetUnitDefense = targetUnit.GetCurrentStat("Defense");
+
+            float modifiedAccuracy = baseAccuracy + weaponModifier - targetUnitDefense;
             
             float distance = (attackingUnit.Cell - targetUnit.Cell).magnitude;
 

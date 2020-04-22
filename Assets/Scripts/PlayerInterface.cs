@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Buffs;
 using UnityEngine;
 
 namespace DefaultNamespace
@@ -55,6 +56,7 @@ namespace DefaultNamespace
         bool HasMeleeWeapon { get; }
         Mod.RuleUnit Rules { get; }
         List<Vector3Int> OccupiedTiles { get; set; }
+        void ApplyBuff(Buff buff);
     }
     
 }

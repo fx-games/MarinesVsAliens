@@ -14,6 +14,11 @@ using YamlDotNet.Serialization.NamingConventions;
 
 public class Mod : MonoBehaviour
 {
+    public enum EndConditionPreset
+    {
+        None,
+        OnFirstAttack
+    }
     public class Rules
     {
         public List<RuleFaction> Factions { get; set; }
@@ -81,6 +86,7 @@ public class Mod : MonoBehaviour
             public string Unit { get; set; }
             [DefaultValue(1)] public int Count { get; set; } = 1;
             public List<string> Weapons { get; set; }
+            public bool DoNotSpawn { get; set; }
         }
 
         public override string ToString()
@@ -100,14 +106,43 @@ public class Mod : MonoBehaviour
         public List<int[]> OccupiedTiles { get; set; } = new List<int[]> {new []{0,0}};
         public bool CanMoveDiagonally { get; set; } = true;
         public string UnitSprite { get; set; } = "";
+        public bool SpriteHasNoFactionPrefix { get; set; }
+        public List<string> UnitSkills { get; set; } = new List<string>();
+        public int VisionRange { get; set; }
     }
     
     public class RuleSkill
     {
         public string Name { get; set; }
-        public List<string> Effects { get; set; } = new List<string>();
+        public List<RuleEffect> Effects { get; set; } = new List<RuleEffect>();
+        public List<RuleBuff> Buffs { get; set; } = new List<RuleBuff>();
         public RuleTargeting TargetMode { get; set; }
+        public string DisplayName { get; set; }
+        public bool IsMelee { get; set; }
     }
+    public class RuleEffect
+    {
+        public string Name { get; set; }
+        public string StringOne { get; set; }
+        public int IntegerOne { get; set; }
+        public int IntegerTwo { get; set; }
+        public float FloatOne { get; set; }
+    }
+    public class RuleBuff
+    {
+        public string Name { get; set; }
+        public int Timer { get; set; }
+
+        public List<NameIntValuePair> StatModifiers { get; set; } = new List<NameIntValuePair>();
+        public EndConditionPreset EndCondition { get; set; }
+    }
+
+    public class NameIntValuePair
+    {
+        public string Name { get; set; }
+        public int Value { get; set; }
+    }
+
     public class RuleTargeting
     {
         public TargetModeType Type { get; set; }
@@ -292,4 +327,21 @@ public class Mod : MonoBehaviour
             ? translations["en-US"].Strings[textKey]
             : textKey;
     }
+
+    public RuleSkill GetSkill(string skillName)
+    {
+        return skillRules[skillName];
+    }
+
+    public RuleFaction.RuleLoadout GetLoadout(RuleFaction faction, string unitType)
+    {
+        foreach (var loadout in factionRules[faction.Type].LoadOut)
+        {
+            if (loadout.Unit == unitType)
+            {
+                return loadout;
+            }
+        }
+        throw new KeyNotFoundException("UnitType "+unitType+" has no loadout.");
+    } 
 }

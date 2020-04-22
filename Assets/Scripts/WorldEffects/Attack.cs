@@ -13,8 +13,6 @@ namespace WorldEffects
         
                 foreach (var aoePos in areaOfEffect)
                 {
-                    _game.CreateExplosionOnTile(aoePos);
-                
                     if (!_map.IsUnitOn(aoePos)) continue;
         
                     var hitUnit = (Unit)_map.GetUnitAt(aoePos);
@@ -29,8 +27,8 @@ namespace WorldEffects
             {
                 ActingUnit.SetLabelText(ChanceToHitRoll.Sum().ToString());
             }
-            
-            ActingUnit.HasAttacked();
+            ActingUnit.Procs.OnHasAttacked();
+            ActingUnit.AllowNoMoreActions();
         }
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Buffs;
 using UnityEngine;
 using WorldEffects;
 using static Unit.UnitState;
@@ -20,7 +21,9 @@ namespace DefaultNamespace.Units.UnitActions
         public Mod.RuleFaction ActingFaction { get; set; }
         public Unit ActingUnit { get; set; }
         public string Identifier { get; set; }
-        public List<Lazy<WorldEffect>> EffectsOnTheWorld { get; set; } = new List<Lazy<WorldEffect>>();
+        public List<Mod.RuleBuff> Buffs { get; set; } = new List<Mod.RuleBuff>();
+
+        public List<Lazy<WorldEffect>> Effects { get; set; } = new List<Lazy<WorldEffect>>();
         public TargetMode TargetMode { get; set; }
         
         protected internal void Initialize(BattleGame game, Map map)
@@ -99,7 +102,7 @@ namespace DefaultNamespace.Units.UnitActions
             int[] chanceToHit = Options.CombatMechanics.RollChanceToHit(ActingUnit);
             int[] damageRoll = Options.CombatMechanics.RollDamage(ActingUnit, IsMelee);
             
-            foreach (var lazyEffect in EffectsOnTheWorld)
+            foreach (var lazyEffect in Effects)
             {
                 var effect = lazyEffect.Value;
                 
@@ -115,7 +118,20 @@ namespace DefaultNamespace.Units.UnitActions
                     ? Options.CombatMechanics.RollChanceToHit(ActingUnit)
                     : chanceToHit;
                 
-                effect.Execute();
+                effect.Execute(); // EFFECTS EXECUTED HERE
+            }
+
+            foreach (var ruleBuff in Buffs)
+            {
+                var buffFromRules = GameFactory.CreateBuffFromRules(ruleBuff);
+                foreach (var affectedTile in affectedTiles)
+                {
+                    if (!_map.IsUnitOn(affectedTile)) continue;
+                    
+                    var affectedUnit = _map.GetUnitAt(affectedTile);
+                    
+                    affectedUnit.ApplyBuff(buffFromRules); // BUFFS APPLIED HERE
+                }
             }
 
             AfterAction();
