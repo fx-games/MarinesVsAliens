@@ -579,25 +579,15 @@ MonoBehaviour:
   - {fileID: 2223305004873385641, guid: 4373d706cfe934cf581754da9fdb3a37, type: 3}
   soundUnitSelection: {fileID: 8300000, guid: 8e540327485704cf1afe9bd93798fdb7, type: 3}
   soundUiDenied: {fileID: 8300000, guid: b5eed40d9e6014904ad96fb0377ab569, type: 3}
-  soundAbortAll: {fileID: 8300000, guid: a82a3facfec154fa69629f4e251c6ce5, type: 3}
+  soundAbortAll: {fileID: 8300000, guid: b5eed40d9e6014904ad96fb0377ab569, type: 3}
   soundUiConfirm: {fileID: 8300000, guid: 6de985bfdf51740adb4d7ec2e9df4775, type: 3}
   soundButtonPressed: {fileID: 8300000, guid: 5a81bd89cf4714e76ba2f84d26df350f, type: 3}
   globalAudioSource: {fileID: 532638968}
-  unitPrefabs:
-  - {fileID: 3510056058709453012, guid: afa119a5405264ff49ddab1b23605099, type: 3}
-  - {fileID: 3510056058709453012, guid: 830c0d4175b9d4042b9beb6b04d205fa, type: 3}
+  factionPrefabs:
   - {fileID: 3510056058709453012, guid: 3ce33b0e64c7a49eeb8b3213c8e8611d, type: 3}
-  - {fileID: 3510056058709453012, guid: 160bfee3402b1467482642e64bde1023, type: 3}
-  - {fileID: 3510056058709453012, guid: 1ac83802138074b5db3bc9ac14a88dc1, type: 3}
-  - {fileID: 3510056058709453012, guid: e68d0daa36c82416ab53dcd10eb81552, type: 3}
-  - {fileID: 3510056058709453012, guid: b8d98e1d32e8a4e73a9c53ab83b7facb, type: 3}
-  - {fileID: 3510056058709453012, guid: 5ca6b539893fb45998a06145cc0f00a9, type: 3}
-  - {fileID: 3510056058709453012, guid: c50bb781ec3d14d0198c190128d2a999, type: 3}
-  - {fileID: 3510056058709453012, guid: 7b7b599f6fb204a2eae6dda06374cff5, type: 3}
-  - {fileID: 3510056058709453012, guid: 0926a0953939944c9a691b3ae618f5a7, type: 3}
-  - {fileID: 3510056058709453012, guid: 9edc324d3c06a4b9d9ebcce4aa3dd9d9, type: 3}
-  - {fileID: 3510056058709453012, guid: 3c915dd1c792746bcb84218c833bba4c, type: 3}
-  - {fileID: 3510056058709453012, guid: 0f4f7acaa6f43485386aca92d8176408, type: 3}
+  - {fileID: 3510056058709453012, guid: da50247c496ad49d785eb7828d02182f, type: 3}
+  - {fileID: 3510056058709453012, guid: 9d293eed5a7594c71bb61562c363832b, type: 3}
+  - {fileID: 3510056058709453012, guid: def4b641659ed455a986226f6adc0c61, type: 3}
   - {fileID: 3510056058709453012, guid: fd8e556028ced4fe3bb86a055f16132f, type: 3}
   explosionPrefab: {fileID: 5012863476137197226, guid: 5b8a5482dc39842e18a1802f79c1f97a,
     type: 3}

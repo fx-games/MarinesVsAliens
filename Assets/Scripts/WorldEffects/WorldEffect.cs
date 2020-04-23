@@ -38,6 +38,11 @@ namespace WorldEffects
         {
             OnEffectCompleted?.Invoke(this);
         }
+
+        public void RemoveAllCompletionHandlers()
+        {
+            OnEffectCompleted = null;
+        }
     }
 
     public delegate void VoidEvent(object sender);

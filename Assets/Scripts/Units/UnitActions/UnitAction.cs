@@ -14,6 +14,7 @@ namespace DefaultNamespace.Units.UnitActions
         private BattleGame _game;
         
         private HashSet<Vector3Int> targetList = new HashSet<Vector3Int>();
+        private List<WorldEffect> executedEffects = new List<WorldEffect>();
         public bool ReRollDamageForEachEffect { get; set; }
 
         public bool ReRollChanceToHitForEachEffect { get; set; }
@@ -25,7 +26,8 @@ namespace DefaultNamespace.Units.UnitActions
 
         public List<Lazy<WorldEffect>> Effects { get; set; } = new List<Lazy<WorldEffect>>();
         public TargetMode TargetMode { get; set; }
-        
+        public int ChangeSpriteTo { get; set; }
+
         protected internal void Initialize(BattleGame game, Map map)
         {
             _game = game;
@@ -65,6 +67,10 @@ namespace DefaultNamespace.Units.UnitActions
 
                 if (validTargetPositions.Any())
                 {
+                    if (ChangeSpriteTo != -1)
+                    {
+                        ActingUnit.ChangeSprite(ChangeSpriteTo);
+                    }
                     _game.ChangeStateTo(BattleGame.GameState.AttackTargetSelection);
                     targetList.Clear();
                 }
@@ -101,7 +107,7 @@ namespace DefaultNamespace.Units.UnitActions
         private void ExecuteOn(List<Vector3Int> targets, Dictionary<Vector3Int, List<Vector3Int>> affectedTiles)
         {
             int[] chanceToHit = Options.CombatMechanics.RollChanceToHit(ActingUnit);
-            int[] damageRoll = Options.CombatMechanics.RollDamage(ActingUnit, IsMelee);
+            int[] damageRoll = IsOffensiveAction ? Options.CombatMechanics.RollDamage(ActingUnit, IsMelee) : new int[0];
             var effectChainCallsAfterAction = false;
             WorldEffect chainedEffect = null;
             for (var index = Effects.Count - 1; index >= 0; index--)
@@ -128,26 +134,24 @@ namespace DefaultNamespace.Units.UnitActions
                 if (chainedEffect != null)
                 {
                     var afterEffect = chainedEffect;
-                    if (afterEffect.LastEffect)
-                    {
-                        effectChainCallsAfterAction = true;
-                        effect.OnEffectCompleted += sender => { afterEffect.Execute(); AfterAction(); };
-                    }
-                    else
-                    {
-                        effect.OnEffectCompleted += sender => { afterEffect.Execute(); };
-                    }
-                    
+                    effect.OnEffectCompleted += sender => { afterEffect.Execute(); };                    
                     chainedEffect = null;
                 }
                 if (effect.Chained)
                 {
                     chainedEffect = effect;
+                    if (!effectChainCallsAfterAction)
+                    {
+                        effectChainCallsAfterAction = true;
+                        effect.OnEffectCompleted += sender => { AfterAction(); };
+                    }
                 }
                 else
                 {
                     effect.Execute(); // EFFECTS EXECUTED HERE
                 }
+
+                executedEffects.Add(effect);
             }
 
             foreach (var ruleBuff in Buffs)
@@ -173,14 +177,24 @@ namespace DefaultNamespace.Units.UnitActions
         }
 
         public bool IsMelee { get; set; }
+        public bool IsOffensiveAction { get; set; }
 
         private void AfterAction()
         {
+            
+            executedEffects.ForEach(e => { e.RemoveAllCompletionHandlers(); });
+            ActingUnit.ResetSprite();
+            if (IsOffensiveAction)
+            {
+                ActingUnit.Procs.OnHasAttacked();
+                ActingUnit.AllowNoMoreActions();
+            }
+            
+            _game.CheckForDeadUnits();
             targetList.Clear();
             _map.RemoveAllTileMarker();
-            _game.CheckForDeadUnits();
             _game.UpdateUIButtons();
-
+            
             if (!_map.FieldOfViewHasChanged) return;
             _game.GlobalFOVUpdate();
             _map.FieldOfViewHasChanged = false;

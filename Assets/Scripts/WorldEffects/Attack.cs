@@ -29,8 +29,6 @@ namespace WorldEffects
                 }
             }
             
-            ActingUnit.Procs.OnHasAttacked();
-            ActingUnit.AllowNoMoreActions();
             
             OnCompleted();
         }

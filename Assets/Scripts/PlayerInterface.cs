@@ -46,7 +46,7 @@ namespace DefaultNamespace
     {
         Weapon RangedWeapon { get; }
         Weapon MeleeWeapon { get; }
-        int CurrentMovesLeft { get; }
+        int ActionPoints { get; }
         int CurrentVisionRange { get; }
         int CurrentHealth { get; }
         bool CanAttack { get; }

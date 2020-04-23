@@ -76,9 +76,8 @@ public class Mod : MonoBehaviour
         public Mod Mod { get; set; }
 
         public string Type { get; set; }
-        public string SpritePrefix { get; set; } = "Marine";
         public int[] Color { get; set; }
-
+        public int FactionPrefab { get; set; } = 0;
         public List<RuleLoadout> LoadOut { get; set; }
 
         public class RuleLoadout
@@ -98,17 +97,13 @@ public class Mod : MonoBehaviour
     public class RuleUnit
     {
         public string Type { get; set; }
-        [DefaultValue(6)] public int Movement { get; set; } = 6;
-        [DefaultValue(1)] public int Health { get; set; } = 1;
-        [DefaultValue(0)] public int Armor { get; set; } = 0;
-        public int Accuracy { get; set; } = 50;
-        public int Defense { get; set; } = 0;
+        //public List<NameIntValuePair> Stats { get; set; } = new List<NameIntValuePair>();
+        public Dictionary<string, int> Stats { get; set; }
         public List<int[]> OccupiedTiles { get; set; } = new List<int[]> {new []{0,0}};
         public bool CanMoveDiagonally { get; set; } = true;
-        public string UnitSprite { get; set; } = "";
-        public bool SpriteHasNoFactionPrefix { get; set; }
+        public int FactionPrefab { get; set; } = -1;
+        public int SpriteOffset { get; set; } = 0;
         public List<string> UnitSkills { get; set; } = new List<string>();
-        public int VisionRange { get; set; }
     }
     
     public class RuleSkill
@@ -119,6 +114,8 @@ public class Mod : MonoBehaviour
         public RuleTargeting TargetMode { get; set; }
         public string DisplayName { get; set; }
         public bool IsMelee { get; set; }
+        public int ChangeSpriteTo { get; set; } = -1;
+        public bool IsOffensiveAction { get; set; }
     }
     public class RuleEffect
     {
@@ -128,7 +125,6 @@ public class Mod : MonoBehaviour
         public int IntegerTwo { get; set; }
         public float FloatOne { get; set; }
         public bool Chained { get; set; }
-        public bool LastEffect { get; set; }
     }
     public class RuleBuff
     {
@@ -171,14 +167,11 @@ public class Mod : MonoBehaviour
         [DefaultValue(false)] public bool StraightLineOnly { get; set; } = false;
         [DefaultValue(false)] public bool DamageLineOfFire { get; set; } = false;
         [DefaultValue(false)] public bool DamageDistribution { get; set; } = false;
-        public bool MultipleTargets { get; set; } = false;
-        public string WeaponSprite { get; set; } = "";
-        
+        public bool MultipleTargets { get; set; } = false;        
     }
     private Dictionary<string, RuleFaction> factionRules = new Dictionary<string, RuleFaction>();
     private Dictionary<string, RuleUnit> unitRules = new Dictionary<string, RuleUnit>();
     private Dictionary<string, RuleWeapon> weaponRules = new Dictionary<string, RuleWeapon>();
-    private Dictionary<string, RuleSpawn> spawnRules = new Dictionary<string, RuleSpawn>();
     private Dictionary<string, RuleMap> mapRules = new Dictionary<string, RuleMap>();
     private Dictionary<string, RuleMapBlock> mapBlockRules = new Dictionary<string, RuleMapBlock>();
     private Dictionary<string, Translation> translations = new Dictionary<string, Translation>();
@@ -241,10 +234,6 @@ public class Mod : MonoBehaviour
         {
             weaponRules[ruleWeapon.Type] = ruleWeapon;
         }
-        foreach (var ruleSpawn in rules.Spawns)
-        {
-            spawnRules[ruleSpawn.Faction] = ruleSpawn;
-        }
         foreach (var ruleSkill in rules.Skills)
         {
             skillRules[ruleSkill.Name] = ruleSkill;
@@ -282,12 +271,7 @@ public class Mod : MonoBehaviour
     {
         return weaponRules[type];
     }
-
-    public RuleSpawn GetSpawnRule(string faction)
-    {
-        return spawnRules[faction];
-    }
-
+    
     public List<RuleFaction> GetFactions()
     {
         return factionRules.Values.ToList();

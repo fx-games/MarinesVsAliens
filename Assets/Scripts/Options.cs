@@ -15,6 +15,7 @@ namespace DefaultNamespace
         public static ICombatMechanics CombatMechanics { get; set; } = new PercentageBasedCombat();
 
         public static bool Debug { get; set; } = false;
+        public static bool AllowRangedWeaponsRangeOne { get; set; } = false;
     }
 
     public interface ICombatMechanics

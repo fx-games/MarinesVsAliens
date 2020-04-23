@@ -16,6 +16,8 @@ namespace DefaultNamespace.Units.UnitActions
         public Lazy<TargetMode> TargetMode { get; set; }
         public bool IsMelee { get; set; }
         public List<Mod.RuleBuff> Buffs { get; set; }
+        public int ChangeSpriteTo { get; set; }
+        public bool IsOffensiveAction { get; set; }
     }
     public static class GameFactory
     {
@@ -84,7 +86,9 @@ namespace DefaultNamespace.Units.UnitActions
                 Effects = skillMap[identifier].Effects,
                 Buffs = skillMap[identifier].Buffs,
                 TargetMode = targetMode,
-                IsMelee = skillMap[identifier].IsMelee
+                IsMelee = skillMap[identifier].IsMelee,
+                IsOffensiveAction = skillMap[identifier].IsOffensiveAction,
+                ChangeSpriteTo = skillMap[identifier].ChangeSpriteTo
             };
             action.Initialize(Game, Map);
             return action;
@@ -100,7 +104,6 @@ namespace DefaultNamespace.Units.UnitActions
                 IntegerOne = effectRules.IntegerOne,
                 IntegerTwo = effectRules.IntegerTwo,
                 Chained = effectRules.Chained,
-                LastEffect = effectRules.LastEffect
             };
             effect.Initialize(Game, Map, Mod);
             return effect;
@@ -125,6 +128,8 @@ namespace DefaultNamespace.Units.UnitActions
                 {
                     Name = skillDef.Name,
                     IsMelee = skillDef.IsMelee,
+                    IsOffensiveAction = skillDef.IsOffensiveAction,
+                    ChangeSpriteTo = skillDef.ChangeSpriteTo,
                     TargetMode = new Lazy<TargetMode>(() => new TargetMode(skillDef.TargetMode.Type)
                     {
                         AllowedTargetTypes = skillDef.TargetMode.AllowedTargetTypes,

@@ -24,6 +24,8 @@ skills:
       - name: OpenDoorEffect
   - name: MeleeAttack
     isMelee: true
+    isOffensiveAction: true
+    changeSpriteTo: 8
     targetMode:
       type: 1
       allowedTargetTypes: 12
@@ -35,6 +37,7 @@ skills:
         chained: true
         lastEffect: true
   - name: RangedAttack
+    isOffensiveAction: true
     targetMode:
       type: 1
       allowedTargetTypes: 12
@@ -52,6 +55,8 @@ skills:
         lastEffect: true
   - name: RocketLauncher
     displayName: "Rocket\nLauncher"
+    isOffensiveAction: true
+    changeSpriteTo: 10
     targetMode:
       type: 1
       allowedTargetTypes: 13
@@ -70,6 +75,7 @@ skills:
         lastEffect: true
   - name: StunMelee
     displayName: "Stun\nStrike"
+    changeSpriteTo: 0
     isMelee: true
     targetMode:
       type: 1
@@ -120,28 +126,9 @@ mapBlocks:
       - [9, 4, 10, 5]
       - [7, 9, 8, 10]
 
-
-spawns:
-  - faction: STR_GREEN_MARINES
-    locations:
-      - [0,0]
-      - [0,1]
-      - [1,0]
-      - [1,1]
-      - [1,2]
-  - faction: STR_RED_SPACEMEN
-    locations:
-      - [11,11]
-      - [10,11]
-      - [11,10]
-      - [10,10]
-      - [9,10]
-  - faction: STR_ALIENS
-    randomPlacement: true
-
 factions:
   - type: STR_GREEN_MARINES
-    spritePrefix: Marine
+    factionPrefab: 0
     color: [57,135,203,1]
     loadOut:
       - unit: STR_ROGUE
@@ -164,7 +151,7 @@ factions:
         weapons:
           - STR_NORMAL_HITTER
   - type: STR_RED_SPACEMEN
-    spritePrefix: RedSpace
+    factionPrefab: 3
     color: [226,55,60,1]
     loadOut:
       - unit: STR_ROGUE
@@ -186,113 +173,114 @@ factions:
         doNotSpawn: true
         weapons:
           - STR_NORMAL_HITTER
-  - type: STR_ALIENS
-    spritePrefix: Alien
-    color: [177, 52, 235, 1]
+  - type: STR_BLUE_BIRD_PEOPLE
+    factionPrefab: 1
+    color: [226,55,60,1]
     loadOut:
-      - unit: STR_ANDROID_ALIEN
-        count: 3
-        weapons:
-          - STR_HEAVY_HITTER
-          - STR_ANDROID_RIFLE
-      - unit: STR_BIG_ALIEN
-        count: 1
+      - unit: STR_ROGUE
         weapons:
           - STR_HARD_HITTER
-          - STR_ROCKET_LAUNCHER
-      - unit: STR_SPIDER_ALIEN
-        count: 8
-        weapons:
-          - STR_LOW_HITTER
-          - STR_RIFLE
-      - unit: STR_RIFLE_ALIEN
-        count: 8
+      - unit: STR_HUNTER
         weapons:
           - STR_NORMAL_HITTER
           - STR_RIFLE
+      - unit: STR_HEAVY
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_ROCKET_LAUNCHER
+      - unit: STR_ENGINEER
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_HEAVY_ASSAULT_CANNON
       - unit: STR_DRONE
         doNotSpawn: true
         weapons:
           - STR_NORMAL_HITTER
+  - type: STR_YELLOW_ROBOTS
+    factionPrefab: 2
+    color: [226,55,60,1]
+    loadOut:
+      - unit: STR_ROGUE
+        weapons:
+          - STR_HARD_HITTER
+      - unit: STR_HUNTER
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_RIFLE
+      - unit: STR_HEAVY
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_ROCKET_LAUNCHER
+      - unit: STR_ENGINEER
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_HEAVY_ASSAULT_CANNON
+      - unit: STR_DRONE
+        doNotSpawn: true
+        weapons:
+          - STR_NORMAL_HITTER
+
 units:
   - type: STR_DRONE
-    unitSprite: NeutralDrone
-    spriteHasNoFactionPrefix: true
-    visionRange: 10
-    accuracy: 65
-    defense: 0
-    movement: 4
-    health: 3
-    armor: 2
+    factionPrefab: 4 # DroneUnits
+    spriteOffset: 0
+    stats:
+      ActionPoints: 4
+      VisionRange: 10
+      Accuracy: 65
+      Defense: 0
+      Movement: 4
+      Health: 3
+      Armor: 2
   - type: STR_ROGUE
-    unitSprite: Shotgun
-    visionRange: 10
-    accuracy: 65
-    defense: 0
-    movement: 4
-    health: 5
-    armor: 1
+    spriteOffset: 8
+    stats:
+      ActionPoints: 4
+      VisionRange: 10
+      Accuracy: 65
+      Defense: 0
+      Movement: 4
+      Health: 5
+      Armor: 1
     unitSkills:
       - StunMelee
   - type: STR_HEAVY
-    visionRange: 10
-    accuracy: 65
-    defense: 0
-    movement: 4
-    health: 5
-    armor: 2
+    spriteOffset: 14
+    stats:
+      ActionPoints: 4
+      VisionRange: 10
+      Accuracy: 65
+      Defense: 0
+      Movement: 4
+      Health: 5
+      Armor: 2
     unitSkills:
       - RocketLauncher
   - type: STR_HUNTER
-    visionRange: 10
-    accuracy: 70
-    defense: 0
-    movement: 6
-    health: 6
-    armor: 2
+    spriteOffset: 2
+    stats:
+      ActionPoints: 4
+      VisionRange: 10
+      Accuracy: 70
+      Defense: 0
+      Movement: 6
+      Health: 6
+      Armor: 2
     unitSkills:
       - AimedShot
   - type: STR_ENGINEER
-    visionRange: 10
-    accuracy: 65
-    defense: 0
-    movement: 4
-    health: 5
-    armor: 1
+    spriteOffset: 4
+    stats:
+      ActionPoints: 4
+      VisionRange: 10
+      Accuracy: 65
+      Defense: 0
+      Movement: 4
+      Health: 5
+      Armor: 1
     unitSkills:
       - DeployDrone
-  - type: STR_SPIDER_ALIEN
-    visionRange: 12
-    accuracy: 60
-    defense: 10
-    unitSprite: Spider
-    movement: 8
-    health: 3
-    armor: 1
-  - type: STR_ANDROID_ALIEN
-    visionRange: 8
-    defense: 10
-    accuracy: 60
-    unitSprite: Android
-    movement: 4
-    health: 5
-    armor: 2
-  - type: STR_RIFLE_ALIEN
-    visionRange: 10
-    defense: 10
-    accuracy: 65  
-    unitSprite: Rifle
-    movement: 6
-    health: 4
-    armor: 1
-  - type: STR_BIG_ALIEN
-    visionRange: 10
-    defense: 20
-    accuracy: 70  
-    unitSprite: Rocket
-    movement: 4
-    health: 8
-    armor: 4
+
 #    occupiedTiles: [[0,0],[0,1],[1,0],[1,1]]
 #    canMoveDiagonally: false
 
@@ -351,14 +339,10 @@ translations:
   - lang: en-US
     strings:
       STR_FIRST_MISSION: Mission One
-      STR_ALIENS: Alien Lifeforms
       STR_GREEN_MARINES: Colonial Marines
       STR_RED_SPACEMEN: Travellers
-      STR_YELLOW_MARINES: Legion
-      STR_SPIDER_ALIEN: Spiderbrain
-      STR_RIFLE_ALIEN: Xenophob
-      STR_SQUADDIE: Space Marine
-      STR_SQUAD_LEADER: Squad Leader
+      STR_YELLOW_ROBOTS: Legion
+      STR_BLUE_BIRD_PEOPLE: Birds of Prey
       STR_PLASMA_GUN: Plasma Gun
       STR_HEAVY_ASSAULT_CANNON: Assault Cannon
       STR_ROCKET_LAUNCHER: Missile Launcher
@@ -368,7 +352,6 @@ translations:
       STR_ANDROID_ALIEN: Manic-depressive Android
       STR_HEAVY_HITTER: Mechanic Punch
       STR_ANDROID_RIFLE: Laser Rifle
-      STR_BIG_ALIEN: Cyclone Soldier
       STR_LOW_HITTER: Pummel
       STR_ROGUE: Rogue
       STR_HUNTER: Bounty Hunter

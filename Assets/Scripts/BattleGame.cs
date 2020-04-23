@@ -36,7 +36,8 @@ public class BattleGame : MonoBehaviour, IGame
     public AudioClip soundButtonPressed;
 
     public AudioSource globalAudioSource;
-    public GameObject[] unitPrefabs;
+    public GameObject[] factionPrefabs;
+    
     public GameObject explosionPrefab;
     public GameObject meleeHitPrefab;
 
@@ -263,6 +264,10 @@ public class BattleGame : MonoBehaviour, IGame
 
     private void DeselectAll()
     {
+        if (selectedUnit != null)
+        {
+            selectedUnit.ResetSprite();
+        }
         selectedUnit = null;        
         ToDefaultState();
         UpdateUIButtons();
@@ -331,6 +336,9 @@ public class BattleGame : MonoBehaviour, IGame
                         if (unitAction.TargetMode.Type == TargetModeType.Single)
                         {
                             unitAction.ConfirmTargets();
+                        }
+                        else
+                        {
                             PlaySoundEffect(UiSoundEffect.UiConfirm);
                         }
                     }
@@ -400,7 +408,7 @@ public class BattleGame : MonoBehaviour, IGame
         {
             selectedUnit = (Unit) clickedUnit;
             Debug.Log("UnitSelected: " + selectedUnit);
-            if (selectedUnit.CurrentMovesLeft > 0)
+            if (selectedUnit.ActionPoints > 0)
             {
                 gameState = GameState.MoveTargetSelection;
             }
@@ -425,7 +433,7 @@ public class BattleGame : MonoBehaviour, IGame
     public Projectile CreateProjectile(Vector3 start, Vector3 end, float speed, int selectedSprite)
     {
         var moveDirection = (end - start);
-        Debug.Log("Spawning projectile effect (" + start +" -> " + end + ")");
+//        Debug.Log("Spawning projectile effect (" + start +" -> " + end + ")");
         float angle = Mathf.Atan2(moveDirection.y, moveDirection.x) * Mathf.Rad2Deg;
         var go = Instantiate(projectilePrefab, start, Quaternion.AngleAxis(angle, Vector3.forward));
         Projectile projectile = go.GetComponent<Projectile>();
@@ -444,7 +452,7 @@ public class BattleGame : MonoBehaviour, IGame
         
         var path = unit.GetShortestPath(mapPos);
         
-        if (path.Count <= 0 || path.Count - 1 > unit.CurrentMovesLeft) return false;
+        if (path.Count <= 0 || unit.ActionPoints <= 0) return false;
         
         _map.RemoveAllHighlights();
         _map.RemoveAllHighlights(1);
@@ -709,7 +717,8 @@ public class BattleGame : MonoBehaviour, IGame
         }
         else
         {
-            StartTargetingForAction(selectedUnit.AvailableSkills[skillIndex]);
+            var skillName = selectedUnit.AvailableSkills[skillIndex];
+            StartTargetingForAction(skillName);
         }
     }
 
@@ -750,7 +759,7 @@ public class BattleGame : MonoBehaviour, IGame
         
         GlobalFOVUpdate();
         
-        if (selectedUnit == args.unit && selectedUnit.CurrentMovesLeft > 0)
+        if (selectedUnit == args.unit && selectedUnit.ActionPoints > 0)
         {
             gameState = GameState.MoveTargetSelection;
             HighlightTiles(selectedUnit.ReachablePositions, new Color(0, 0.8f, 0, 0.2f));
@@ -836,45 +845,24 @@ public class BattleGame : MonoBehaviour, IGame
     private void SpawnUnits()
     {
         var mapRules = mod.GetMap(currentMapIndex);
-        List<List<Vector3Int>> spawnPointsByFaction = null;
-        if (mapRules.Generator == 0) // premade map, load spawnpoints from map
-        {
-            spawnPointsByFaction =_map.GetSpawnPoints();
-        }
+        var spawnPointsByFaction = _map.GetSpawnPoints();
         foreach (var ruleFaction in factions)
         {
-            var spawnRule = mod.GetSpawnRule(ruleFaction.Type);
-            if (spawnRule.RandomPlacement)
+            var factionIndex = ruleFaction.FactionPrefab;
+            var spawnPositions = spawnPointsByFaction[factionIndex];
+            int spawnIndex = 0;
+            foreach (var loadOut in ruleFaction.LoadOut)
             {
-                RandomPlacement(ruleFaction);
-            }
-            else
-            {
-                List<Vector3Int> spawnPositions;
-                if (mapRules.Generator == 0 && spawnPointsByFaction != null)
+                for (int i = 0; i < loadOut.Count; i++)
                 {
-                    var factionIndex = factions.IndexOf(ruleFaction);
-                    spawnPositions = spawnPointsByFaction[factionIndex];
-                }
-                else
-                {
-                    spawnPositions = spawnRule.Locations.ConvertAll(elem => new Vector3Int(elem[0], elem[1], 0));
-                }
-                
-                int spawnIndex = 0;
-                foreach (var loadOut in ruleFaction.LoadOut)
-                {
-                    for (int i = 0; i < loadOut.Count; i++)
-                    {
-                        if (loadOut.DoNotSpawn) continue;
-                        if (spawnIndex >= spawnPositions.Count)
-                            break;
-                        var spawnPosition = spawnPositions[spawnIndex];
-                        string unitType = loadOut.Unit;
-                        SpawnUnit(spawnPosition, unitType, loadOut, ruleFaction);
-                        Debug.Log("Unit " + unitType + " spawned at " + spawnPosition);
-                        spawnIndex++;
-                    }
+                    if (loadOut.DoNotSpawn) continue;
+                    if (spawnIndex >= spawnPositions.Count)
+                        break;
+                    var spawnPosition = spawnPositions[spawnIndex];
+                    string unitType = loadOut.Unit;
+                    SpawnUnit(spawnPosition, unitType, loadOut, ruleFaction);
+                    Debug.Log("Unit " + unitType + " spawned at " + spawnPosition);
+                    spawnIndex++;
                 }
             }
         }
@@ -882,18 +870,17 @@ public class BattleGame : MonoBehaviour, IGame
 
     public bool SpawnUnit(Vector3Int spawnPosition, string unitType, RuleLoadout loadout, RuleFaction ruleFaction)
     {
-        var unitPrefab = FindPrefab(unitType, loadout, ruleFaction);
-        var unit = Instantiate(unitPrefab, _map.CellToWorld(spawnPosition), Quaternion.identity)
-            .GetComponent<Unit>();
+        var unitRules = mod.GetUnitRule(unitType);
+        var unitPrefab = unitRules.FactionPrefab != -1 ? factionPrefabs[unitRules.FactionPrefab] : factionPrefabs[ruleFaction.FactionPrefab];
+        var go = Instantiate(unitPrefab, _map.CellToWorld(spawnPosition), Quaternion.identity);
+        var unit = go.GetComponent<Unit>();
         unit.LoadRules(unitType, ruleFaction, loadout);
         if (_map.AddUnit(unit, spawnPosition))
         {
-            var spriteRenderer = unit.GetComponentInChildren<SpriteRenderer>();
-            //spriteRenderer.color = ColorFromArray(ruleFaction.Color);
-            //spriteRenderer.enabled = false; // spawn every unit invisible
-            
             unit.FinishedMoving += UnitFinishedMoving;
             unit.StepCompleted += UnitStepCompleted;
+            var unitAnimator = go.GetComponentInChildren<UnitAnimator>();
+            unitAnimator.SetSpriteOffset(unitRules.SpriteOffset);
             
             var unitLabel = Instantiate(unitLabelPrefab).GetComponent<Text>();
             unitLabel.transform.SetParent(worldCanvasTransform);
@@ -901,52 +888,12 @@ public class BattleGame : MonoBehaviour, IGame
             unit.SetLabel(unitLabel);
             
             allUnits.Add(unit);
-            
-            //gameMap.UpdateFOV(spawnPosition, unit.visionRange);
             return true;
         }
 
         Destroy(unit.gameObject);
         Debug.LogWarning("Could not spawn unit at: " + spawnPosition);
         return false;
-    }
-
-    private GameObject FindPrefab(string unitType, RuleLoadout loadout, RuleFaction ruleFaction)
-    {
-        var unitRules = mod.GetUnitRule(unitType);
-        var unitSprite = unitRules.UnitSprite;
-        var ruleWeapons = loadout.Weapons.Select(weaponName => mod.GetWeaponRule(weaponName));
-        var prefabName = "";
-        var weaponRules = ruleWeapons as RuleWeapon[] ?? ruleWeapons.ToArray();
-        if (weaponRules.Any(rule => rule.WeaponSprite.Length > 0))
-        {
-            var weaponRuleWithSprite = weaponRules.First(rule => rule.WeaponSprite.Length > 0);
-        
-            if (weaponRuleWithSprite != null)
-            {
-                prefabName = ruleFaction.SpritePrefix + weaponRuleWithSprite.WeaponSprite;
-            }
-        }
-
-        if (unitSprite.Length > 0)
-        {
-            if (unitRules.SpriteHasNoFactionPrefix)
-            {
-                prefabName = unitSprite;
-            }
-            else
-            {
-                prefabName = ruleFaction.SpritePrefix + unitSprite;
-            }
-        }
-
-        if (prefabName == "")
-        {
-            Debug.Log("NO PREFAB FOR " + unitType);
-        }
-        Debug.Log("Trying to load prefab " + prefabName);
-        var unitPrefab = unitPrefabs.First(go => go.name == prefabName);
-        return unitPrefab;
     }
 
     private void UnitStepCompleted(object sender, UnitEventArgs args)
@@ -1092,6 +1039,7 @@ public class BattleGame : MonoBehaviour, IGame
     {
         foreach (var loadOut in ruleFaction.LoadOut)
         {
+            if (loadOut.DoNotSpawn) continue;
             for (int i = 0; i < loadOut.Count; i++)
             {
                 Vector3Int randomPosition = _map.RandomPosition;

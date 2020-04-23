@@ -35,8 +35,6 @@ namespace WorldEffects
                 }
             }
             
-            ActingUnit.AllowNoMoreActions();
-            
             OnCompleted();
         }
     }

@@ -31,7 +31,7 @@ namespace WorldEffects
                         }
                         
                     }, timer);
-                    timer += Random.Range(0.001f, 0.201f);
+                    timer += Random.Range(0.100f, 0.301f);
                 }
             }
         }

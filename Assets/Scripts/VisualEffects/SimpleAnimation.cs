@@ -26,6 +26,10 @@ public class SimpleAnimation : MonoBehaviour
         {
             simpleAudio.OnCompleted += AudioCompleted;
         }
+        else // no audio
+        {
+            audioFinished = true;
+        }
         frameCount = frames.Length;
         spriteRenderer.sprite = frames[currentFrame];
     }

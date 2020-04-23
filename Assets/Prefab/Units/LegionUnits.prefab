@@ -72,7 +72,7 @@ SpriteRenderer:
   m_SortingLayerID: 2079868369
   m_SortingLayer: 2
   m_SortingOrder: 0
-  m_Sprite: {fileID: 3275460484590516757, guid: ab3cb6d4caafa46808f2d173069831a1,
+  m_Sprite: {fileID: -5232357338474393125, guid: ab3cb6d4caafa46808f2d173069831a1,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -96,9 +96,39 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 38564dc6ca4c346e2a9f90ee66535d7b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  frames:
-  - {fileID: 3275460484590516757, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
-  - {fileID: -1245536424210475614, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  idleFrames:
+  - {fileID: -6248067526141773228, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 1012113890196653016, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: -4879973459712207330, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 8378278426067883451, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 6459743805786168823, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 6491139929011406851, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 5602879786310848165, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: -1972073758778012532, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 5574916455584912309, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 1869505704865980209, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 3570127810198606407, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: -1293766409652342372, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 8147291351657739128, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 3657097885477106245, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 2733210617256466115, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: -5051125062566465660, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 7907298651026096347, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 6746291762448173768, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: -5232357338474393125, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 4590436214335494599, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: -1653574695088782881, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 1340997019660746970, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 7687192936180047135, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: -6015729361173164385, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 6435092780679608640, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 3630532662090516135, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 2783727513369367965, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: -3513457198514261834, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 4208518908390290790, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 1229942798074988494, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 5940480885724763589, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
+  - {fileID: 4167372128879187114, guid: ab3cb6d4caafa46808f2d173069831a1, type: 3}
 --- !u!96 &274053069669889033
 TrailRenderer:
   serializedVersion: 2
@@ -279,7 +309,7 @@ GameObject:
   - component: {fileID: 3510056058709453009}
   - component: {fileID: 3510056058709453015}
   m_Layer: 0
-  m_Name: MarineCommander
+  m_Name: MarineUnits 1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

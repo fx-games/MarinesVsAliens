@@ -23,12 +23,12 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public Weapon RangedWeapon { get; private set; }
     public Weapon MeleeWeapon { get; private set; }
     public GameObject bloodSplatter;
-    public int CurrentMovesLeft
+    public int ActionPoints
     {
-        get => GetCurrentStat("Movement");
-        private set => SetCurrentStat("Movement", value);
+        get => GetCurrentStat("ActionPoints") / 100;
+        private set => SetCurrentStat("ActionPoints", value * 100);
     }
-
+    
     public int CurrentVisionRange => GetCurrentStat("VisionRange");
 
     public int CurrentHealth
@@ -81,7 +81,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
         return melee + ranged;
     } }
 
-    public bool CanAct => CanAttack || CurrentMovesLeft > 0;
+    public bool CanAct => CanAttack || ActionPoints > 0;
     public RuleUnit Rules => unitRules;
     public List<Vector3Int> OccupiedTiles { get; set; }
     public HashSet<IPlayerUnit> VisibleEnemies => _visibleEnemies;
@@ -98,6 +98,10 @@ public class Unit : MonoBehaviour, IPlayerUnit
     private int currentMapPathIndex = -1;
     private Light2D lightSource;
     private bool animatingLabel;
+    private UnitAnimator animator;
+    private int originalSpriteOffset;
+    private int cardinalStepCost = 100;
+    private int diagonalStepCost = 140;
     public event UnitEvent FinishedMoving;
     public event UnitEvent StepCompleted;
     // Start is called before the first frame update
@@ -109,8 +113,14 @@ public class Unit : MonoBehaviour, IPlayerUnit
         mod = FindObjectOfType<Mod>();
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
         lightSource = GetComponentInChildren<Light2D>();
-        pathfinder = new Pathfinder(_map, 1.0f, 1.41f);
-        Procs = new ProcReceiver(activeBuffs);
+        animator = GetComponentInChildren<UnitAnimator>();
+        pathfinder = new Pathfinder(_map, cardinalStepCost, diagonalStepCost);
+        Procs = new ProcReceiver(activeBuffs);                
+    }
+
+    private void Start()
+    {
+        originalSpriteOffset = animator.SpriteOffset;
         UpdateReachablePositions();
     }
 
@@ -119,7 +129,16 @@ public class Unit : MonoBehaviour, IPlayerUnit
         get => healthBar.enabled;
         set => healthBar.enabled = value;
     }
-
+    
+    public void ChangeSprite(int spriteOffset)
+    {
+        animator.SetSpriteOffset(spriteOffset);
+    }
+    public void ResetSprite()
+    {
+        Debug.Log("Trying to reset sprite of " + this);
+        animator.SetSpriteOffset(originalSpriteOffset);
+    }
     // Update is called once per frame
     private void Update()
     {
@@ -233,7 +252,8 @@ public class Unit : MonoBehaviour, IPlayerUnit
             State = UnitState.Moving;
             lastMoveTime = Time.time;
 
-            CurrentMovesLeft--;
+            // handle movement with a scale of *10
+            SetCurrentStat("ActionPoints", GetCurrentStat("ActionPoints") - StepCost(currVisPos, nextVisPos));
             
             // WE VISUALLY MOVE THE UNIT HERE
             RepositionUnitInWorld(nextVisPos);
@@ -247,12 +267,29 @@ public class Unit : MonoBehaviour, IPlayerUnit
         }
     }
 
+    private int StepCost(Vector3Int curPos, Vector3Int nextPos)
+    {
+        // 4 AP => 400 AP in Datastructure
+        // movement = 10 -> 10 tiles in gerader linie
+        // 10 schritte = 400 ap -> 1 schritt = MaxAP/MaxMovement (400/10=40)
+        
+        
+        if (curPos.x == nextPos.x || curPos.y == nextPos.y) return cardinalStepCost;
+        return (int) diagonalStepCost;
+    }
+    
+    private void ReduceActionPoints(int amount)
+    {
+        ActionPoints -= amount;
+    }
+
     public void EndMovement()
     {
         State = UnitState.Idle;
         visualPathIndex = 0;
         currentPath = null;
 
+        
         UpdateReachablePositions();
         UpdateValidAttackTargets();
         OnFinishedMoving();
@@ -260,7 +297,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     private void UpdateHealthBar()
     {
-        var healthInPercent = CurrentHealth / (float)Rules.Health;
+        var healthInPercent = CurrentHealth / (float)Rules.Stats["Health"];
         var leftPoint = healthBar.GetPosition(0);
         healthBar.SetPosition(1, new Vector3(leftPoint.x + healthInPercent, leftPoint.y, leftPoint.z));
     }
@@ -374,13 +411,21 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
         AvailableSkills = unitRules.UnitSkills;
         
-        stats["Health"] = new UnitStat("Health", unitRules.Health);
-        stats["Armor"] = new UnitStat("Armor", unitRules.Armor);
-        stats["Movement"] = new UnitStat("Movement", unitRules.Movement);
-        stats["Accuracy"] = new UnitStat("Accuracy", unitRules.Accuracy);
-        stats["Defense"] = new UnitStat("Defense", unitRules.Defense);
-        stats["VisionRange"] = new UnitStat("VisionRange", unitRules.VisionRange);
+        foreach (var kvp in unitRules.Stats)
+        {
+            var statName = kvp.Key;
+            var statValue = kvp.Value;
 
+            if (statName == "ActionPoints") statValue *= 100; // scale action points
+            
+            stats[statName] = new UnitStat(statName, statValue);
+        }
+        
+        cardinalStepCost = stats["ActionPoints"].MaxValue / stats["Movement"].MaxValue;
+        diagonalStepCost = (int) (cardinalStepCost * 1.4f);
+        
+        pathfinder = new Pathfinder(_map, cardinalStepCost, diagonalStepCost);
+        
         OccupiedTiles = unitRules.OccupiedTiles.ConvertAll(elem => new Vector3Int(elem[0], elem[1], 0));
 
         OffsetSprite();
@@ -405,9 +450,9 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     public void AllowNoMoreActions()
     {
-        if (CurrentMovesLeft != unitRules.Movement)
+        if (ActionPoints != unitRules.Stats["ActionPoints"])
         {
-            CurrentMovesLeft = 0;    // can not move before AND after firing
+            ActionPoints = 0;    // can not move before AND after firing
         }
         CanAttack = false;
         UpdateMarker();
@@ -415,7 +460,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     public void PrepareNewPhase()
     {
-        CurrentMovesLeft = unitRules.Movement;
+        ActionPoints = unitRules.Stats["ActionPoints"];
         CanAttack = true;
         UpdateValidAttackTargets();
         UpdateReachablePositions();
@@ -497,15 +542,15 @@ public class Unit : MonoBehaviour, IPlayerUnit
             {
                 markerRenderer.color = new Color(1.0f, 0.64f, 0.0f);
             }
-            else if (CurrentMovesLeft > 0 && CanAttack)
+            else if (ActionPoints > 0 && CanAttack)
             {
                 markerRenderer.color = Color.green;
             }
-            else if (CurrentMovesLeft <= 0 && CanAttack)
+            else if (ActionPoints <= 0 && CanAttack)
             {
                 markerRenderer.color = Color.red;
             }
-            else if (!CanAttack && CurrentMovesLeft > 0)
+            else if (!CanAttack && ActionPoints > 0)
             {
                 markerRenderer.color = Color.yellow;
             }
@@ -518,7 +563,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     public int DamageReceived(Unit source, Weapon weaponUsed, int damage)
     {
-        //Debug.Log(name + " received " + damage + " damage");
+        Debug.Log(name + " received " + damage + " damage from " + source);
         var oldHealth = CurrentHealth;
         CurrentHealth -= damage;
 
@@ -586,6 +631,21 @@ public class Unit : MonoBehaviour, IPlayerUnit
             }
             
             validTargets.Remove(mapPos);
+
+            if (!Options.AllowRangedWeaponsRangeOne)
+            {
+                foreach (var direction in _map.Cardinal)
+                {
+                    validTargets.Remove(mapPos + direction.ToVector());
+                }
+            }
+            if (!Options.AllowDiagonalAdjacentAttacks)
+            {
+                foreach (var direction in _map.Diagonal)
+                {
+                    validTargets.Remove(mapPos + direction.ToVector());
+                }
+            }
         }
         
         return validTargets;
@@ -625,19 +685,19 @@ public class Unit : MonoBehaviour, IPlayerUnit
     
     public override string ToString()
     {
-        return name + "\nM:" + CurrentMovesLeft + "/H:" + CurrentHealth + "/A:" + CurrentArmor + "/ACC:" + GetCurrentStat("Accuracy") + "@" + Cell;
+        return name + "\nM:" + ActionPoints + "/H:" + CurrentHealth + "/A:" + CurrentArmor + "/ACC:" + GetCurrentStat("Accuracy") + "@" + Cell;
     }
     
 
     private List<Vector3Int> CreateMovementMap()
     {
-        pathfinder.MaxReachableCost = CurrentMovesLeft + 1f;
+        pathfinder.MaxReachableCost = GetCurrentStat("ActionPoints") + cardinalStepCost;
         pathfinder.MaxCost =  -1;
         pathfinder.CurrentUnit = this;
         pathfinder.Dijkstra(new HashSet<Vector3Int>(){Cell}, new HashSet<Vector3Int>());
-        return CurrentMovesLeft == 0 ? new List<Vector3Int>() : pathfinder.ReachableList.ToList();
+        return ActionPoints == 0 ? new List<Vector3Int>() : pathfinder.ReachableList.ToList();
     }
-    
+
     public List<Vector3Int> GetShortestPath(Vector3Int startPosition, Vector3Int goalPosition)
     {
 //        Debug.Log("GetShortestPath(" + startPosition + ", " + goalPosition + ")");
@@ -732,82 +792,12 @@ public class Unit : MonoBehaviour, IPlayerUnit
     }
     public void DisableMovement()
     {
-        SetCurrentStat("Movement", 0);
+        ActionPoints = 0;
         UpdateReachablePositions();
         UpdateMarker();
     }
 }
 
-
-public class Weapon
-{
-    private RuleWeapon weaponRules;
-    private Mod mod;
-
-    public Weapon(Mod mod, RuleWeapon rules)
-    {
-        this.mod = mod;
-        weaponRules = rules;
-    }
-
-    public bool HasAreaOfEffect => weaponRules.Radius > 0;
-
-    public RuleWeapon Rules => weaponRules;
-
-    public override string ToString()
-    {
-        return mod.Tr(weaponRules.Type);
-    }
-
-    public int DamageToTile()
-    {
-        return Options.CombatMechanics.ResolveDamageToTile(this);
-    }
-
-    public int AoEDamageToTile()
-    {
-        return DamageToTile();
-    }
-}
-
-public class UnitStat
-{
-    public UnitStat(string name, int maxValue)
-    {
-        Name = name;
-        CurrentValue = maxValue;
-        MaxValue = maxValue;
-    }
-
-    public string Name { get; }
-    public int MaxValue { get; private set; }
-    public int CurrentValue { get; private set; }
-
-    public int Change(int change)
-    {
-        int oldValue = CurrentValue;
-        Set(CurrentValue + change);
-        var absorbed = CurrentValue - oldValue;
-        return absorbed;
-    }
-
-    public int Set(int value)
-    {
-        CurrentValue = value;
-        
-        if (CurrentValue <= 0)
-        {
-            CurrentValue = 0;
-        }
-        else if (CurrentValue > MaxValue)
-        {
-            CurrentValue = MaxValue;
-        }
-
-        var rest = value - CurrentValue;
-        return rest;
-    }
-}
 
 public delegate void UnitEvent(object sender, UnitEventArgs args);
 
