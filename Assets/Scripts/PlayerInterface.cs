@@ -49,7 +49,7 @@ namespace DefaultNamespace
         int ActionPoints { get; }
         int CurrentVisionRange { get; }
         int CurrentHealth { get; }
-        bool CanAttack { get; }
+        bool CanAttack();
         Mod.RuleFaction Faction { get; set; }
         Vector3Int Cell { get; }
         bool HasRangedWeapon { get; }

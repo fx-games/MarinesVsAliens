@@ -44,7 +44,7 @@ namespace DefaultNamespace.Units.UnitActions
                 return;
             }
 
-            if (ActingUnit.State != Moving && ActingUnit.CanAttack)
+            if (ActingUnit.State != Moving)
             {
                 _map.RemoveAllHighlights(0);
                 _map.RemoveAllHighlights(1);
@@ -180,14 +180,14 @@ namespace DefaultNamespace.Units.UnitActions
         public bool IsOffensiveAction { get; set; }
 
         private void AfterAction()
-        {
-            
+        {            
             executedEffects.ForEach(e => { e.RemoveAllCompletionHandlers(); });
             ActingUnit.ResetSprite();
             if (IsOffensiveAction)
             {
+                var actionCost = IsMelee ? ActingUnit.MeleeWeapon.Rules.UseCost : ActingUnit.RangedWeapon.Rules.UseCost;
                 ActingUnit.Procs.OnHasAttacked();
-                ActingUnit.AllowNoMoreActions();
+                ActingUnit.DeductActionPoints(actionCost);
             }
             
             _game.CheckForDeadUnits();

@@ -26,7 +26,7 @@ namespace AI
 
         public override bool CheckIfFired(Unit unit, MapTileInfo[,] mapKnowledge, List<Unit> visibleEnemies)
         {
-            if (unit.VisibleEnemies.Count == 0 || !unit.CanAttack) return false;
+            if (unit.VisibleEnemies.Count == 0 || !unit.CanAttack()) return false;
             return unit.VisibleEnemies.Any(unit.CanAttackUnit);
         }
 

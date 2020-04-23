@@ -286,16 +286,19 @@ units:
 
 weapons:
   - type: STR_HARD_HITTER
+    useCost: 3
     damage:
       - [3,4]
     isMelee: true
   - type: STR_RIFLE
+    useCost: 2
     minRange: 1
     maxRange: 8
     weaponSprite: Rifle
     damage:
       - [1,3]
   - type: STR_ANDROID_RIFLE
+    useCost: 3
     maxRange: 20
     maxDropOff: 10
     minRange: 6
@@ -305,31 +308,37 @@ weapons:
     damage:
       - [1,4]
   - type: STR_LOW_HITTER
+    useCost: 2
     damage:
       - [1]
     isMelee: true
   - type: STR_NORMAL_HITTER
+    useCost: 2
     damage:
       - [1,2]
     isMelee: true
   - type: STR_HEAVY_HITTER
+    useCost: 2
     damage:
       - [3,4]
     isMelee: true
   - type: STR_ROCKET_LAUNCHER
     accuracyModifier: -10
     weaponSprite: Rocket
+    useCost: 3
     damage:
       - [3]
     radius: 1
   - type: STR_HEAVY_ASSAULT_CANNON
     weaponSprite: Heavy
+    useCost: 3
     damage:
       - [2,4]
     multipleTargets: true
     damageDistribution: true
   - type: STR_PLASMA_GUN
     weaponSprite: Heavy
+    useCost: 3
     damage:
       - [1,3]
     straightLineOnly: true

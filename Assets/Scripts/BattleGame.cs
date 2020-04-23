@@ -928,8 +928,8 @@ public class BattleGame : MonoBehaviour, IGame
 
         var unitIsSelected = selectedUnit != null;
         
-        var rangedAttackButtonShouldBeVisible = unitIsSelected && selectedUnit.CanAttack && selectedUnit.HasRangedWeapon;
-        var meleeAttackButtonShouldBeVisible = unitIsSelected && selectedUnit.CanAttack && selectedUnit.HasMeleeWeapon;
+        var rangedAttackButtonShouldBeVisible = unitIsSelected && selectedUnit.CanAffordRangedAttack() && selectedUnit.HasRangedWeapon;
+        var meleeAttackButtonShouldBeVisible = unitIsSelected && selectedUnit.CanAffordMeleeAttack() && selectedUnit.HasMeleeWeapon;
         var openDoorButtonShouldBeVisible = unitIsSelected && IsNextToDoor(selectedUnit);
         var numberOfNeededSkillButtons = unitIsSelected ? selectedUnit.AvailableSkills.Count : 0;
         
@@ -975,7 +975,7 @@ public class BattleGame : MonoBehaviour, IGame
             }
         }
 
-        if (unitIsSelected && selectedUnit.CanAttack)
+        if (unitIsSelected && selectedUnit.CanAct)
         {
             for (int i = 0; i < skillButtons.Count; i++)
             {

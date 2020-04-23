@@ -38,7 +38,6 @@ public class Unit : MonoBehaviour, IPlayerUnit
     }
 
     public int CurrentArmor => GetCurrentStat("Armor");
-    public bool CanAttack { get; private set; } = true;
     public RuleFaction Faction { get; set; }
     
     public Vector3Int Cell => _map.WorldToCell(transform.position);
@@ -81,7 +80,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
         return melee + ranged;
     } }
 
-    public bool CanAct => CanAttack || ActionPoints > 0;
+    public bool CanAct => ActionPoints > 0;
     public RuleUnit Rules => unitRules;
     public List<Vector3Int> OccupiedTiles { get; set; }
     public HashSet<IPlayerUnit> VisibleEnemies => _visibleEnemies;
@@ -277,11 +276,6 @@ public class Unit : MonoBehaviour, IPlayerUnit
         if (curPos.x == nextPos.x || curPos.y == nextPos.y) return cardinalStepCost;
         return (int) diagonalStepCost;
     }
-    
-    private void ReduceActionPoints(int amount)
-    {
-        ActionPoints -= amount;
-    }
 
     public void EndMovement()
     {
@@ -450,18 +444,13 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     public void AllowNoMoreActions()
     {
-        if (ActionPoints != unitRules.Stats["ActionPoints"])
-        {
-            ActionPoints = 0;    // can not move before AND after firing
-        }
-        CanAttack = false;
+        ActionPoints = 0;
         UpdateMarker();
     }
 
     public void PrepareNewPhase()
     {
         ActionPoints = unitRules.Stats["ActionPoints"];
-        CanAttack = true;
         UpdateValidAttackTargets();
         UpdateReachablePositions();
 
@@ -542,19 +531,19 @@ public class Unit : MonoBehaviour, IPlayerUnit
             {
                 markerRenderer.color = new Color(1.0f, 0.64f, 0.0f);
             }
-            else if (ActionPoints > 0 && CanAttack)
+            else if (ActionPoints == Rules.Stats["ActionPoints"])
             {
                 markerRenderer.color = Color.green;
             }
-            else if (ActionPoints <= 0 && CanAttack)
-            {
-                markerRenderer.color = Color.red;
-            }
-            else if (!CanAttack && ActionPoints > 0)
+            else if (ActionPoints < Rules.Stats["ActionPoints"] / 2)
             {
                 markerRenderer.color = Color.yellow;
             }
-            else
+            else if (ActionPoints < Rules.Stats["ActionPoints"] / 4)
+            {
+                markerRenderer.color = Color.red;
+            }
+            else if (ActionPoints < 1)
             {
                 markerRenderer.color = Color.gray;
             }
@@ -602,11 +591,32 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     public bool CanAttackUnit(IPlayerUnit otherUnit)
     {
-        return CanAttack
+        return CanAttack()
                && (HasMeleeWeapon && _map.AreNeighbors(Cell, otherUnit.Cell) ||
                    HasRangedWeapon && ValidRangedTargets.Contains(otherUnit.Cell));
     }
 
+    public bool CanAttack()
+    {
+        var meleeCosts = HasMeleeWeapon ? MeleeWeapon.Rules.UseCost : int.MaxValue;
+        var rangedCosts = HasRangedWeapon ? RangedWeapon.Rules.UseCost : int.MaxValue;
+
+        var minApCosts = Mathf.Min(meleeCosts, rangedCosts);
+
+        return ActionPoints >= minApCosts;
+    }
+
+    public bool CanAffordRangedAttack()
+    {
+        var rangedCosts = HasRangedWeapon ? RangedWeapon.Rules.UseCost : int.MaxValue;
+        return ActionPoints >= rangedCosts; 
+    }
+
+    public bool CanAffordMeleeAttack()
+    {
+        var meleeCosts = HasMeleeWeapon ? MeleeWeapon.Rules.UseCost : int.MaxValue;
+        return ActionPoints >= meleeCosts;
+    }
     public HashSet<Vector3Int> GetValidRangedAttackTargetsAt(Vector3Int mapPos)
     {
         HashSet<Vector3Int> validTargets = new HashSet<Vector3Int>();
@@ -785,14 +795,16 @@ public class Unit : MonoBehaviour, IPlayerUnit
         }
     }
 
-    public void DisableAttack()
-    {
-        CanAttack = false;        
-        UpdateMarker();
-    }
-    public void DisableMovement()
+    public void DisableActions()
     {
         ActionPoints = 0;
+        UpdateReachablePositions();
+        UpdateMarker();
+    }
+
+    public void DeductActionPoints(int actionCost)
+    {
+        ActionPoints -= actionCost;
         UpdateReachablePositions();
         UpdateMarker();
     }

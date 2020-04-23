@@ -10,15 +10,13 @@ namespace Buffs
         {
             if (buff == this)
             {
-                BuffedUnit.DisableAttack();
-                BuffedUnit.DisableMovement();
+                BuffedUnit.DisableActions();
             }
         }
 
         public override void OnNextTurn()
         {
-            BuffedUnit.DisableAttack();
-            BuffedUnit.DisableMovement();
+            BuffedUnit.DisableActions();
         }
     }
 }

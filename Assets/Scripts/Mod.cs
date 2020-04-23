@@ -154,6 +154,7 @@ public class Mod : MonoBehaviour
 
     public class RuleWeapon
     {
+        public int UseCost { get; set; }
         public string Type { get; set; }
         public List<int[]> Damage { get; set; }
         public int MinRange { get; set; } = 1;
