@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using UnityEngine.Serialization;
+using WorldEffects;
 
 public class SimpleAnimation : MonoBehaviour
 {
@@ -10,19 +11,34 @@ public class SimpleAnimation : MonoBehaviour
     private float delay = 0.1f;
     private SpriteRenderer spriteRenderer;
     private float lastAnimTime = 0;
+    private SimpleAudio simpleAudio;
+    private bool animationFinished = false;
+    private bool audioFinished = false;
+    private bool completed = false;
 
+    public event VoidEvent OnCompleted;
     // Start is called before the first frame update
     void Start()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
+        simpleAudio = GetComponent<SimpleAudio>();
+        if (simpleAudio != null)
+        {
+            simpleAudio.OnCompleted += AudioCompleted;
+        }
         frameCount = frames.Length;
         spriteRenderer.sprite = frames[currentFrame];
+    }
+
+    private void AudioCompleted(object sender)
+    {
+        audioFinished = true;
     }
 
     // Update is called once per frame
     void Update()
     {
-        if (Time.time - lastAnimTime > delay)
+        if (!animationFinished && Time.time - lastAnimTime > delay)
         {
             currentFrame++;
             if (currentFrame < frameCount)
@@ -30,7 +46,17 @@ public class SimpleAnimation : MonoBehaviour
                 spriteRenderer.sprite = frames[currentFrame];
                 lastAnimTime = Time.time;
             }
-            else if (DestroyOnFinish)
+            else
+            {
+                animationFinished = true;
+            }
+        }
+
+        if (audioFinished && animationFinished && !completed)
+        {
+            completed = true;
+            OnCompleted?.Invoke(this);
+            if (DestroyOnFinish)
             {
                 Destroy(gameObject);
             }

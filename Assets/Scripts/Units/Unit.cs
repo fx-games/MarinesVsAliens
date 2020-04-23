@@ -54,6 +54,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     private SpriteRenderer spriteRenderer;
     private SpriteRenderer markerRenderer;
     private Text unitLabel;
+    private Color labelColor;
     private Camera gameCamera;
     public UnitState State { get; private set; } = UnitState.Idle;
     public bool HasRangedWeapon => RangedWeapon != null;
@@ -96,6 +97,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     private LineRenderer healthBar;
     private int currentMapPathIndex = -1;
     private Light2D lightSource;
+    private bool animatingLabel;
     public event UnitEvent FinishedMoving;
     public event UnitEvent StepCompleted;
     // Start is called before the first frame update
@@ -118,14 +120,24 @@ public class Unit : MonoBehaviour, IPlayerUnit
         set => healthBar.enabled = value;
     }
 
-    
-
     // Update is called once per frame
     private void Update()
     {
         if (State == UnitState.Moving && (Time.time - lastMoveTime) > moveDelay)
         {
             NextMove();
+        }
+
+        if (animatingLabel)
+        {
+            unitLabel.transform.position += Vector3.up * Time.deltaTime;
+            labelColor.a -= 0.005f;
+            unitLabel.color = labelColor;
+            if (labelColor.a < 0)
+            {
+                animatingLabel = false;
+                RemoveLabel();
+            }
         }
     }
 
@@ -137,11 +149,14 @@ public class Unit : MonoBehaviour, IPlayerUnit
         }
     }
 
-    public void SetLabelText(string text)
+    public void SetLabelText(string text, bool animate = false)
     {
+        labelColor = Color.white;
         unitLabel.enabled = true;
         unitLabel.transform.position = transform.position;
         unitLabel.text = text;
+        unitLabel.color = labelColor;
+        animatingLabel = animate;
     }
 
     public void RemoveLabel()

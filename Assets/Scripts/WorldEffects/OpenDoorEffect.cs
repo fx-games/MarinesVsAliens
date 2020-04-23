@@ -7,29 +7,37 @@ namespace WorldEffects
         public override void Execute()
         {
             Debug.Log("OpenDoor() FIRED: " + this);
-            foreach (var affectedTile in AffectedTiles)
+            foreach (var targetAffectedPair in AffectedTiles)
             {
-                if (_map.IsDoorAt(affectedTile))
+                var target = targetAffectedPair.Key;
+                var areaOfEffect = targetAffectedPair.Value;
+
+                foreach (var affectedTile in areaOfEffect)
                 {
-                    _map.RemoveDoor(affectedTile);
-                }
-                else
-                {
-                    foreach (var direction in _map.Cardinal)
+                    if (_map.IsDoorAt(affectedTile))
                     {
-                        var neighborPos = affectedTile + direction.ToVector();
+                        _map.RemoveDoor(affectedTile);
+                    }
+                    else
+                    {
+                        foreach (var direction in _map.Cardinal)
+                        {
+                            var neighborPos = affectedTile + direction.ToVector();
                     
-                        if (!_map.IsDoorAt(neighborPos)) continue;
+                            if (!_map.IsDoorAt(neighborPos)) continue;
                     
-                        _map.RemoveDoor(neighborPos);
+                            _map.RemoveDoor(neighborPos);
     
-                        break;
+                            break;
+                        }
                     }
                 }
             }
             
             _game.GlobalFOVUpdate();
-            _game.UpdateVisibleUnits(ActingUnit);            
+            _game.UpdateVisibleUnits(ActingUnit);
+            
+            OnCompleted();
         }
     }
 }

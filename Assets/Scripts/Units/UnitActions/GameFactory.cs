@@ -99,7 +99,8 @@ namespace DefaultNamespace.Units.UnitActions
                 FloatOne = effectRules.FloatOne,
                 IntegerOne = effectRules.IntegerOne,
                 IntegerTwo = effectRules.IntegerTwo,
-                Chained = effectRules.Chained
+                Chained = effectRules.Chained,
+                LastEffect = effectRules.LastEffect
             };
             effect.Initialize(Game, Map, Mod);
             return effect;
@@ -148,7 +149,8 @@ namespace DefaultNamespace.Units.UnitActions
                         {
                             MethodInfo createMethod = typeof(GameFactory).GetMethod("CreateWorldEffect")
                                 ?.MakeGenericMethod(Type.GetType("WorldEffects." + effectRules.Name));
-                            return createMethod.Invoke(null, new object[]{effectRules}) as WorldEffect;
+                            var worldEffect = createMethod.Invoke(null, new object[]{effectRules}) as WorldEffect;
+                            return worldEffect;
                         });
                     }).ToList()
                 });

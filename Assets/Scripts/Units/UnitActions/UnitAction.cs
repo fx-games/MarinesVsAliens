@@ -37,7 +37,8 @@ namespace DefaultNamespace.Units.UnitActions
             {
                 // simple case, no special targeting needed:
                 var selfPos = new List<Vector3Int>() {ActingUnit.Cell};
-                ExecuteOn(selfPos, selfPos);
+                var selfTarget = new Dictionary<Vector3Int, List<Vector3Int>>(){{ActingUnit.Cell, new List<Vector3Int>(){ActingUnit.Cell}}};
+                ExecuteOn(selfPos, selfTarget);
                 return;
             }
 
@@ -97,12 +98,11 @@ namespace DefaultNamespace.Units.UnitActions
             targetList.Clear();
         }
         
-        private void ExecuteOn(List<Vector3Int> targets, List<Vector3Int> affectedTiles)
+        private void ExecuteOn(List<Vector3Int> targets, Dictionary<Vector3Int, List<Vector3Int>> affectedTiles)
         {
             int[] chanceToHit = Options.CombatMechanics.RollChanceToHit(ActingUnit);
             int[] damageRoll = Options.CombatMechanics.RollDamage(ActingUnit, IsMelee);
-
-            bool effectChain = false;
+            var effectChainCallsAfterAction = false;
             WorldEffect chainedEffect = null;
             for (var index = Effects.Count - 1; index >= 0; index--)
             {
@@ -120,11 +120,24 @@ namespace DefaultNamespace.Units.UnitActions
                 effect.ChanceToHitRoll = ReRollChanceToHitForEachEffect
                     ? Options.CombatMechanics.RollChanceToHit(ActingUnit)
                     : chanceToHit;
+                
+                effect.ActiveWeapon = IsMelee && ActingUnit.HasMeleeWeapon
+                    ? ActingUnit.MeleeWeapon
+                    : ActingUnit.RangedWeapon;
 
                 if (chainedEffect != null)
                 {
                     var afterEffect = chainedEffect;
-                    effect.OnEffectCompleted += sender => { afterEffect.Execute(); };
+                    if (afterEffect.LastEffect)
+                    {
+                        effectChainCallsAfterAction = true;
+                        effect.OnEffectCompleted += sender => { afterEffect.Execute(); AfterAction(); };
+                    }
+                    else
+                    {
+                        effect.OnEffectCompleted += sender => { afterEffect.Execute(); };
+                    }
+                    
                     chainedEffect = null;
                 }
                 if (effect.Chained)
@@ -140,17 +153,23 @@ namespace DefaultNamespace.Units.UnitActions
             foreach (var ruleBuff in Buffs)
             {
                 var buffFromRules = GameFactory.CreateBuffFromRules(ruleBuff);
-                foreach (var affectedTile in affectedTiles)
+                foreach (var affectedTileList in affectedTiles.Values)
                 {
-                    if (!_map.IsUnitOn(affectedTile)) continue;
+                    foreach (var affectedTile in affectedTileList)
+                    {
+                        if (!_map.IsUnitOn(affectedTile)) continue;
                     
-                    var affectedUnit = _map.GetUnitAt(affectedTile);
+                        var affectedUnit = _map.GetUnitAt(affectedTile);
                     
-                    affectedUnit.ApplyBuff(buffFromRules); // BUFFS APPLIED HERE
+                        affectedUnit.ApplyBuff(buffFromRules); // BUFFS APPLIED HERE
+                    }
                 }
             }
 
-            AfterAction();
+            if (!effectChainCallsAfterAction)
+            {
+                AfterAction();
+            }
         }
 
         public bool IsMelee { get; set; }

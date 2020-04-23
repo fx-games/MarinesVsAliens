@@ -14,7 +14,7 @@ namespace WorldEffects
         public Unit ActingUnit { get; set; }
         public Vector3Int SourcePosition { get; set; }
         public List<Vector3Int> Targets { get; set; }
-        public List<Vector3Int> AffectedTiles { get; set; }
+        public Dictionary<Vector3Int, List<Vector3Int>> AffectedTiles { get; set; }
         public string StringOne { get; set; }
         public float FloatOne { get; set; }
         public int IntegerOne { get; set; }
@@ -22,6 +22,8 @@ namespace WorldEffects
         public int[] DamageRoll { get; set; }
         public int[] ChanceToHitRoll { get; set; }
         public bool Chained { get; set; }
+        public bool LastEffect { get; set; }
+        public Weapon ActiveWeapon { get; set; }
 
         protected internal void Initialize(BattleGame game, Map map, Mod mod)
         {

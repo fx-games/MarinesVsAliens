@@ -1,5 +1,6 @@
 using System.Linq;
 using DefaultNamespace;
+using UnityEngine;
 
 namespace WorldEffects
 {
@@ -7,34 +8,36 @@ namespace WorldEffects
     {
         public override void Execute()
         {
-            foreach (var targetedPos in Targets)
+            if (_game.CurrentFaction == _game.PoVFaction)
             {
-                var areaOfEffect = AffectedTiles;
-        
+                ActingUnit.SetLabelText(ChanceToHitRoll.Sum().ToString());
+            }
+
+            foreach (var targetAffectedPair in AffectedTiles)
+            {
+                var target = targetAffectedPair.Key;
+                var areaOfEffect = targetAffectedPair.Value;
+                 
                 foreach (var aoePos in areaOfEffect)
                 {
                     // the following call will add damage to map tiles automatically
-                    if (!_map.ExplosionReaches(targetedPos, aoePos, DamageRoll.Sum())) continue;
+                    if (!_map.ExplosionReaches(target, aoePos, DamageRoll.Sum())) continue;
         
-                    _game.CreateExplosionOnTile(aoePos);
-                
                     if (!_map.IsUnitOn(aoePos)) continue;
         
                     var hitUnit = (Unit)_map.GetUnitAt(aoePos);
             
                     hitUnit.TurnTowards(ActingUnit.Cell);
                 
-                    Options.CombatMechanics.ResolveAttack(ChanceToHitRoll, ActingUnit.Cell,ActingUnit, targetedPos, aoePos, hitUnit);            
+                    Debug.Log("Explosion hit " + hitUnit);
+                    
+                    Options.CombatMechanics.ResolveExplosion(ActiveWeapon, DamageRoll, ActingUnit, hitUnit);            
                 }
             }
             
-            
-            if (_game.CurrentFaction == _game.PoVFaction)
-            {
-                ActingUnit.SetLabelText(ChanceToHitRoll.Sum().ToString());
-            }
-            
             ActingUnit.AllowNoMoreActions();
+            
+            OnCompleted();
         }
     }
 }

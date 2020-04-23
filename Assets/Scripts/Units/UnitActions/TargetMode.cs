@@ -58,28 +58,31 @@ namespace DefaultNamespace.Units.UnitActions
         public int AffectedRange { get; set; } // radius for explosions
         public int AffectedLimit { get; set; }
 
-        public List<Vector3Int> GetAffectedTiles(Vector3Int sourcePos, HashSet<Vector3Int> targets)
+        public Dictionary<Vector3Int,List<Vector3Int>> GetAffectedTiles(Vector3Int sourcePos, HashSet<Vector3Int> targets)
         {
-            if (Type == TargetModeType.Self) return new List<Vector3Int>{sourcePos};
+            if (Type == TargetModeType.Self) return new Dictionary<Vector3Int,List<Vector3Int>>{{targets.First(), new List<Vector3Int>{sourcePos}}};
             
-            HashSet<Vector3Int> positions = new HashSet<Vector3Int>();
+            Dictionary<Vector3Int,List<Vector3Int>> positions = new Dictionary<Vector3Int, List<Vector3Int>>();
             
             if (AffectedTiles.Count > 0) // custom tiles have been set            
             {
                 foreach (var target in targets)
                 {
-                    positions.UnionWith(AffectedTiles.Select(rel => target + rel));
+                    positions.Add(target, AffectedTiles.Select(rel => target + rel).ToList());
                 }       
-                return positions.ToList();
+                return positions;
             }
 
             if (ActiveAffectedPreset == AffectedPreset.StraightLine)
             {
                 foreach (var target in targets)
                 {
-                    positions.UnionWith(GetStraightLine(sourcePos, target));
-                    positions.Remove(sourcePos);
+                    var straightLine = GetStraightLine(sourcePos, target);
+                    straightLine.Remove(sourcePos);
+                    positions.Add(target, straightLine.ToList());
                 }
+
+                return positions;
             }
             
             if (ActiveAffectedPreset == AffectedPreset.Explosion)
@@ -87,26 +90,29 @@ namespace DefaultNamespace.Units.UnitActions
                 var radius = AffectedRange;
                 if (radius > 0)
                 {
-                    foreach (var mapPos in targets)
+                    HashSet<Vector3Int> explPositions = new HashSet<Vector3Int>();
+                    foreach (var target in targets)
                     {
-                        for (int i = mapPos.x - radius; i <= mapPos.x + radius; i++)
+                        explPositions.Clear();
+                        for (int i = target.x - radius; i <= target.x + radius; i++)
                         {
-                            for (int j = mapPos.y - radius; j <= mapPos.y + radius; j++)
+                            for (int j = target.y - radius; j <= target.y + radius; j++)
                             {
                                 var nextPos = new Vector3Int(i, j, 0);
-                                var euclideanDistance = (mapPos - nextPos).magnitude;
+                                var euclideanDistance = (target - nextPos).magnitude;
                                 if (Mathf.Floor(euclideanDistance) <= radius)
                                 {
-                                    positions.Add(nextPos);
+                                    explPositions.Add(nextPos);
                                 }
                             }
                         }
+                        positions.Add(target, explPositions.ToList());
                     }
-                    return positions.ToList();
+                    return positions;
                 }                
             }
             
-            return positions.ToList();
+            return positions;
         }
         
         public HashSet<Vector3Int> GetStraightLine(Vector3Int posOne, Vector3Int posTwo)

@@ -14,15 +14,19 @@ public class Projectile : MonoBehaviour
     public AudioClip[] AudioClips;
     private SpriteRenderer spriteRenderer;
     private bool targetHit = false;
+    public float VolumeSFX { get; set; } = 0.5f;
+
     public event VoidEvent OnArrivedAtTarget;
     private void Start()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
         spriteRenderer.sprite = Sprites[SelectedSprite];
         localAudioSource = GetComponent<AudioSource>();
+        localAudioSource.volume = VolumeSFX;
         localAudioSource.PlayOneShot(AudioClips[GetLaunchClip(SelectedSprite)]);
     }
 
+    
     private int GetLaunchClip(int selectedSprite)
     {
         if (selectedSprite == 4) return 1;
@@ -53,8 +57,6 @@ public class Projectile : MonoBehaviour
         
         targetHit = true;
         spriteRenderer.enabled = false;
-
-        Game.CreateExplosionOnTile(target);
 
         localAudioSource.PlayOneShot(AudioClips[GetHitClip(SelectedSprite)]);
 

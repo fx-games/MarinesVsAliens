@@ -38,6 +38,8 @@ public class BattleGame : MonoBehaviour, IGame
     public AudioSource globalAudioSource;
     public GameObject[] unitPrefabs;
     public GameObject explosionPrefab;
+    public GameObject meleeHitPrefab;
+
     private List<Unit> allUnits = new List<Unit>();
     private System.Collections.Generic.HashSet<RuleFaction> eliminatedFactions = new System.Collections.Generic.HashSet<RuleFaction>();
     private Map _map;
@@ -467,7 +469,11 @@ public class BattleGame : MonoBehaviour, IGame
         allUnits.Remove(unit);
         unit.UnitDeath();
     }
-
+    public void CreateMeleeHitOnTile(Vector3Int mapPos)
+    {
+        var go = Instantiate(meleeHitPrefab, _map.CellToWorld(mapPos), Quaternion.identity);
+        //go.GetComponent<SimpleAnimation>().OnCompleted += sender => { action.Invoke(); };
+    }
     public void CreateExplosionOnTile(Vector3Int mapPos)
     {
         Instantiate(explosionPrefab, _map.CellToWorld(mapPos), Quaternion.identity);
@@ -973,10 +979,12 @@ public class BattleGame : MonoBehaviour, IGame
     {
         uiButtons.Clear();
 
-        var rangedAttackButtonShouldBeVisible = selectedUnit != null && selectedUnit.CanAttack && selectedUnit.HasRangedWeapon;
-        var meleeAttackButtonShouldBeVisible = selectedUnit != null && selectedUnit.CanAttack && selectedUnit.HasMeleeWeapon;
-        var openDoorButtonShouldBeVisible = selectedUnit != null && IsNextToDoor(selectedUnit);
-        var numberOfNeededSkillButtons = selectedUnit != null ? selectedUnit.AvailableSkills.Count : 0;
+        var unitIsSelected = selectedUnit != null;
+        
+        var rangedAttackButtonShouldBeVisible = unitIsSelected && selectedUnit.CanAttack && selectedUnit.HasRangedWeapon;
+        var meleeAttackButtonShouldBeVisible = unitIsSelected && selectedUnit.CanAttack && selectedUnit.HasMeleeWeapon;
+        var openDoorButtonShouldBeVisible = unitIsSelected && IsNextToDoor(selectedUnit);
+        var numberOfNeededSkillButtons = unitIsSelected ? selectedUnit.AvailableSkills.Count : 0;
         
         uiButtons.Add(endTurnButton);
 
@@ -1020,7 +1028,7 @@ public class BattleGame : MonoBehaviour, IGame
             }
         }
 
-        if (selectedUnit != null && selectedUnit.CanAttack)
+        if (unitIsSelected && selectedUnit.CanAttack)
         {
             for (int i = 0; i < skillButtons.Count; i++)
             {

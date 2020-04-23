@@ -7,9 +7,15 @@ namespace WorldEffects
     {
         public override void Execute()
         {
-            foreach (var targetedPos in Targets)
+            if (_game.CurrentFaction == _game.PoVFaction)
             {
-                var areaOfEffect = AffectedTiles;
+                ActingUnit.SetLabelText(ChanceToHitRoll.Sum().ToString());
+            }
+            
+            foreach (var targetAffectedPair in AffectedTiles)
+            {
+                var target = targetAffectedPair.Key;
+                var areaOfEffect = targetAffectedPair.Value;
         
                 foreach (var aoePos in areaOfEffect)
                 {
@@ -18,17 +24,15 @@ namespace WorldEffects
                     var hitUnit = (Unit)_map.GetUnitAt(aoePos);
             
                     hitUnit.TurnTowards(ActingUnit.Cell);
-                
-                    Options.CombatMechanics.ResolveAttack(ChanceToHitRoll, ActingUnit.Cell,ActingUnit, targetedPos, aoePos, hitUnit);            
+
+                    Options.CombatMechanics.ResolveAttack(ActiveWeapon, DamageRoll, ChanceToHitRoll, ActingUnit, hitUnit);            
                 }
             }
             
-            if (_game.CurrentFaction == _game.PoVFaction)
-            {
-                ActingUnit.SetLabelText(ChanceToHitRoll.Sum().ToString());
-            }
             ActingUnit.Procs.OnHasAttacked();
             ActingUnit.AllowNoMoreActions();
+            
+            OnCompleted();
         }
     }
 }

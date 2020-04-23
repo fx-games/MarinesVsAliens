@@ -30,7 +30,10 @@ skills:
       allowedTargetPreset: 1
       affectedTiles: [[0,0]]
     effects:
+      - name: MeleeHitEffect
       - name: Attack
+        chained: true
+        lastEffect: true
   - name: RangedAttack
     targetMode:
       type: 1
@@ -38,11 +41,15 @@ skills:
       allowedTargetPreset: 2
       affectedTiles: [[0,0]]
     effects:
-      - name: Attack
       - name: ProjectileEffect
         integerOne: 1
         integerTwo: 3
         floatOne: 8
+      - name: Attack
+        chained: true
+      - name: ExplosionEffect
+        chained: true
+        lastEffect: true
   - name: RocketLauncher
     displayName: "Rocket\nLauncher"
     targetMode:
@@ -58,6 +65,9 @@ skills:
         floatOne: 4
       - name: Explosion
         chained: true
+      - name: ExplosionEffect
+        chained: true
+        lastEffect: true
   - name: StunMelee
     displayName: "Stun\nStrike"
     isMelee: true

@@ -21,9 +21,8 @@ namespace DefaultNamespace
     {
         string AttackPreviewInformationFor(Unit attackingUnit, Unit targetUnit);
         int[] AttackValues(Unit attackingUnit, Vector3Int targetedPos, bool isMelee);
-        int ResolveAttack(int[] attackValues, Vector3Int unitPos, Unit attackingUnit, Vector3Int targetedPos, Vector3Int aoePos,
-            Unit hitUnit);
-
+        int ResolveAttack(Weapon activeWeapon, int[] damageRoll, int[] attackValues, Unit attackingUnit, Unit hitUnit);
+        int ResolveExplosion(Weapon activeWeapon, int[] damageRoll, Unit attackingUnit, Unit hitUnit);
         int ResolveDamageToTile(Weapon weapon);
         int[] RollChanceToHit(Unit actingUnit);
         int[] RollDamage(Unit actingUnit, bool isMelee);
@@ -35,152 +34,6 @@ namespace DefaultNamespace
         {
             return attacker.IsNextTo(target);
         }
-    }
-
-    public class DiceBasedCombat : CombatBase, ICombatMechanics
-    {
-        public string AttackPreviewInformationFor(Unit attackingUnit, Unit targetUnit)
-        {
-            if (IsMelee(attackingUnit, targetUnit))
-            {
-                int maxMeleeDef = targetUnit.MeleeWeapon.Rules.Damage.Sum(die => die.Max());
-                int minMeleeDef = targetUnit.MeleeWeapon.Rules.Damage.Sum(die => die.Min());
-            
-                int maxMeleeAtt = attackingUnit.MeleeWeapon.Rules.Damage.Sum(die => die.Max());
-                int minMeleeAtt = attackingUnit.MeleeWeapon.Rules.Damage.Sum(die => die.Min());
-
-                return minMeleeAtt + "-" + maxMeleeAtt + ":" + minMeleeDef + "-" + maxMeleeDef;
-            }
-            else
-            {
-                int maxRangedAtt = attackingUnit.RangedWeapon.Rules.Damage.Sum(die => die.Max());
-                int minRangedAtt = attackingUnit.RangedWeapon.Rules.Damage.Sum(die => die.Min());
-            
-                int armor = targetUnit.CurrentArmor;
-
-                return minRangedAtt + "-" + maxRangedAtt + ":" + armor;
-            }
-        }
-
-        public int[] AttackValues(Unit attackingUnit, Vector3Int targetedPos, bool isMelee)
-        {
-            return isMelee ? RollDamage(attackingUnit.MeleeWeapon.Rules) : RollDamage(attackingUnit.RangedWeapon.Rules);
-        }
-        
-        public int ResolveAttack(int[] attackerDice, Vector3Int attackerPos, Unit attackingUnit, Vector3Int targetPos,
-            Vector3Int aoePos, Unit target)
-        {
-            int damageLeft = -1;
-            
-            var isMelee = IsMelee(attackingUnit, target);
-            
-            if (isMelee && !attackingUnit.HasMeleeWeapon)
-            {
-                return damageLeft; // No melee weapon for melee attack
-            }
-
-            if (!isMelee && !attackingUnit.HasRangedWeapon)
-                return damageLeft; // No ranged weapon
-        
-            var isAoEPosition = targetPos != aoePos;
-        
-            var weapon = attackingUnit.RangedWeapon;
-            if (isMelee)
-            {
-                weapon = attackingUnit.MeleeWeapon;
-            }
-
-            var isExplosion = weapon.Rules.Radius > 0;
-
-            int attackerScore = attackerDice.Sum();
-            int damage = -1;
-            
-            if (isExplosion && isAoEPosition)
-            {
-                attackerScore = attackerDice.Max();
-            }
-            //Debug.Log("Attack: " + attackerScore);
-            int defenderScore = -1;
-            if (attackerScore > 0)
-            {
-                defenderScore = GetDefense(target, isMelee);
-                //Debug.Log("Defense: " + defenderScore);
-                LastMeleeDefense = defenderScore;
-                //target.AttackedWith(attack, isMelee);
-                if (defenderScore >= attackerScore)
-                {
-                    // no damage to target
-                    damageLeft = 0;
-                    if (isMelee && defenderScore > attackerScore)
-                    {
-                        // damage to attacker
-                        int returnedMeleeDamage = defenderScore - attackerScore;
-                        attackingUnit.DamageReceived(target, target.MeleeWeapon, returnedMeleeDamage);
-                    }
-                }
-                else
-                {
-                    // damage to target
-                    damage = attackerScore - defenderScore;
-                    damageLeft = target.DamageReceived(attackingUnit, weapon, damage);
-                }
-            }
-            
-            Debug.Log("ATT:" + attackingUnit + "(" + attackerScore + ") -> " + target + "("+defenderScore+") => Dmg: " + damage);
-            
-            return damageLeft;
-        }
-
-        public int ResolveDamageToTile(Weapon weapon)
-        {
-            return RollDamage(weapon.Rules).Sum();
-        }
-
-        public int[] RollChanceToHit(Unit actingUnit)
-        {
-            throw new NotImplementedException();
-        }
-
-        public int[] RollDamage(Unit actingUnit, bool isMelee)
-        {
-            throw new NotImplementedException();
-        }
-
-        private int GetDefense(Unit target, bool isMelee)
-        {
-            if (isMelee)
-            {
-                return target.HasMeleeWeapon ? RollDamage(target.MeleeWeapon.Rules).Sum() : 0;
-            }
-
-            return target.CurrentArmor;
-        }
-
-        public int[] RollDamage(Mod.RuleWeapon weaponRules)
-        {
-            int[] results = new int[weaponRules.Damage.Count];
-            int diceCount = 0;
-            foreach (var damageRoll in weaponRules.Damage)
-            {
-                if (damageRoll.Length == 1)
-                {
-                    results[diceCount] = damageRoll[0];
-                }
-                else if (damageRoll.Length == 2)
-                {
-                    results[diceCount] = Random.Range(damageRoll[0], damageRoll[1] + 1);
-                }
-                else if (damageRoll.Length > 2)
-                {
-                    results[diceCount] = damageRoll[Random.Range(0, damageRoll.Length)];
-                }
-
-                diceCount++;
-            }
-
-            return results;
-        }
-        public int LastMeleeDefense { get; private set; }
     }
 
     public class PercentageBasedCombat : CombatBase, ICombatMechanics
@@ -195,42 +48,58 @@ namespace DefaultNamespace
         {
             return new[] { Random.Range(0,100)}; // 0-99
         }
+        public int ResolveExplosion(Weapon activeWeapon, int[] damageRoll, Unit attackingUnit, Unit hitUnit)
+        {
+            // HIT
+            Debug.Log("Combat Mechanics registered an explosion on " + hitUnit);
+                
+            var damage = damageRoll.Sum();
 
-        public int ResolveAttack(int[] attackValues, Vector3Int unitPos, Unit attackingUnit, Vector3Int targetedPos, Vector3Int aoePos, Unit hitUnit)
+            attackingUnit.Procs.OnHit(hitUnit, activeWeapon);
+            hitUnit.Procs.OnBeingHit(attackingUnit, activeWeapon);
+            damage -= hitUnit.CurrentArmor;
+            if (damage > 0)
+            {
+                hitUnit.SetLabelText(damage.ToString(), animate: true);
+                return hitUnit.DamageReceived(attackingUnit, activeWeapon, damage);
+            }
+            else
+            {
+                hitUnit.SetLabelText("abs", animate: true);
+            }
+
+            return -1;
+        }
+        public int ResolveAttack(Weapon activeWeapon,  int[] damageRoll, int[] attackValues, Unit attackingUnit, Unit hitUnit)
         {
             int randomAttackValue = attackValues.Sum();
-            var isAoEPosition = targetedPos != aoePos;
-            var isMelee = attackingUnit.IsNextTo(hitUnit);
-
-            var weapon = attackingUnit.RangedWeapon;
-            if (isMelee)
-            {
-                weapon = attackingUnit.MeleeWeapon;
-            }
             
-            var isExplosion = weapon.Rules.Radius > 0;
-            
-            int chanceToHit = CalculateChanceToHit(attackingUnit, hitUnit, isMelee);
-            if (randomAttackValue < chanceToHit || (isExplosion && isAoEPosition))
+            int chanceToHit = CalculateChanceToHit(attackingUnit, hitUnit, attackingUnit.MeleeWeapon == activeWeapon);
+            if (randomAttackValue < chanceToHit)
             {
                 // HIT
-                Debug.Log("Combat Mechanics registered a hit on " + hitUnit);
+                Debug.Log("Combat Mechanics registered an attack hit on " + hitUnit);
                 
-                var damage = RollDamage(weapon.Rules).Sum();
+                var damage = damageRoll.Sum();
 
-                attackingUnit.Procs.OnHit(hitUnit, weapon);
-                hitUnit.Procs.OnBeingHit(attackingUnit, weapon);
+                attackingUnit.Procs.OnHit(hitUnit, activeWeapon);
+                hitUnit.Procs.OnBeingHit(attackingUnit, activeWeapon);
                 damage -= hitUnit.CurrentArmor;
                 if (damage > 0)
                 {
-                    return hitUnit.DamageReceived(attackingUnit, weapon, damage);
+                    hitUnit.SetLabelText(damage.ToString(), animate: true);
+                    return hitUnit.DamageReceived(attackingUnit, activeWeapon, damage);
+                }
+                else
+                {
+                    hitUnit.SetLabelText("abs", animate: true);
                 }
             }
             else
             {
                 // MISS
-                attackingUnit.Procs.OnMiss(hitUnit, weapon);
-                hitUnit.SetLabelText("mis");
+                attackingUnit.Procs.OnMiss(hitUnit, activeWeapon);
+                hitUnit.SetLabelText("mis", animate: true);
             }
             
             return -1;

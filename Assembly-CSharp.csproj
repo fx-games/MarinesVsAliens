@@ -95,6 +95,7 @@
     <Compile Include="Assets\Scripts\Mod.cs" />
     <Compile Include="Assets\Scripts\Options.cs" />
     <Compile Include="Assets\Scripts\PlayerInterface.cs" />
+    <Compile Include="Assets\Scripts\SimpleAudio.cs" />
     <Compile Include="Assets\Scripts\Units\Unit.cs" />
     <Compile Include="Assets\Scripts\Units\UnitActions\GameFactory.cs" />
     <Compile Include="Assets\Scripts\Units\UnitActions\TargetMode.cs" />
@@ -105,13 +106,15 @@
     <Compile Include="Assets\Scripts\VisualEffects\UnitAnimator.cs" />
     <Compile Include="Assets\Scripts\WorldEffects\Attack.cs" />
     <Compile Include="Assets\Scripts\WorldEffects\Explosion.cs" />
+    <Compile Include="Assets\Scripts\WorldEffects\ExplosionEffect.cs" />
+    <Compile Include="Assets\Scripts\WorldEffects\MeleeHitEffect.cs" />
     <Compile Include="Assets\Scripts\WorldEffects\OpenDoorEffect.cs" />
     <Compile Include="Assets\Scripts\WorldEffects\ProjectileEffect.cs" />
     <Compile Include="Assets\Scripts\WorldEffects\SpawnUnit.cs" />
     <Compile Include="Assets\Scripts\WorldEffects\WorldEffect.cs" />
-    <None Include="Assets\107 Free Retro Game Sounds\license.txt" />
+    <None Include="Assets\LicensedAssets\107 Free Retro Game Sounds\license.txt" />
     <None Include="Assets\Packages\C5.2.5.3\lib\netstandard1.0\C5.xml" />
-    <None Include="Assets\launches\info.txt" />
+    <None Include="Assets\LicensedAssets\launches\info.txt" />
     <None Include="Assets\PaidAssets\BitmapFonts\Pixel\_PixelCharLimits.txt" />
     <Reference Include="Unity.RenderPipeline.Universal.ShaderLibrary">
       <HintPath>/Users/felix/Marines vs Aliens/Library/ScriptAssemblies/Unity.RenderPipeline.Universal.ShaderLibrary.dll</HintPath>

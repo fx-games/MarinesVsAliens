@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 4458575253749221283}
   - component: {fileID: 3990780430425742940}
   m_Layer: 0
-  m_Name: blanktile
+  m_Name: glowtile
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -70,7 +70,7 @@ SpriteRenderer:
   m_SortingLayerID: 334519645
   m_SortingLayer: 5
   m_SortingOrder: 10
-  m_Sprite: {fileID: 5931242471646302317, guid: 4fb74d4e314ba4104a72e4d4991db13c,
+  m_Sprite: {fileID: -6405433073719687424, guid: 4fb74d4e314ba4104a72e4d4991db13c,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0

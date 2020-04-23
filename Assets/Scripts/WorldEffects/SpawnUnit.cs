@@ -12,13 +12,21 @@ namespace WorldEffects
             var unitType = StringOne;
             Debug.Log("SpawnUnit("+unitType+") executing.");
 
-            foreach (var affectedTile in AffectedTiles)
+            foreach (var targetAffectedPair in AffectedTiles)
             {
-                var unitLoadout = _mod.GetLoadout(ActingUnit.Faction, unitType);
-                _game.SpawnUnit(affectedTile, unitType, unitLoadout, ActingUnit.Faction);
+                var target = targetAffectedPair.Key;
+                var areaOfEffect = targetAffectedPair.Value;
+
+                foreach (var affectedTile in areaOfEffect)
+                {
+                    var unitLoadout = _mod.GetLoadout(ActingUnit.Faction, unitType);
+                    _game.SpawnUnit(affectedTile, unitType, unitLoadout, ActingUnit.Faction);
+                }
             }
             
             ActingUnit.AllowNoMoreActions();
+            
+            OnCompleted();
         }
     }
 }
