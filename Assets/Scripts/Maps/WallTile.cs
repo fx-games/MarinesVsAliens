@@ -30,6 +30,7 @@ public class WallTile : Tile
     
     public override void GetTileData(Vector3Int location, ITilemap tilemap, ref TileData tileData)
     {
+        if (!Map.Contains(location.x, location.y)) return;
         var mask = GetNeighborMask(location, tilemap);
         int index = GetIndex((byte)mask);
         

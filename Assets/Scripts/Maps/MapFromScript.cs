@@ -1,22 +1,21 @@
+using System.Collections;
 using UnityEngine;
 
 namespace DefaultNamespace
 {
-    public class MapFromScript : IMapGenerator
+    public class FromScript : GeneratorBase
     {
         private Mod.RuleMap mapRules;
         private Mod mod;
-        private Map map;
 
-        public MapFromScript(Mod mod, Mod.RuleMap mapRules)
+        public FromScript(Mod mod, Mod.RuleMap mapRules)
         {
             this.mod = mod;
             this.mapRules = mapRules;
         }
 
-        public void Generate(Map map)
+        public override IEnumerator Generate()
         {
-            this.map = map;
             map.Init(mapRules.Size[0], mapRules.Size[1]);
             
             foreach (var mapScriptCommand in mapRules.MapScript)
@@ -30,9 +29,14 @@ namespace DefaultNamespace
                     } 
                 }
             }
-            
+            yield break;
         }
-        
+
+        public override void Step()
+        {
+            throw new System.NotImplementedException();
+        }
+
         private void PlaceMapBlock(int[] offset, string blockName)
         {
             var block = mod.GetMapBlock(blockName);

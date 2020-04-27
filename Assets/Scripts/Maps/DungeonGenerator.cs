@@ -1,6 +1,9 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using QuickGraph;
+using QuickGraph.Algorithms.ShortestPath;
 using UnityEngine;
 using static Map;
 using Random = UnityEngine.Random;
@@ -8,15 +11,14 @@ using Random = UnityEngine.Random;
 namespace DefaultNamespace
 {
     
-    public class DungeonGenerator : IMapGenerator
+    public class DungeonGeneratorBase : GeneratorBase
     {
-        private Map map;
         private int genCurrentRegion = -1;
         private Dictionary<Vector3Int, int> genRegions = new Dictionary<Vector3Int, int>();
         private int extraConnectorChance = 5;
         private List<RectInt> genRooms;
 
-        public DungeonGenerator(int height, int width)
+        public DungeonGeneratorBase(int height, int width)
         {
             Height = height;
             Width = width;
@@ -25,10 +27,35 @@ namespace DefaultNamespace
         public int Height { get; set; }
         public int Width { get; set; }
         
-        public void Generate(Map map)
+        public override IEnumerator Generate()
         {
-            this.map = map;
             Generator(Width, Height);
+            yield break;
+        }
+
+        public override void Step()
+        {
+            throw new NotImplementedException();
+        }
+
+        private void Test()
+        {
+            var g = new AdjacencyGraph<Vector3Int, TaggedEdge<Vector3Int, string>>();
+            Vector3Int zero = Vector3Int.zero;
+            Vector3Int rightOfZero = Vector3Int.right;
+            g.AddVertex(zero);
+            g.AddVertex(rightOfZero);
+            
+            var edge = new TaggedEdge<Vector3Int, string>(zero, rightOfZero, "NeighborEdge");
+            g.AddEdge(edge);
+
+            var weights = new Func<TaggedEdge<Vector3Int, string>, double>(e => e.Source.x == e.Target.x || e.Source.y == e.Target.y
+                ? 10
+                : 14);
+            
+            var fw = new FloydWarshallAllShortestPathAlgorithm<Vector3Int, TaggedEdge<Vector3Int, string>>(g, weights);
+            fw.Compute();
+
         }
 
         private void Generator(int width, int height)

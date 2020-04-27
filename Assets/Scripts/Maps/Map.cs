@@ -1,6 +1,6 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
 using Default;
 using DefaultNamespace;
@@ -12,9 +12,16 @@ using static Mod;
 using Color = UnityEngine.Color;
 using Random = UnityEngine.Random;
 
-public interface IMapGenerator
+public abstract class GeneratorBase
 {
-    void Generate(Map map);
+    protected Map map;
+
+    public void SetMap(Map map)
+    {
+        this.map = map;
+    }
+    public abstract IEnumerator Generate();
+    public abstract void Step();
 }
 public class Map : MonoBehaviour, IGridMap, IPlayerMap
 {
@@ -61,7 +68,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     public Vector3Int CurrentCursorPosition { get; private set; }
     private HashSet<Vector3Int> visibleTiles = new HashSet<Vector3Int>();
     private Mod mod;
-    private IMapGenerator generator;
+    private GeneratorBase mapGenerator;
     private Vector3Int lastCursorPosition;
     public GameObject cellLabelPrefab;
     private HashSet<Text> cellLabels = new HashSet<Text>();
@@ -232,28 +239,32 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
 
     public void DebugActionTwo()
     {
-        ((CavernGenerator) generator).MakeCaverns(1);
+        ((CavernGenerator) mapGenerator).MakeCaverns(1);
     }
 
     public void FromRules(RuleMap mapRules)
     {
         if (mapRules.Generator == 1)
         {
-            generator = new MapFromScript(mod, mapRules);
+            mapGenerator = new FromScript(mod, mapRules);
         }
         else if (mapRules.Generator == 2)
         {
-            generator = new DungeonGenerator(25,25);
+            mapGenerator = new DungeonGeneratorBase(25,25);
         }
         else if (mapRules.Generator == 3)
         {
-            generator = new CavernGenerator(25,25);
+            mapGenerator = new CavernGenerator(25, 25);
         }
-        generator.Generate(this);        
+
+        mapGenerator.SetMap(this);
+        mapGenerator.Generate();        
     }
 
     public virtual void Init(int width, int height)
     {
+        Width = width;
+        Height = height;
         foreach (var kvp in layerMap)
         {
             var layer = kvp.Value;
@@ -479,11 +490,13 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
                 layerMap["FogOfWar"].BoxFill(new Vector3Int(1, 1, 0), fogTile, 0, 0, Width, Height);
                 FillMapArray(fogMap, true);
                 break;
-        }
-
-        
+        }        
     }
 
+    public void ForTileInLine(Vector3Int start, Vector3Int end, Action<Vector3Int> posCallback)
+    {
+        raycaster.Bresenham(start, end, posCallback);
+    }
     private void FillMapArray<T>(T[][] array, T value)
     {
         for (int x = 0; x < Width; x++)
@@ -1156,11 +1169,6 @@ public static class Vector3IntExtension
         if (v == Vector3Int.left + Vector3Int.down) return Direction.SouthWest;
         
         return Direction.None;
-    }
-    
-    public static Point ToPoint(this Vector3Int v)
-    {
-        return new Point(v.x, v.y);
     }
 }
 

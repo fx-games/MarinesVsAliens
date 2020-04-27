@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -8,13 +9,12 @@ using Random = UnityEngine.Random;
 namespace DefaultNamespace
 {
     //http://www.roguebasin.com/index.php?title=Cellular_Automata_Method_for_Generating_Random_Cave-Like_Levels
-    public class CavernGenerator : IMapGenerator
+    public class CavernGenerator : GeneratorBase
     {
-        private Map map;
         public int PercentWalls { get; set; } = 40;
         private List<RectInt> genRooms = new List<RectInt>();
 
-        public CavernGenerator(int height, int width)
+        public CavernGenerator(int width, int height)
         {
             Height = height;
             Width = width;
@@ -23,10 +23,15 @@ namespace DefaultNamespace
         public int Height { get; set; }
         public int Width { get; set; }
         
-        public void Generate(Map map)
+        public override IEnumerator Generate()
         {
-            this.map = map;
             Generator(Width, Height);
+            yield break;
+        }
+
+        public override void Step()
+        {
+            throw new NotImplementedException();
         }
 
         private void Generator(int width, int height)

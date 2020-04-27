@@ -1,3 +1,4 @@
+using System;
 using Default;
 using UnityEngine;
 
@@ -15,6 +16,35 @@ namespace DefaultNamespace
 
         private IGridMap map;
 
+        public void Bresenham(Vector3Int start, Vector3Int end, Action<Vector3Int> positionCallback)
+        {
+            var dx = Mathf.Abs(end.x - start.x);
+            var sx = start.x < end.x ? 1 : -1;            
+            var dy = -Mathf.Abs(end.y - start.y);
+            var sy = start.y < end.y ? 1 : -1;
+            var x0 = start.x;
+            var y0 = start.y;
+
+            var err = dx + dy;
+
+            while (true)
+            {
+                positionCallback(new Vector3Int(x0, y0, 0));
+                if (x0 == end.x && y0 == end.y) break;
+                var e2 = 2 * err;
+                if (e2 >= dy)
+                {
+                    err += dy;
+                    x0 += sx;
+                }
+
+                if (e2 <= dx)
+                {
+                    err += dx;
+                    y0 += sy;
+                }
+            }
+        }
         public bool LineCast(int x0, int y0, int x1, int y1)
         {
             int sx, sy, xnext, ynext, dx, dy, prevX, prevY;
