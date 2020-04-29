@@ -37,8 +37,8 @@ namespace QuickGraph.Algorithms
         public void SetRootVertex(TVertex rootVertex)
         {
             Contract.Requires(rootVertex != null);
-
-            bool changed = Comparer<TVertex>.Default.Compare(this.rootVertex, rootVertex) != 0;
+            //bool changed = Comparer<TVertex>.Default.Compare(this.rootVertex, rootVertex) != 0;
+            bool changed = !this.rootVertex.Equals(rootVertex);
             this.rootVertex = rootVertex;
             if (changed)
                 this.OnRootVertexChanged(EventArgs.Empty);

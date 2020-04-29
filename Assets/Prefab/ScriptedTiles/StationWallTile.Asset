@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 46bcb9c032bb34a1091d48412d988688, type: 3}
-  m_Name: WallTile
+  m_Name: StationWallTile
   m_EditorClassIdentifier: 
   m_Sprite: {fileID: -4316969176536977815, guid: 0646cc5396fd44b88bca5707ce558326,
     type: 3}
@@ -74,4 +74,3 @@ MonoBehaviour:
   - {fileID: -3829176170665684942, guid: 0646cc5396fd44b88bca5707ce558326, type: 3}
   - {fileID: -209298916013963847, guid: 0646cc5396fd44b88bca5707ce558326, type: 3}
   NorthWallAlternativeChance: 5
-  map: {fileID: 2223305004873385642, guid: 4373d706cfe934cf581754da9fdb3a37, type: 3}

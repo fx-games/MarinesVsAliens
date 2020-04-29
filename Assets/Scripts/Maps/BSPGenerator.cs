@@ -5,8 +5,12 @@ using System.Linq;
 using DelaunayVoronoi;
 using QuickGraph;
 using QuickGraph.Algorithms;
+using QuickGraph.Algorithms.Observers;
+using QuickGraph.Algorithms.Search;
+using QuickGraph.Algorithms.ShortestPath;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UIElements;
 using Random = UnityEngine.Random;
 
 public class BSPRoomNode
@@ -59,6 +63,9 @@ public class BspGeneratorBase : GeneratorBase
     private HashSet<BSPRoomNode> connectedRooms = new HashSet<BSPRoomNode>();
     private bool nextStep = false;
     private BSPRoomNode rootNode;
+    private IEnumerable<STaggedEquatableEdge<Vector3Int, Corridor>> mst;
+    private UndirectedGraph<Vector3Int, STaggedEquatableEdge<Vector3Int, Corridor>> mstGraph;
+    private Dictionary<Vector3Int, Vector3Int> predecessors;
 
     public BspGeneratorBase(int width, int height)
     {
@@ -72,7 +79,8 @@ public class BspGeneratorBase : GeneratorBase
         
         map.Init(_width, _height);            
         // fill all with walls, we carve in the following steps
-        map.FillLayer("Walls");
+        map.FillLayer("Floors", 1);
+        map.FillLayer("Walls", 1);
         
         rootNode = new BSPRoomNode(1,1, _width-2, _height-2);
         
@@ -83,47 +91,140 @@ public class BspGeneratorBase : GeneratorBase
         map.RemoveAllHighlights();
         connectedRooms.Clear();
         
+        mst = CreateMinimumSpanningTree(leafs);
+        mstGraph = mst.ToUndirectedGraph<Vector3Int, STaggedEquatableEdge<Vector3Int, Corridor>>();
+
         //yield return ConnectRoomsRecursive(rootNode);
-        yield return ConnectRoomsAlternative(rootNode);
+        ConnectRoomsFromMST();
+
+        ChooseRegions();
+        
+        yield break;
     }
 
-    private IEnumerator ConnectRoomsAlternative(BSPRoomNode currentNode)
+    private void ChooseRegions()
+    {
+        map.RemoveAllHighlights();
+        map.RemoveAllCellLabels();
+        
+        var green = new Color(0f, 0.8f, 0, 0.5f);
+        var red = new Color(0.8f, 0.2f, 0, 0.5f);
+        var yellow = new Color(0.8f, 0.8f, 0, 0.5f);
+        
+        var mstLeafs = mstGraph.Vertices.Where(v => mstGraph.AdjacentDegree(v) == 1).ToList();
+        
+        // choose a leaf of the mst at random
+        var randomLeaf = mstLeafs.RandomElement();
+        
+        // calculate distance to all other vertices
+        var distances = new Dictionary<Vector3Int, int>();
+        predecessors = new Dictionary<Vector3Int, Vector3Int>();
+        CalcDistanceTable(0, randomLeaf, distances, predecessors);
+        var distanceList = distances.ToList();
+        distanceList.Sort((one, two) => one.Value.CompareTo(two.Value));
+        
+        foreach (var keyValuePair in predecessors)
+        {
+            map.DrawLine(keyValuePair.Key, keyValuePair.Value, yellow);
+        }
+        
+        distanceList.ForEach(kvp => map.SetTextAt(kvp.Key, kvp.Value.ToString()));
+        // choose by distance
+        var start = randomLeaf;
+        var keyVertex = distanceList.Skip(distanceList.Count / 2).First().Key;
+        var end = distanceList.Last().Key;
+
+        var doorEdge = FindDoorTo(end);
+        map.CreateDoor(doorEdge.Tag.DoorPosition, 1);
+
+        var startRoom = RoomFromPosition(start);
+        var keyRoom = RoomFromPosition(keyVertex);
+        var endRoom = RoomFromPosition(end);
+        
+        ColorRoom(startRoom, green);
+        ColorRoom(keyRoom, yellow);
+        ColorRoom(endRoom, red);
+    }
+
+    private STaggedEquatableEdge<Vector3Int, Corridor> FindDoorTo(Vector3Int currentVertex)
+    {
+        var predecessor = predecessors[currentVertex];
+        STaggedEquatableEdge<Vector3Int, Corridor> edge;
+        if (mstGraph.TryGetEdge(predecessor, currentVertex, out edge))
+        {
+            if (edge.Tag.HasDoor) return edge;
+            return FindDoorTo(predecessor);
+        }
+
+        return null;
+    }
+
+    private void CalcDistanceTable(int currentDistance, Vector3Int vertex, Dictionary<Vector3Int, int> distances, Dictionary<Vector3Int, Vector3Int> predecessors)
+    {
+        if (distances.ContainsKey(vertex)) return;
+        distances[vertex] = currentDistance;
+        foreach (var edge in mstGraph.AdjacentEdges(vertex))
+        {
+            var otherVertex = edge.GetOtherVertex(vertex);
+            if (!predecessors.ContainsKey(otherVertex)) predecessors[otherVertex] = vertex;
+            CalcDistanceTable(currentDistance + 1, otherVertex, distances, predecessors);
+        }
+    }
+
+    private void ColorRoom(BSPRoomNode room, Color color)
+    {        
+        foreach (var roomPos in room.Bounds.allPositionsWithin)
+        {
+            map.HighlightTile(roomPos.ToVector3Int(), color);
+        }
+    }
+
+    private void ConnectRoomsFromMST()
+    {
+        map.RemoveAllLines();
+        foreach (var edge in mst)
+        {
+            //DrawEdge(edge);
+            var firstRoom = RoomFromPosition(edge.Source);
+            var secondRoom = RoomFromPosition(edge.Target);
+            if (firstRoom != null && secondRoom != null)
+            {
+                var corridor = ConnectTwoRooms(firstRoom, secondRoom);
+                edge.Tag = corridor;
+            }
+        }
+    }
+
+    private BSPRoomNode RoomFromPosition(Vector3Int pos)
+    {
+        return leafs.Find(r => r.Bounds.Contains(new Vector2Int(pos.x, pos.y)));
+    }
+
+    private IEnumerable<STaggedEquatableEdge<Vector3Int, Corridor>> CreateMinimumSpanningTree(List<BSPRoomNode> rooms)
     {
         var delaunayTriangulator = new DelaunayTriangulator();
-        var points = leafs.Select(r => new Point(r.Bounds.center.x, r.Bounds.center.y));
+        var points = rooms.Select(r => new Point(r.Bounds.center.x, r.Bounds.center.y));
         var triangles = delaunayTriangulator.BowyerWatson(points);
-        
-        UndirectedGraph<Vector3Int, Edge<Vector3Int>> g = new UndirectedGraph<Vector3Int, Edge<Vector3Int>>(allowParallelEdges: false);
-        Func<Edge<Vector3Int>, double> edgeWeights = edge => (edge.Source - edge.Target).magnitude;
+
+        UndirectedGraph<Vector3Int, STaggedEquatableEdge<Vector3Int, Corridor>> g =
+            new UndirectedGraph<Vector3Int, STaggedEquatableEdge<Vector3Int, Corridor>>(allowParallelEdges: false);
+        Func<STaggedEquatableEdge<Vector3Int, Corridor>, double> edgeWeights = edge => (edge.Source - edge.Target).magnitude;
 
         foreach (var triangle in triangles)
         {
             var start = new Vector3Int((int) triangle.Vertices[0].X, (int) triangle.Vertices[0].Y, 0);
             var mid = new Vector3Int((int) triangle.Vertices[1].X, (int) triangle.Vertices[1].Y, 0);
             var end = new Vector3Int((int) triangle.Vertices[2].X, (int) triangle.Vertices[2].Y, 0);
-            
-            var graphEdgeOne = new Edge<Vector3Int>(start, mid); 
-            var graphEdgeTwo = new Edge<Vector3Int>(mid, end); 
-            var graphEdgeThree = new Edge<Vector3Int>(end, start); 
+
+            var graphEdgeOne = new STaggedEquatableEdge<Vector3Int, Corridor>(start, mid, null);
+            var graphEdgeTwo = new STaggedEquatableEdge<Vector3Int, Corridor>(mid, end, null);
+            var graphEdgeThree = new STaggedEquatableEdge<Vector3Int, Corridor>(end, start, null);
             g.AddVerticesAndEdge(graphEdgeOne);
             g.AddVerticesAndEdge(graphEdgeTwo);
             g.AddVerticesAndEdge(graphEdgeThree);
         }
 
-        IEnumerable<Edge<Vector3Int>> mst = g.MinimumSpanningTreePrim(edgeWeights);
-        
-        map.RemoveAllLines();
-        foreach (var edge in mst)
-        {
-            DrawEdge(edge);
-            var firstRoom = leafs.Find(r => r.Bounds.Contains(new Vector2Int(edge.Source.x, edge.Source.y)));
-            var secondRoom = leafs.Find(r => r.Bounds.Contains(new Vector2Int(edge.Target.x, edge.Target.y)));
-            if (firstRoom != null && secondRoom != null)
-            {
-                yield return ConnectTwoRooms(firstRoom, secondRoom);
-            }
-        }
-        yield break;
+        return g.MinimumSpanningTreePrim<Vector3Int, STaggedEquatableEdge<Vector3Int, Corridor>>(edgeWeights);
     }
 
     private void DrawTriangle(Triangle triangle)
@@ -137,7 +238,7 @@ public class BspGeneratorBase : GeneratorBase
         map.DrawLine(three, one, color);
     }
 
-    private void DrawEdge(Edge<Vector3Int> edge)
+    private void DrawEdge(STaggedEquatableEdge<Vector3Int, Corridor> edge)
     {
         map.DrawLine(edge.Source, edge.Target, Color.green);
     }
@@ -165,8 +266,66 @@ public class BspGeneratorBase : GeneratorBase
         }        
     }
 
-    private IEnumerator ConnectTwoRooms(BSPRoomNode firstSibling, BSPRoomNode secondSibling)
+    
+    private Corridor ConnectTwoRooms(BSPRoomNode firstSibling, BSPRoomNode secondSibling)
     {
+        Corridor corr = new Corridor()
+        {
+            ConnectedRooms = new Tuple<BSPRoomNode, BSPRoomNode>(firstSibling, secondSibling)
+        };
+        nextStep = false;
+        Vector3Int corridorStart = Vector3Int.zero;
+        Vector3Int corridorEnd = Vector3Int.zero;
+        
+        var one = firstSibling.Bounds;
+        var two = secondSibling.Bounds;
+        var needsHorizontal = false;
+        var needsVertical = false;
+        if (one.xMax < two.xMin) // one is left of two
+        {
+            needsHorizontal = true;
+        }
+        else if (one.xMin > two.xMax) // two is left of one
+        {
+            needsHorizontal = true;
+        }
+        
+        if (one.yMax < two.yMin) // one is below of two
+        {
+            needsVertical = true;
+        }
+        else if (one.yMin > two.yMax) // two is below of one
+        {
+            needsVertical = true;
+        }
+
+        if (needsHorizontal && !needsVertical)
+        {
+            // chose y coordinate
+            var minY = Mathf.Max(one.yMin, two.yMin);
+            var maxY = Mathf.Min(one.yMax, two.yMax);
+            var corrY = Random.Range(minY, maxY);
+            var oneX = one.center.x;
+            var twoX = two.center.x;
+            corridorStart.x = (int) oneX;
+            corridorStart.y = corrY;
+            corridorEnd.x = (int) twoX;
+            corridorEnd.y = corrY;
+        }
+        
+        if (!needsHorizontal && needsVertical)
+        {
+            // chose x coordinate
+            var minX = Mathf.Max(one.xMin, two.xMin);
+            var maxX = Mathf.Min(one.xMax, two.xMax);
+            var corrX = Random.Range(minX, maxX);
+            var oneY = one.center.y;
+            var twoY = two.center.y;
+            corridorStart.x = corrX;
+            corridorStart.y = (int) oneY;
+            corridorEnd.x = corrX;
+            corridorEnd.y = (int) twoY;
+        }
         map.RemoveAllHighlights();
         var redColor = new Color(0.5f,0.2f,0,0.5f);
         foreach (var pos in firstSibling.Bounds.allPositionsWithin)
@@ -178,17 +337,38 @@ public class BspGeneratorBase : GeneratorBase
             map.HighlightTile(new Vector3Int(pos.x, pos.y, 0), redColor);
         }
         var color = new Color(0f,0.8f,0,0.5f);
-        map.ForTileInLine(firstSibling.RoomCenter, secondSibling.RoomCenter, pos =>
+        map.ForTileInLine(corridorStart, corridorEnd, pos =>
         {            
             map.HighlightTile(pos, color);
         });
         //yield return new WaitUntil(() => nextStep);
-        map.ForTileInLine(firstSibling.RoomCenter, secondSibling.RoomCenter, pos =>
+        bool doorPlaced = false;
+        map.ForTileInLine(corridorStart, corridorEnd, pos =>
         {            
-            map.RemoveWallAt(pos);
+            if (map.IsWallAt(pos))
+            {
+                corr.Tiles.Add(pos);
+                map.RemoveWallAt(pos);
+                if (!doorPlaced)
+                {
+                    doorPlaced = CanPlaceDoor(pos);
+                    if (doorPlaced)
+                    {
+                        corr.HasDoor = true;
+                        corr.DoorPosition = pos;
+                        map.CreateDoor(pos.x, pos.y);
+                    }
+                }
+            }
         });
-        yield return null;
+        return corr;
     }
+
+    private bool CanPlaceDoor(Vector3Int pos)
+    {
+        return true;
+    }
+
     private void AddRooms()
     {
         foreach (var roomNode in leafs)
@@ -264,10 +444,57 @@ public class BspGeneratorBase : GeneratorBase
 
 }
 
+public class Corridor
+{
+    public HashSet<Vector3Int> Tiles { get; set; } = new HashSet<Vector3Int>();
+    public bool HasDoor { get; set; }
+    public Vector3Int DoorPosition { get; set; }
+    public Tuple<BSPRoomNode, BSPRoomNode> ConnectedRooms { get; set; }
+}
 public static class PointExtension
 {
     public static Vector3Int ToVector3Int(this Point point)
     {
         return new Vector3Int((int) point.X, (int) point.Y, 0);
+    }
+}
+
+public static class Vector2IntExtension
+{
+    public static Vector3Int ToVector3Int(this Vector2Int point)
+    {
+        return new Vector3Int((int) point.x, (int) point.y, 0);
+    }
+}
+
+public static class IEnumerableExtension
+{
+    public static T RandomElement<T>(this IEnumerable<T> list)
+    {
+        var enumerable = list as T[] ?? list.ToArray();
+        return enumerable.ElementAt(Random.Range(0, enumerable.Length));
+    }
+}
+
+public static class ComparableExtension
+{
+    public static int CompareTo(this Vector3Int leftHand, Vector3Int other)
+    {
+        return leftHand.x.CompareTo(other.x) + leftHand.y.CompareTo(other.y);
+    }
+    
+    public static int Compare<T>(this System.Collections.Generic.IComparer<T> comparer, Vector3Int leftHand, Vector3Int other)
+    {
+        if (leftHand == other)
+        {
+            return 0;
+        }
+        // cannot return zero now
+        if (leftHand.x == other.x)
+        {
+            return leftHand.y.CompareTo(other.y);
+        }
+        
+        return leftHand.x.CompareTo(other.x);
     }
 }

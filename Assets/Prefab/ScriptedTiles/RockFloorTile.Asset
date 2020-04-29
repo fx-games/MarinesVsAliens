@@ -10,9 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f869ca4ff169e4d9ebeda5b12ebae889, type: 3}
-  m_Name: FloorTile
+  m_Name: RockFloorTile
   m_EditorClassIdentifier: 
-  m_Sprite: {fileID: 265596017115981189, guid: 0646cc5396fd44b88bca5707ce558326, type: 3}
+  m_Sprite: {fileID: -6322211295378324877, guid: 0646cc5396fd44b88bca5707ce558326,
+    type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Transform:
     e00: 1
@@ -35,4 +36,4 @@ MonoBehaviour:
   m_Flags: 0
   m_ColliderType: 2
   m_Sprites:
-  - {fileID: 265596017115981189, guid: 0646cc5396fd44b88bca5707ce558326, type: 3}
+  - {fileID: -25016179675456017, guid: 0646cc5396fd44b88bca5707ce558326, type: 3}

@@ -14,7 +14,6 @@ public class WallTile : Tile
     public Sprite[] NorthWallAlternatives;
     public int NorthWallAlternativeChance;
     public Map Map { get; set; }
-
     public override void RefreshTile(Vector3Int location, ITilemap tilemap)
     {
         for (int yd = -1; yd <= 1; yd++)
@@ -30,7 +29,7 @@ public class WallTile : Tile
     
     public override void GetTileData(Vector3Int location, ITilemap tilemap, ref TileData tileData)
     {
-        if (!Map.Contains(location.x, location.y)) return;
+        if (Map == null || !Map.Contains(location.x, location.y)) return;
         var mask = GetNeighborMask(location, tilemap);
         int index = GetIndex((byte)mask);
         
@@ -182,7 +181,7 @@ public class WallTile : Tile
         return tilemap.GetTile(position) == this;
     }
     // The following determines which sprite to use based on the number of adjacent RoadTiles
-    private int GetIndex(byte mask)
+    protected virtual int GetIndex(byte mask)
     {
         switch (mask)
         {

@@ -35,6 +35,20 @@ public enum DroneSpriteOffset
     SmallCube = 14,
     LargeCube = 16
 }
+
+public enum AlienSpriteOffset
+{
+    GreenSmallHead = 0,
+    GreenMediumHead = 2,
+    GreenLargeHead = 4,
+    RedSmallHead = 6,
+    RedMediumHead = 8,
+    RedLargeHead = 10,
+    PurpleSmallHead = 12,
+    PurpleMediumHead = 14,
+    PurpleLargeHead = 16
+}
+
 public class UnitAnimator : MonoBehaviour
 {
     public Sprite[] idleFrames;
@@ -62,6 +76,11 @@ public class UnitAnimator : MonoBehaviour
     }
     
     public void SetSpriteOffset(DroneSpriteOffset sprite)
+    {
+        SetSpriteOffset((int) sprite);
+    }
+    
+    public void SetSpriteOffset(AlienSpriteOffset sprite)
     {
         SetSpriteOffset((int) sprite);
     }

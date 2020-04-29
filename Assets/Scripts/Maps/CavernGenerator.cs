@@ -41,7 +41,7 @@ namespace DefaultNamespace
                 throw new ArgumentException("Size must be odd.");
             }
             map.Init(width, height);
-
+            map.FillLayer("Floors", 1);
             RandomFillMap();
             //MakeCaverns();
         }
@@ -75,7 +75,7 @@ namespace DefaultNamespace
             {
                 if (numWallsOne >= 5 || numWallsTwo <= 3)
                 {
-                    map.AddWall(pos);
+                    map.AddWall(pos, 1);
                     return;
                 }
             }
@@ -83,7 +83,7 @@ namespace DefaultNamespace
             {
                 if (numWallsOne >= 5)
                 {
-                    map.AddWall(pos);
+                    map.AddWall(pos, 1);
                     return;
                 }
             }
@@ -110,14 +110,14 @@ namespace DefaultNamespace
             {
                 if (pos.x == 0 || pos.y == 0 || pos.x == map.Width - 1 || pos.y == map.Height - 1)
                 {
-                    map.AddWall(pos);
+                    map.AddWall(pos, 1);
                 }
                 else
                 {
                     var random = Random.Range(0, 99);
                     if (pos.x != mapMiddle && random < PercentWalls)
                     {
-                        map.AddWall(pos);
+                        map.AddWall(pos, 1);
                     }
                     else
                     {

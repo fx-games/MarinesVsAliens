@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Default;
 using DefaultNamespace;
+using QuickGraph;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 using UnityEngine.UI;
@@ -126,6 +127,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         raycaster = new Raycaster(this);
 
         ((WallTile) walls[0]).Map = this;
+        ((WallTile) walls[1]).Map = this;
     }
 
     public void DrawLine(Vector3Int start, Vector3Int end, Color color)
@@ -283,7 +285,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             fogMap[i] = new bool[Height];
             damageMap[i] = new int[Height];
         }
-        FillLayer("Floors");
+        
         //FillLayer("FogOfWar");
     }   
     private void Start()
@@ -388,12 +390,17 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     {
         return calcMap[x][y] == MapInfo.Door;
     }
-    public void CreateDoor(int x, int y)
+    public void CreateDoor(int x, int y, int tileIndex = 0)
     {
         var pos = new Vector3Int(x,y,0);
-        layerMap["Doors"].SetTile(pos, doors[0]);
+        layerMap["Doors"].SetTile(pos, doors[tileIndex]);
         calcMap[pos.x][pos.y] = MapInfo.Door;
         RemoveWallAt(pos); // no walls at door tiles
+    }
+    
+    public void CreateDoor(Vector3Int pos, int tileIndex = 0)
+    {
+        CreateDoor(pos.x, pos.y, tileIndex);
     }
 
     // returns true if wall is destroyed and fov update needed
@@ -474,16 +481,16 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         }
     }
 
-    public void FillLayer(string layerName)
+    public void FillLayer(string layerName, int tileIndex = 0)
     {
         switch (layerName)
         {
             case "Walls":
-                layerMap["Walls"].BoxFill(new Vector3Int(1, 1, 0), walls[0], 0, 0, Width, Height);
+                layerMap["Walls"].BoxFill(new Vector3Int(1, 1, 0), walls[tileIndex], 0, 0, Width, Height);
                 FillMapArray(calcMap, MapInfo.Wall);
                 break;
             case "Floors":
-                layerMap["Floors"].BoxFill(new Vector3Int(1, 1, 0), floorTiles[0], 0, 0, Width, Height);
+                layerMap["Floors"].BoxFill(new Vector3Int(1, 1, 0), floorTiles[tileIndex], 0, 0, Width, Height);
                 FillMapArray(calcMap, MapInfo.Floor);
                 break;
             case "FogOfWar":
@@ -1116,6 +1123,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return mapOne == mapTwo;
     }
 
+   
 }
 
 public enum MapInfo

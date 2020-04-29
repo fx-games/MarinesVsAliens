@@ -17828,6 +17828,21 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8754880735499266653, guid: 6e9dfcc2367df4acb8b9e9adce5500bc,
         type: 3}
+      propertyPath: doors.Array.size
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 8754880735499266653, guid: 6e9dfcc2367df4acb8b9e9adce5500bc,
+        type: 3}
+      propertyPath: walls.Array.size
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 8754880735499266653, guid: 6e9dfcc2367df4acb8b9e9adce5500bc,
+        type: 3}
+      propertyPath: floorTiles.Array.size
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 8754880735499266653, guid: 6e9dfcc2367df4acb8b9e9adce5500bc,
+        type: 3}
       propertyPath: spawnFloorMarkerTiles.Array.data[0]
       value: 
       objectReference: {fileID: 11400000, guid: 2761cb4ca438e4f90a51615ff12b6f1f,
@@ -17861,6 +17876,24 @@ PrefabInstance:
       propertyPath: fogTile
       value: 
       objectReference: {fileID: 11400000, guid: e2a7ecd55a39140e28b54926e58c5268,
+        type: 2}
+    - target: {fileID: 8754880735499266653, guid: 6e9dfcc2367df4acb8b9e9adce5500bc,
+        type: 3}
+      propertyPath: doors.Array.data[1]
+      value: 
+      objectReference: {fileID: 11400000, guid: b914570bd6e9f43dfa79f8ea1f82173c,
+        type: 2}
+    - target: {fileID: 8754880735499266653, guid: 6e9dfcc2367df4acb8b9e9adce5500bc,
+        type: 3}
+      propertyPath: walls.Array.data[1]
+      value: 
+      objectReference: {fileID: 11400000, guid: 2e0cfb5b404504ab6b19324b20224a67,
+        type: 2}
+    - target: {fileID: 8754880735499266653, guid: 6e9dfcc2367df4acb8b9e9adce5500bc,
+        type: 3}
+      propertyPath: floorTiles.Array.data[1]
+      value: 
+      objectReference: {fileID: 11400000, guid: b6c77bfb0c52d4c4e98d74df50ecb9e8,
         type: 2}
     - target: {fileID: 8754880735499266654, guid: 6e9dfcc2367df4acb8b9e9adce5500bc,
         type: 3}
