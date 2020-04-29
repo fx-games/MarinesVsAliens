@@ -7,7 +7,7 @@ namespace WorldEffects
     {
         public override void Execute()
         {
-            if (_game.CurrentFaction == _game.PoVFaction)
+            if (_game.CurrentPlayer == _game.PoVPlayer)
             {
                 ActingUnit.SetLabelText(ChanceToHitRoll.Sum().ToString());
             }

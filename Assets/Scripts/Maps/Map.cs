@@ -629,7 +629,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     {
         if (!IsUnitOn(mapPos)) return false;
         var unitAtPos = GetUnitAt(mapPos);
-        return unitAtPos.Faction == unit.Faction;
+        return unitAtPos.ControllingPlayer == unit.ControllingPlayer;
     }
     public bool AddUnit(Unit unit, Vector3Int mapPos, bool doorsAreBlocking = true)
     {
@@ -774,7 +774,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
 
     public bool IsOtherFactionOn(Unit unit, Vector3Int pos)
     {
-        return IsOtherFactionOn(unit.Faction, pos);
+        return IsOtherFactionOn(unit.ControllingPlayer, pos);
     }
 
     public bool IsOtherFactionOn(RuleFaction faction, Vector3Int mapPosition)
@@ -785,7 +785,18 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         }
 
         var otherUnit = GetUnitAt(mapPosition);
-        return faction != otherUnit.Faction;
+        return faction != otherUnit.ControllingPlayer.Faction;
+    }
+    
+    public bool IsOtherFactionOn(Player player, Vector3Int mapPosition)
+    {
+        if (!IsUnitOn(mapPosition))
+        {
+            return false;
+        }
+
+        var otherUnit = GetUnitAt(mapPosition);
+        return player != otherUnit.ControllingPlayer;
     }
 
 
@@ -853,7 +864,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             if (IsUnitOn(offsetPos))
             {
                 var unitAtPosition = GetUnitAt(offsetPos);
-                var isFriendlyUnit = unitAtPosition.Faction == unit.Faction;
+                var isFriendlyUnit = unitAtPosition.ControllingPlayer == unit.ControllingPlayer;
                 if (friendlyUnitsAreBlocking) return false;
                 if (!isFriendlyUnit) return false;
             }

@@ -97,6 +97,7 @@
     <Compile Include="Assets\Scripts\Maps\WallTile.cs" />
     <Compile Include="Assets\Scripts\Mod.cs" />
     <Compile Include="Assets\Scripts\Options.cs" />
+    <Compile Include="Assets\Scripts\Player.cs" />
     <Compile Include="Assets\Scripts\PlayerInterface.cs" />
     <Compile Include="Assets\Scripts\SimpleAudio.cs" />
     <Compile Include="Assets\Scripts\Units\Unit.cs" />

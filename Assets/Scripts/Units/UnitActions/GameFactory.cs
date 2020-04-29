@@ -81,7 +81,7 @@ namespace DefaultNamespace.Units.UnitActions
             {
                 ActingUnit = unit,
                 Turn = Game.CurrentTurn,
-                ActingFaction = Game.CurrentFaction,
+                ActingPlayer = Game.CurrentPlayer,
                 Identifier = identifier,
                 Effects = skillMap[identifier].Effects,
                 Buffs = skillMap[identifier].Buffs,

@@ -38,8 +38,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     }
 
     public int CurrentArmor => GetCurrentStat("Armor");
-    public RuleFaction Faction { get; set; }
-    
+    public Player ControllingPlayer { get; set; }    
     public Vector3Int Cell => _map.WorldToCell(transform.position);
 
     private float lastMoveTime;
@@ -384,9 +383,9 @@ public class Unit : MonoBehaviour, IPlayerUnit
         Destroy(gameObject);
     }
 
-    public void LoadRules(string unitType, RuleFaction faction, RuleLoadout loadout)
+    public void LoadRules(string unitType, Player player, RuleLoadout loadout)
     {
-        Faction = faction;
+        ControllingPlayer = player;
         foreach (var weaponType in loadout.Weapons)
         {
             var weaponRules = mod.GetWeaponRule(weaponType);
@@ -665,7 +664,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     {
         var previouslyVisibleEnemies = _visibleEnemies;
         _fieldOfView = CreateFieldOfView(removeFogVisually, removeFogMechanically);
-        _visibleEnemies = new HashSet<IPlayerUnit>(FieldOfView.Where(pos => _map.IsOtherFactionOn(Faction, pos)).Select(pos => _map.GetUnitAt(pos)));
+        _visibleEnemies = new HashSet<IPlayerUnit>(FieldOfView.Where(pos => _map.IsOtherFactionOn(ControllingPlayer, pos)).Select(pos => _map.GetUnitAt(pos)));
 
         var becameVisible = new HashSet<IPlayerUnit>(_visibleEnemies);
         becameVisible.ExceptWith(previouslyVisibleEnemies);
@@ -726,7 +725,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public List<IPlayerUnit> VisibleEnemiesFrom(Vector3Int reachableMapPosition)
     {
         var fov = _map.GetFOV(this, reachableMapPosition, CurrentVisionRange, false, false);
-        return fov.Where(pos => _map.IsOtherFactionOn(Faction, pos)).Select(pos => _map.GetUnitAt(pos)).ToList();
+        return fov.Where(pos => _map.IsOtherFactionOn(ControllingPlayer, pos)).Select(pos => _map.GetUnitAt(pos)).ToList();
     }
 
     public int GetCurrentStat(string statName)

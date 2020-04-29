@@ -17,12 +17,11 @@ public enum MapTileInfo
 }
 public enum AIState { Thinking, Idle}
 
-public class AIPlayer
+public class AIPlayer : Player
 {
     private IGame game;
     private IPlayerMap map;
     private Mod mod;
-    public Mod.RuleFaction Faction { get; }
     private SubsumptionScheduler scheduler;
     private List<Unit> allUnits;
     private MapTileInfo[,] mapKnowledge;
@@ -31,7 +30,7 @@ public class AIPlayer
     private HashSet<Unit> noopUnits = new HashSet<Unit>();
     public AIState State { get; private set; }
 
-    public AIPlayer(IGame game, Mod mod, IPlayerMap map, Mod.RuleFaction faction)
+    public AIPlayer(int index, IGame game, Mod mod, IPlayerMap map, Mod.RuleFaction faction) : base(index)
     {
         this.game = game;
         this.map = map;
@@ -159,10 +158,10 @@ public class AIPlayer
 
 public interface IGame
 {
-    List<Unit> GetAllUnits(AIPlayer aiPlayer);
-    List<Unit> GetVisibleEnemies(AIPlayer aiPlayer);
+    List<Unit> GetAllUnits(Player player);
+    List<Unit> GetVisibleEnemies(Player player);
     Vector3Int GetBestMoveTowards(Unit unit, Vector3Int first);
-    void EndPhase(AIPlayer aiPlayer);
+    void EndPhase(Player player);
     void MoveUnit(Unit unit, Vector3Int targetPos);
     void AttackWithUnit(Unit unit, List<Vector3Int> targets);
 }

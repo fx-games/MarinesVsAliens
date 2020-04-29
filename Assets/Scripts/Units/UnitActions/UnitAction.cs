@@ -19,7 +19,7 @@ namespace DefaultNamespace.Units.UnitActions
 
         public bool ReRollChanceToHitForEachEffect { get; set; }
         public int Turn { get; set; }
-        public Mod.RuleFaction ActingFaction { get; set; }
+        public Player ActingPlayer { get; set; }
         public Unit ActingUnit { get; set; }
         public string Identifier { get; set; }
         public List<Mod.RuleBuff> Buffs { get; set; } = new List<Mod.RuleBuff>();
@@ -54,7 +54,7 @@ namespace DefaultNamespace.Units.UnitActions
                 
                 var unitsInRange = validTargetPositions.Where(pos => _map.IsOtherFactionOn(ActingUnit, pos))
                     .Select(pos => _map.GetUnitAt(pos));
-                if (_game.CurrentFaction == _game.PoVFaction)
+                if (_game.CurrentPlayer == _game.PoVPlayer)
                 {
                     foreach (var unit in unitsInRange)
                     {

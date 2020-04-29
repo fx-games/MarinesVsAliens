@@ -19,8 +19,8 @@ namespace WorldEffects
 
                 foreach (var affectedTile in areaOfEffect)
                 {
-                    var unitLoadout = _mod.GetLoadout(ActingUnit.Faction, unitType);
-                    _game.SpawnUnit(affectedTile, unitType, unitLoadout, ActingUnit.Faction);
+                    var unitLoadout = _mod.GetLoadout(ActingUnit.ControllingPlayer.Faction, unitType);
+                    _game.SpawnUnit(affectedTile, unitType, unitLoadout, ActingUnit.ControllingPlayer);
                 }
             }
             

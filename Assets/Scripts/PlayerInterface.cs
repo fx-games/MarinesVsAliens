@@ -50,7 +50,7 @@ namespace DefaultNamespace
         int CurrentVisionRange { get; }
         int CurrentHealth { get; }
         bool CanAttack();
-        Mod.RuleFaction Faction { get; set; }
+        Player ControllingPlayer { get; set; }
         Vector3Int Cell { get; }
         bool HasRangedWeapon { get; }
         bool HasMeleeWeapon { get; }

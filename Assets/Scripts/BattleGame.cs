@@ -42,7 +42,7 @@ public class BattleGame : MonoBehaviour, IGame
     public GameObject meleeHitPrefab;
 
     private List<Unit> allUnits = new List<Unit>();
-    private System.Collections.Generic.HashSet<RuleFaction> eliminatedFactions = new System.Collections.Generic.HashSet<RuleFaction>();
+    private C5.HashSet<Player> eliminatedPlayers = new C5.HashSet<Player>();
     private Map _map;
     private Unit selectedUnit;
     private Camera gameCamera;
@@ -50,18 +50,17 @@ public class BattleGame : MonoBehaviour, IGame
     public Text centerOfScreenLabel;
     private GameState gameState = GameState.WaitForHotSeatPlayer;
     private Mod mod;
-    private List<RuleFaction> playerFactions;
-    private int phaseFaction = 0;
+    private List<Player> players;
+    private int playerPhase = 0;
     private CameraControls cameraController;
     private Vector3Int lastCursorLocation;
     private int currentMapIndex;
     public int CurrentTurn { get; private set; } = 0;
-    private Dictionary<RuleFaction, AIPlayer> aiPlayers = new Dictionary<RuleFaction, AIPlayer>();
     private double lastAiCommandTime;
     private double aiCommandDelay = 0.8f;
     private bool spectatorMode = false;
     private Coroutine currentAiCoroutine;
-    private RuleFaction singlePlayerFaction;
+    private Player campaignPlayer;
     private Vector3Int movePreConfirmedAt;
     private List<GameObject> uiButtons = new List<GameObject>();
     public GameObject endTurnButton;
@@ -73,6 +72,7 @@ public class BattleGame : MonoBehaviour, IGame
     public GameObject skillButtonPrefab;
     private UnitAction unitAction;
     private Queue<Action> scheduledActions = new Queue<Action>();
+    private List<RuleFaction> allFactions;
 
     private void Awake()
     {
@@ -88,12 +88,9 @@ public class BattleGame : MonoBehaviour, IGame
     void Start()
     {
         cameraController = gameCamera.GetComponent<CameraControls>();
-        var allFactions = mod.GetFactions();
-        playerFactions = new List<RuleFaction>();
-        for (int i = 0; i < GameController.SkirmishPlayerCount; i++)
-        {
-            playerFactions.Add(allFactions[GameController.SkirmishFactions[i]]);
-        }
+        allFactions = mod.GetFactions();
+        players = new List<Player>();
+        
         currentMapIndex = (0);
         LoadMap();
     }
@@ -157,20 +154,38 @@ public class BattleGame : MonoBehaviour, IGame
     private void AfterMapLoad()
     {
         GameFactory.Initialize(this, _map, mod);
+        
         if (GameController.ChosenMode == GameController.GameMode.Campaign)
         {
-            singlePlayerFaction = playerFactions[GameController.CampaignFaction];
-            Debug.Log("Campaign Player Faction: " + singlePlayerFaction);
+            // add campaign player
+            campaignPlayer = new Player(0)
+            {
+                Faction = allFactions[GameController.CampaignFaction]
+            };
+            players.Add(campaignPlayer);
+            Debug.Log("Campaign Player: " + campaignPlayer);
+            CreateAIPlayers();
+        }
+        else if (GameController.ChosenMode == GameController.GameMode.Skirmish)
+        {
+            // add skirmish players
+            for (int i = 0; i < GameController.SkirmishPlayerCount; i++)
+            {
+                players.Add(new Player(i)
+                {
+                    Faction = allFactions[GameController.SkirmishFactions[i]]
+                });
+            }
         }
         
-        CreateAIPlayers();
+        
 
         if (GameController.ChosenMode == GameController.GameMode.WatchAI)
         {
             EnableSpectatorMode();
         }
 
-        phaseFaction = -1; // start with player 0 on first phase
+        playerPhase = -1; // start with player 0 on first phase
         
         SpawnUnits();
         
@@ -185,24 +200,26 @@ public class BattleGame : MonoBehaviour, IGame
     }
     private void CreateAIPlayers()
     {
-        foreach (var faction in playerFactions)
+        foreach (var faction in allFactions)
         {
-            var playerAi = new AIPlayer(this, mod, _map, faction);
-            aiPlayers[faction] = playerAi;
+            if (campaignPlayer.Faction == faction) continue;
+            var playerAi = new AIPlayer(0, this, mod, _map, faction);
+            players.Add(playerAi);
         }
     }
 
     // Update is called once per frame
     private void Update()
     {
-        if (playerFactions.Count <= 1) return;
+        if (players.Count <= 1) return;
         if (gameState == GameState.WaitForHotSeatPlayer) return;
         
         /* Automatic AI moves */
-        if ((spectatorMode || (GameController.ChosenMode == GameController.GameMode.Campaign && CurrentFaction != singlePlayerFaction)))
+        if (CurrentPlayer is AIPlayer)
         {
-            Debug.Log("CurrentFaction (AI Move): " + CurrentFaction);
-            if (aiPlayers[CurrentFaction].State == AIState.Idle && currentAiCoroutine != null)
+            var aiPlayer = CurrentPlayer as AIPlayer;
+            Debug.Log("CurrentFaction (AI Move): " + CurrentPlayer);
+            if (aiPlayer.State == AIState.Idle && currentAiCoroutine != null)
             {
                 StopCoroutine(currentAiCoroutine);
             }
@@ -210,7 +227,7 @@ public class BattleGame : MonoBehaviour, IGame
             {
                 ToDefaultState();
 
-                currentAiCoroutine = StartCoroutine(aiPlayers[CurrentFaction].ExecuteNextCommand());
+                currentAiCoroutine = StartCoroutine(aiPlayer.ExecuteNextCommand());
                 lastAiCommandTime = Time.time;
             }
 
@@ -391,7 +408,7 @@ public class BattleGame : MonoBehaviour, IGame
         movePreConfirmedAt = mapPos;
         gameState = GameState.MovementSelectedPreConfirmation;
         _map.SetHighlightColor(new Color(0, 0, 0.7f, 0.6f), 1);
-        foreach (var visibleEnemy in GetVisibleEnemies(CurrentFaction))
+        foreach (var visibleEnemy in GetVisibleEnemies(CurrentPlayer))
         {
             if (_map.IsLineOfFireBetween(unit, mapPos, visibleEnemy.Cell))
             {
@@ -420,7 +437,7 @@ public class BattleGame : MonoBehaviour, IGame
     {
         var clickedUnit = _map.GetUnitAt(mapPos);
         
-        if (clickedUnit.Faction == CurrentFaction)
+        if (clickedUnit.ControllingPlayer == CurrentPlayer)
         {
             selectedUnit = (Unit) clickedUnit;
             Debug.Log("UnitSelected: " + selectedUnit);
@@ -430,7 +447,7 @@ public class BattleGame : MonoBehaviour, IGame
             }
             HighlightTiles(selectedUnit.ReachablePositions, new Color(0, 0.8f, 0, 0.2f));
             
-            if (CurrentFaction == PoVFaction)
+            if (CurrentPlayer == PoVPlayer)
             {
                 selectedUnit.Mark();
                 UpdateLabel();
@@ -509,8 +526,8 @@ public class BattleGame : MonoBehaviour, IGame
     public void OpenDoorButtonClicked()
     {
         PlaySoundEffect(UiSoundEffect.ButtonPressed);
-        Debug.Log("OpenDoorButtonClicked() FIRED: " + CurrentFaction + " / " + PoVFaction);
-        if (CurrentFaction != PoVFaction) return;
+        Debug.Log("OpenDoorButtonClicked() FIRED: " + CurrentPlayer + " / " + PoVPlayer);
+        if (CurrentPlayer != PoVPlayer) return;
         Debug.Log("SelectedUnit: " + selectedUnit);        
         StartTargetingForAction("OpenDoor");        
     }
@@ -527,7 +544,7 @@ public class BattleGame : MonoBehaviour, IGame
     public void EndTurnButtonClicked()
     {
         PlaySoundEffect(UiSoundEffect.ButtonPressed);
-        if (CurrentFaction != PoVFaction) return;
+        if (CurrentPlayer != PoVPlayer) return;
         EndPhase();
     }
 
@@ -546,21 +563,21 @@ public class BattleGame : MonoBehaviour, IGame
         }
     }
     
-    public void EndPhase(AIPlayer aiPlayer)
+    public void EndPhase(Player player)
     {
-        if (aiPlayer.Faction == CurrentFaction)
+        if (player == CurrentPlayer)
         {
             EndPhase();
         }
     }
 
-    private void StartWaitingForHeatSeatPlayer(RuleFaction faction)
+    private void StartWaitingForHeatSeatPlayer(Player player)
     {
         selectedUnit = null;
         _map.HideUnitMarker();
         allUnits.ForEach(unit => { unit.IsVisible = false; unit.Deselect(); });
 
-        if (spectatorMode || CurrentFaction != PoVFaction)
+        if (spectatorMode || CurrentPlayer != PoVPlayer)
         {
             gameState = GameState.Default;
             StartNextPhase();
@@ -568,7 +585,7 @@ public class BattleGame : MonoBehaviour, IGame
         }
         gameState = GameState.WaitForHotSeatPlayer;
         centerOfScreenLabel.enabled = true;
-        centerOfScreenLabel.text = "NEXT PLAYER\n" + faction;        
+        centerOfScreenLabel.text = "NEXT PLAYER\n" + player;        
         _map.ResetFog();
         UpdateLabel();
         CenterCameraOn(new Vector3Int(_map.Width / 2, _map.Height / 2, 0));
@@ -578,14 +595,14 @@ public class BattleGame : MonoBehaviour, IGame
 
     private bool IsMissionOver()
     {
-        Dictionary<RuleFaction, int> unitCounts = new Dictionary<RuleFaction, int>();
-        foreach (var faction in playerFactions)
+        Dictionary<Player, int> unitCounts = new Dictionary<Player, int>();
+        foreach (var player in players)
         {
-            unitCounts[faction] = 0;
+            unitCounts[player] = 0;
         }
         foreach (var unit in allUnits)
         {
-            unitCounts[unit.Faction]++;
+            unitCounts[unit.ControllingPlayer]++;
         }
 
         foreach (var kvp in unitCounts)
@@ -593,13 +610,13 @@ public class BattleGame : MonoBehaviour, IGame
             var unitCount = kvp.Value;
             if (unitCount != 0) continue;
             
-            var faction = kvp.Key;
-            playerFactions.Remove(faction);
-            eliminatedFactions.Add(faction);
-            Debug.Log(faction.Type + " has been eliminated.");
+            var player = kvp.Key;
+            players.Remove(player);
+            eliminatedPlayers.Add(player);
+            Debug.Log(player + " has been eliminated.");
         }
 
-        if (playerFactions.Count <= 1)
+        if (players.Count <= 1)
         {
             //only one or zero faction left
             MissionDebriefing();
@@ -619,30 +636,30 @@ public class BattleGame : MonoBehaviour, IGame
     private void PrepareNextPhase()
     {
         ToDefaultState();
-        phaseFaction++;
-        if (phaseFaction > playerFactions.Count - 1)
+        playerPhase++;
+        if (playerPhase > players.Count - 1)
         {
-            phaseFaction = 0;
+            playerPhase = 0;
             NextTurn();
         }
         
-        PoVFaction = CurrentFaction;
+        PoVPlayer = CurrentPlayer;
         if (GameController.ChosenMode == GameController.GameMode.Campaign)
         {
-            PoVFaction = singlePlayerFaction;
+            PoVPlayer = campaignPlayer;
         }
         
-        StartWaitingForHeatSeatPlayer(CurrentFaction);
+        StartWaitingForHeatSeatPlayer(CurrentPlayer);
     }
 
-    public RuleFaction PoVFaction { get; set; }
+    public Player PoVPlayer { get; set; }
 
     private void StartNextPhase()
     {
         gameState = GameState.Default;
         centerOfScreenLabel.enabled = false;
 
-        if (CurrentFaction != PoVFaction)
+        if (CurrentPlayer != PoVPlayer)
         {
             centerOfScreenLabel.text = "HIDDEN MOVEMENT";
             centerOfScreenLabel.enabled = true;
@@ -653,18 +670,16 @@ public class BattleGame : MonoBehaviour, IGame
         bool firstUnitFound = false;
         foreach (var unit in allUnits)
         {
-            if (unit.Faction != CurrentFaction) continue;
+            if (unit.ControllingPlayer != CurrentPlayer) continue;
             unit.PrepareNewPhase();
             
-            if (firstUnitFound || spectatorMode || (GameController.ChosenMode == GameController.GameMode.Campaign && CurrentFaction != singlePlayerFaction)) continue;
+            if (firstUnitFound || spectatorMode || (GameController.ChosenMode == GameController.GameMode.Campaign && CurrentPlayer != campaignPlayer)) continue;
             firstUnitFound = true;            
             UnitSelected(unit.Cell);
             CenterCameraOn(unit);
         }
-        if (aiPlayers.ContainsKey(CurrentFaction) && CurrentFaction != singlePlayerFaction)
-        {
-            aiPlayers[CurrentFaction].NextPhase();
-        }
+
+        (CurrentPlayer as AIPlayer)?.NextPhase();
     }
 
     private void NextTurn()
@@ -687,7 +702,7 @@ public class BattleGame : MonoBehaviour, IGame
     {
         PlaySoundEffect(UiSoundEffect.ButtonPressed);
         if (selectedUnit == null) return;
-        if (CurrentFaction != PoVFaction) return;
+        if (CurrentPlayer != PoVPlayer) return;
                 
         //if (aiPlayers.ContainsKey(CurrentFaction) ) return;
 
@@ -705,7 +720,7 @@ public class BattleGame : MonoBehaviour, IGame
     {
         PlaySoundEffect(UiSoundEffect.ButtonPressed);
         if (selectedUnit == null) return;
-        if (CurrentFaction != PoVFaction) return;
+        if (CurrentPlayer != PoVPlayer) return;
                 
         //if (aiPlayers.ContainsKey(CurrentFaction) ) return;
 
@@ -723,7 +738,7 @@ public class BattleGame : MonoBehaviour, IGame
     {
         PlaySoundEffect(UiSoundEffect.ButtonPressed);
         if (selectedUnit == null) return;
-        if (CurrentFaction != PoVFaction) return;
+        if (CurrentPlayer != PoVPlayer) return;
                 
         //if (aiPlayers.ContainsKey(CurrentFaction) ) return;
 
@@ -746,7 +761,7 @@ public class BattleGame : MonoBehaviour, IGame
     private void HighlightTiles(IEnumerable<Vector3Int> positions, Color color, int layer = 0)
     {
         _map.RemoveAllHighlights(layer);
-        if (CurrentFaction == PoVFaction)
+        if (CurrentPlayer == PoVPlayer)
         {
             foreach (var pos in positions)
             {
@@ -797,15 +812,15 @@ public class BattleGame : MonoBehaviour, IGame
         {
             unit.IsVisible = false;
 
-            if (unit.Faction == PoVFaction)
+            if (unit.ControllingPlayer == PoVPlayer)
             {
                 unit.IsVisible = true;
             }
-            unit.UpdateFoV(unit.Faction == PoVFaction, unit.Faction == PoVFaction);
+            unit.UpdateFoV(unit.ControllingPlayer == PoVPlayer, unit.ControllingPlayer == PoVPlayer);
         }
         foreach (var unit in allUnits)
         {
-            if (unit.Faction != PoVFaction && !_map.IsInFogVisually(unit.Cell))
+            if (unit.ControllingPlayer != PoVPlayer && !_map.IsInFogVisually(unit.Cell))
             {
                 unit.IsVisible = true;
             }
@@ -817,10 +832,10 @@ public class BattleGame : MonoBehaviour, IGame
         foreach (var unit in allUnits)
         {
             var unitPos = _map.WorldToCell(unit.transform.position);
-            var shouldBeVisible = unit.Faction == PoVFaction
+            var shouldBeVisible = unit.ControllingPlayer == PoVPlayer
                                   || !_map.IsInFogVisually(unitPos);
             
-            if (shouldBeVisible && unit.Faction != CurrentFaction)
+            if (shouldBeVisible && unit.ControllingPlayer != CurrentPlayer)
             {
                 unit.TurnTowards(sourceUnit.Cell);
             }
@@ -828,7 +843,7 @@ public class BattleGame : MonoBehaviour, IGame
         }
     }
 
-    public RuleFaction CurrentFaction => playerFactions[phaseFaction];
+    public Player CurrentPlayer => players[playerPhase];
 
 
     public void SetLabel(string text)
@@ -847,7 +862,7 @@ public class BattleGame : MonoBehaviour, IGame
         {
             SetLabel(selectedUnit+"\n" + selectedUnit.WeaponDescription);
         }
-        else if (_map.IsOtherFactionOn(CurrentFaction, _map.CurrentCursorPosition))
+        else if (_map.IsOtherFactionOn(CurrentPlayer, _map.CurrentCursorPosition))
         {
             var enemyUnit = (Unit)_map.GetUnitAt(_map.CurrentCursorPosition);
             SetLabel(enemyUnit + "\n" + enemyUnit.WeaponDescription);
@@ -863,35 +878,48 @@ public class BattleGame : MonoBehaviour, IGame
         var mapRules = mod.GetMap(currentMapIndex);
         var spawnPointsByPlayer = _map.GetSpawnPoints();
         var playerIndex = 0;
-        foreach (var ruleFaction in playerFactions)
+        Debug.Log("SpawnUnits has " + spawnPointsByPlayer.Count + " lists of spawnpoints.");
+        Debug.Log("SpawnUnits tries to spawn units for " + players.Count + " players");
+
+        foreach (var player in players)
         {
             var spawnPositions = spawnPointsByPlayer[playerIndex];
             playerIndex++;
             int spawnIndex = 0;
-            foreach (var loadOut in ruleFaction.LoadOut)
+            bool outOfSpawn = false;
+            foreach (var loadOut in player.Faction.LoadOut)
             {
                 for (int i = 0; i < loadOut.Count; i++)
                 {
                     if (loadOut.DoNotSpawn) continue;
                     if (spawnIndex >= spawnPositions.Count)
+                    {
+                        outOfSpawn = true;
                         break;
+                    }
                     var spawnPosition = spawnPositions[spawnIndex];
                     string unitType = loadOut.Unit;
-                    SpawnUnit(spawnPosition, unitType, loadOut, ruleFaction);
+                    SpawnUnit(spawnPosition, unitType, loadOut, player);
                     Debug.Log("Unit " + unitType + " spawned at " + spawnPosition);
                     spawnIndex++;
+                }
+
+                if (outOfSpawn)
+                {
+                    break;
+                    Debug.Log("Player " + player + " ran out of spawn points.");
                 }
             }
         }
     }
 
-    public bool SpawnUnit(Vector3Int spawnPosition, string unitType, RuleLoadout loadout, RuleFaction ruleFaction)
+    public bool SpawnUnit(Vector3Int spawnPosition, string unitType, RuleLoadout loadout, Player player)
     {
         var unitRules = mod.GetUnitRule(unitType);
-        var unitPrefab = unitRules.FactionPrefab != -1 ? factionPrefabs[unitRules.FactionPrefab] : factionPrefabs[ruleFaction.FactionPrefab];
+        var unitPrefab = unitRules.FactionPrefab != -1 ? factionPrefabs[unitRules.FactionPrefab] : factionPrefabs[player.Faction.FactionPrefab];
         var go = Instantiate(unitPrefab, _map.CellToWorld(spawnPosition), Quaternion.identity);
         var unit = go.GetComponent<Unit>();
-        unit.LoadRules(unitType, ruleFaction, loadout);
+        unit.LoadRules(unitType, player, loadout);
         if (_map.AddUnit(unit, spawnPosition))
         {
             unit.FinishedMoving += UnitFinishedMoving;
@@ -921,7 +949,7 @@ public class BattleGame : MonoBehaviour, IGame
 
         if (gameState == GameState.WaitForHotSeatPlayer) return;
         
-        var unitsBecameVisible = unit.UpdateFoV(unit.Faction == PoVFaction, unit.Faction == PoVFaction);
+        var unitsBecameVisible = unit.UpdateFoV(unit.ControllingPlayer == PoVPlayer, unit.ControllingPlayer == PoVPlayer);
         
         UpdateVisibleUnits(unit);
 
@@ -1052,16 +1080,16 @@ public class BattleGame : MonoBehaviour, IGame
         return new Color(((float)colorDefinition[0])/255f,((float)colorDefinition[1])/255f,((float)colorDefinition[2])/255f);
     }
 
-    private void RandomPlacement(RuleFaction ruleFaction)
+    private void RandomPlacement(Player player)
     {
-        foreach (var loadOut in ruleFaction.LoadOut)
+        foreach (var loadOut in player.Faction.LoadOut)
         {
             if (loadOut.DoNotSpawn) continue;
             for (int i = 0; i < loadOut.Count; i++)
             {
                 Vector3Int randomPosition = _map.RandomPosition;
                 int tryCounter = 0;
-                while (!SpawnUnit(randomPosition, loadOut.Unit, loadOut, ruleFaction) && tryCounter < 100)
+                while (!SpawnUnit(randomPosition, loadOut.Unit, loadOut, player) && tryCounter < 100)
                 {
                     // wait for free spawn pos
                     randomPosition = _map.RandomPosition;
@@ -1121,20 +1149,14 @@ public class BattleGame : MonoBehaviour, IGame
         TryMoveWithUnit(unit, targetPos);
     }
 
-    public List<Unit> GetAllUnits(AIPlayer aiPlayer)
+    public List<Unit> GetAllUnits(Player player)
     {
-        var factionOfPlayer = aiPlayer.Faction;
-        return allUnits.Where(unit => unit.Faction == factionOfPlayer).ToList();
+        return allUnits.Where(unit => unit.ControllingPlayer == player).ToList();
     }
 
-    private List<Unit> GetVisibleEnemies(RuleFaction faction)
+    public List<Unit> GetVisibleEnemies(Player player)
     {
-        return allUnits.Where(unit => unit.Faction != faction && !_map.IsInFogMechanically(unit.Cell)).ToList();
-    }
-
-    public List<Unit> GetVisibleEnemies(AIPlayer aiPlayer)
-    {
-        return allUnits.Where(unit => unit.Faction != aiPlayer.Faction && !_map.IsInFogMechanically(unit.Cell)).ToList();
+        return allUnits.Where(unit => unit.ControllingPlayer != player && !_map.IsInFogMechanically(unit.Cell)).ToList();
     }
 
     public void ChangeStateTo(GameState nextState)

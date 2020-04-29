@@ -18,7 +18,7 @@ public class MainMenu : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        
+        skirmishPlayerFactions[1].GetComponent<Image>().sprite = factionSprites[GameController.SkirmishFactions[1]];
     }
 
     // Update is called once per frame
@@ -46,6 +46,13 @@ public class MainMenu : MonoBehaviour
         Application.Quit();
     }
 
+    public void BackToMainMenu()
+    {
+        mainMenu.SetActive(true);
+        chooseFactionMenu.SetActive(false);
+        skirmishMenu.SetActive(false);
+    }
+
     public void CampaignSelection(int factionIndex)
     {
         GameController.CampaignFaction = factionIndex;
@@ -62,13 +69,17 @@ public class MainMenu : MonoBehaviour
 
     public void AddSkirmishPlayerSlot()
     {
+        int count = 0;
         foreach (var playerSlot in skirmishPlayerSlots)
         {
             if (!playerSlot.activeInHierarchy)
             {
+                skirmishPlayerFactions[count].GetComponent<Image>().sprite = factionSprites[GameController.SkirmishFactions[count]];
                 playerSlot.SetActive(true);
                 return;
             }
+
+            count++;
         }
     }
     
