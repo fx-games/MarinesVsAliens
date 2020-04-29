@@ -68,7 +68,7 @@ public class BspGeneratorBase : GeneratorBase
     private UndirectedGraph<Vector3Int, STaggedEquatableEdge<Vector3Int, Corridor>> mstGraph;
     private Dictionary<Vector3Int, Vector3Int> predecessors;
     private List<Vector3Int> mstLeafs;
-
+    private int tileSet = 0;
     public BspGeneratorBase(int width, int height)
     {
         _width = width;
@@ -81,8 +81,8 @@ public class BspGeneratorBase : GeneratorBase
         
         map.Init(_width, _height);            
         // fill all with walls, we carve in the following steps
-        map.FillLayer("Floors", 1);
-        map.FillLayer("Walls", 1);
+        map.FillLayer("Floors", tileSet);
+        map.FillLayer("Walls", tileSet);
         
         rootNode = new BSPRoomNode(1,1, _width-2, _height-2);
         

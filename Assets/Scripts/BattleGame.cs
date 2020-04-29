@@ -854,7 +854,7 @@ public class BattleGame : MonoBehaviour, IGame
         }
         else
         {
-            SetLabel(_map.CurrentCursorPosition.ToString());
+            SetLabel(_map.CurrentCursorPosition.ToString() +":"+ _map.GetPosDebugInfo(_map.CurrentCursorPosition));
         }
     }
 

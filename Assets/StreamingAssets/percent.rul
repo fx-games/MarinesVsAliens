@@ -150,29 +150,6 @@ factions:
         doNotSpawn: true
         weapons:
           - STR_NORMAL_HITTER
-  - type: STR_RED_SPACEMEN
-    factionPrefab: 3
-    color: [226,55,60,1]
-    loadOut:
-      - unit: STR_ROGUE
-        weapons:
-          - STR_HARD_HITTER
-      - unit: STR_HUNTER
-        weapons:
-          - STR_NORMAL_HITTER
-          - STR_RIFLE
-      - unit: STR_HEAVY
-        weapons:
-          - STR_NORMAL_HITTER
-          - STR_ROCKET_LAUNCHER
-      - unit: STR_ENGINEER
-        weapons:
-          - STR_NORMAL_HITTER
-          - STR_HEAVY_ASSAULT_CANNON
-      - unit: STR_DRONE
-        doNotSpawn: true
-        weapons:
-          - STR_NORMAL_HITTER
   - type: STR_BLUE_BIRD_PEOPLE
     factionPrefab: 1
     color: [226,55,60,1]
@@ -219,7 +196,29 @@ factions:
         doNotSpawn: true
         weapons:
           - STR_NORMAL_HITTER
-
+  - type: STR_RED_SPACEMEN
+    factionPrefab: 3
+    color: [226,55,60,1]
+    loadOut:
+      - unit: STR_ROGUE
+        weapons:
+          - STR_HARD_HITTER
+      - unit: STR_HUNTER
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_RIFLE
+      - unit: STR_HEAVY
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_ROCKET_LAUNCHER
+      - unit: STR_ENGINEER
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_HEAVY_ASSAULT_CANNON
+      - unit: STR_DRONE
+        doNotSpawn: true
+        weapons:
+          - STR_NORMAL_HITTER
 units:
   - type: STR_DRONE
     factionPrefab: 4 # DroneUnits

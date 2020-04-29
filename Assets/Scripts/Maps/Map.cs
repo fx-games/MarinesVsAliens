@@ -401,8 +401,8 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     {
         var pos = new Vector3Int(x,y,0);
         layerMap["Doors"].SetTile(pos, doors[tileIndex]);
-        calcMap[pos.x][pos.y] = MapInfo.Door;
-        RemoveWallAt(pos); // no walls at door tiles
+        layerMap["Walls"].SetTile(pos, null);
+        calcMap[x][y] = MapInfo.Door;        
     }
     
     public void CreateSpawnPoint(Vector3Int pos, int factionIndex)
