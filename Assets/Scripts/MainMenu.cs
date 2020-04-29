@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using DefaultNamespace;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -29,12 +30,14 @@ public class MainMenu : MonoBehaviour
     public void Button1()
     {
         //GameController.ChosenMode
+        GameController.ChosenMode = GameController.GameMode.Campaign;
         mainMenu.SetActive(false);
         chooseFactionMenu.SetActive(true);
     }
 
     public void Button2()
-    {
+    {        
+        GameController.ChosenMode = GameController.GameMode.Skirmish;
         mainMenu.SetActive(false);
         skirmishMenu.SetActive(true);
     }
@@ -45,7 +48,8 @@ public class MainMenu : MonoBehaviour
 
     public void CampaignSelection(int factionIndex)
     {
-        
+        GameController.CampaignFaction = factionIndex;
+        LoadBattleGame();
     }
     
     public void ToggleSkirmishFaction(int playerIndex)
@@ -81,26 +85,14 @@ public class MainMenu : MonoBehaviour
         }
     }
 
-    public void StartSkirmish()
+    public void LoadMapGenerator()
     {
-        
+        SceneManager.LoadScene("MapGenerator");
+        GameController.SkirmishPlayerCount = skirmishPlayerSlots.Count(slot => slot.activeInHierarchy);
     }
     
-    public void PlayHotSeat()
-    {
-        GameController.ChosenMode = GameController.GameMode.HotSeat;
-        SceneManager.LoadScene("BattleGameScene");
-    }
-
-    public void PlayAgainstAI()
-    {
-        GameController.ChosenMode = GameController.GameMode.AgainstAI;
-        SceneManager.LoadScene("BattleGameScene");
-    }
-
-    public void WatchAIPlay()
-    {
-        GameController.ChosenMode = GameController.GameMode.WatchAI;
+    public void LoadBattleGame()
+    {        
         SceneManager.LoadScene("BattleGameScene");
     }
 }

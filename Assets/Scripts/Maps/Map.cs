@@ -87,17 +87,10 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     private Raycaster raycaster;
 
     // Start is called before the first frame update
-    void Awake()
+    public void Awake()
     {
         fogTile.color = Color.black;
-        worldCanvas = FindObjectsOfType<Canvas>().First(c => c.name == "WorldCanvas").transform;
-        selectionRect = Instantiate(selectionRectPrefab);
-        unitSelectedMarker = Instantiate(selectionRectPrefab);
-        var spriteRenderer = unitSelectedMarker.GetComponent<SpriteRenderer>();
-        spriteRenderer.color = Color.blue;
-        spriteRenderer.enabled = false;
         
-        mod = FindObjectOfType<Mod>();
         var mapLayers = GetComponentsInChildren<Tilemap>();
         foreach (Tilemap layer in mapLayers)
         {
@@ -118,16 +111,31 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             fogMap[i] = new bool[Height];
             damageMap[i] = new int[Height];
         }
-        gameCamera = Camera.main;
-        if (gameCamera == null)
-        {
-            throw new Exception("Game needs camera.");
-        }
+        
         cellParticleSystem = new CellParticleSystem(this);
         raycaster = new Raycaster(this);
 
         ((WallTile) walls[0]).Map = this;
         ((WallTile) walls[1]).Map = this;
+        
+        InitInScene();
+    }
+        
+    public void InitInScene()
+    {
+        selectionRect = Instantiate(selectionRectPrefab);
+        unitSelectedMarker = Instantiate(selectionRectPrefab);
+        var spriteRenderer = unitSelectedMarker.GetComponent<SpriteRenderer>();
+        spriteRenderer.color = Color.blue;
+        spriteRenderer.enabled = false;
+        
+        mod = FindObjectOfType<Mod>();
+        worldCanvas = FindObjectsOfType<Canvas>().First(c => c.name == "WorldCanvas").transform;
+        gameCamera = Camera.main;
+        if (gameCamera == null)
+        {
+            throw new Exception("Game needs camera.");
+        }
     }
 
     public void DrawLine(Vector3Int start, Vector3Int end, Color color)
@@ -293,7 +301,6 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         
     }
     
-    
     // Update is called once per frame
     void Update()
     {
@@ -396,6 +403,12 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         layerMap["Doors"].SetTile(pos, doors[tileIndex]);
         calcMap[pos.x][pos.y] = MapInfo.Door;
         RemoveWallAt(pos); // no walls at door tiles
+    }
+    
+    public void CreateSpawnPoint(Vector3Int pos, int factionIndex)
+    {
+        calcMap[pos.x][pos.y] = MapInfo.Floor;
+        layerMap["Floors"].SetTile(pos, spawnFloorMarkerTiles[factionIndex]);
     }
     
     public void CreateDoor(Vector3Int pos, int tileIndex = 0)
@@ -1123,7 +1136,6 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return mapOne == mapTwo;
     }
 
-   
 }
 
 public enum MapInfo

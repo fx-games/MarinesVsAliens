@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using DefaultNamespace;
 using DelaunayVoronoi;
 using QuickGraph;
 using QuickGraph.Algorithms;
@@ -66,6 +67,7 @@ public class BspGeneratorBase : GeneratorBase
     private IEnumerable<STaggedEquatableEdge<Vector3Int, Corridor>> mst;
     private UndirectedGraph<Vector3Int, STaggedEquatableEdge<Vector3Int, Corridor>> mstGraph;
     private Dictionary<Vector3Int, Vector3Int> predecessors;
+    private List<Vector3Int> mstLeafs;
 
     public BspGeneratorBase(int width, int height)
     {
@@ -97,12 +99,51 @@ public class BspGeneratorBase : GeneratorBase
         //yield return ConnectRoomsRecursive(rootNode);
         ConnectRoomsFromMST();
 
-        ChooseRegions();
+        var mapHasNotEnoughSpawnZones = ChooseRegions();
+
+        if (!mapHasNotEnoughSpawnZones)
+        {
+            yield return Generate();
+            yield break;
+        }
+
+        PlaceSkirmishSpawnPoints();
         
         yield break;
     }
 
-    private void ChooseRegions()
+    private void PlaceSkirmishSpawnPoints()
+    {
+        HashSet<Vector3Int> spawnZones = new HashSet<Vector3Int>();
+        while (spawnZones.Count < GameController.SkirmishPlayerCount)
+        {
+            var randomZone = mstLeafs.RandomElement();
+            spawnZones.Add(randomZone);
+        }
+
+        int faction = 0;
+        foreach (var spawnPos in spawnZones)
+        {
+            var roomNode = RoomFromPosition(spawnPos);
+            PlaceSpawnPointsInRoom(roomNode, faction);
+            faction++;
+        }
+    }
+
+    private void PlaceSpawnPointsInRoom(BSPRoomNode roomNode, int factionIndex, int count = 4)
+    {
+        int placed = 0;
+        foreach (var pos in roomNode.Bounds.allPositionsWithin)
+        {
+            if (map.IsFloorAt(pos.x, pos.y) && placed < count)
+            {
+                map.CreateSpawnPoint(pos.ToVector3Int(), factionIndex);
+                placed++;
+            }
+        }
+    }
+
+    private bool ChooseRegions()
     {
         map.RemoveAllHighlights();
         map.RemoveAllCellLabels();
@@ -111,7 +152,9 @@ public class BspGeneratorBase : GeneratorBase
         var red = new Color(0.8f, 0.2f, 0, 0.5f);
         var yellow = new Color(0.8f, 0.8f, 0, 0.5f);
         
-        var mstLeafs = mstGraph.Vertices.Where(v => mstGraph.AdjacentDegree(v) == 1).ToList();
+        mstLeafs = mstGraph.Vertices.Where(v => mstGraph.AdjacentDegree(v) == 1).ToList();
+
+        if (mstLeafs.Count < GameController.SkirmishPlayerCount) return false;
         
         // choose a leaf of the mst at random
         var randomLeaf = mstLeafs.RandomElement();
@@ -144,6 +187,8 @@ public class BspGeneratorBase : GeneratorBase
         ColorRoom(startRoom, green);
         ColorRoom(keyRoom, yellow);
         ColorRoom(endRoom, red);
+
+        return true;
     }
 
     private STaggedEquatableEdge<Vector3Int, Corridor> FindDoorTo(Vector3Int currentVertex)

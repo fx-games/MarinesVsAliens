@@ -50,7 +50,7 @@ public class BattleGame : MonoBehaviour, IGame
     public Text centerOfScreenLabel;
     private GameState gameState = GameState.WaitForHotSeatPlayer;
     private Mod mod;
-    private List<RuleFaction> factions;
+    private List<RuleFaction> playerFactions;
     private int phaseFaction = 0;
     private CameraControls cameraController;
     private Vector3Int lastCursorLocation;
@@ -88,7 +88,12 @@ public class BattleGame : MonoBehaviour, IGame
     void Start()
     {
         cameraController = gameCamera.GetComponent<CameraControls>();
-        factions = mod.GetFactions();
+        var allFactions = mod.GetFactions();
+        playerFactions = new List<RuleFaction>();
+        for (int i = 0; i < GameController.SkirmishPlayerCount; i++)
+        {
+            playerFactions.Add(allFactions[GameController.SkirmishFactions[i]]);
+        }
         currentMapIndex = (0);
         LoadMap();
     }
@@ -98,20 +103,33 @@ public class BattleGame : MonoBehaviour, IGame
         if (_map != null)
         {
             Destroy(_map.gameObject);
+            _map = null;
         }
-        var mapRules = mod.GetMap(currentMapIndex);
-        if (mapRules.Generator == 0)
+        
+        // try to find a map in the scene (in skirmish with map generation)
+        _map = FindObjectOfType<Map>();        
+
+        if (_map == null)
         {
-            var premadeMap = premadeMapBlocks.First(map => map.name == mapRules.Premade);
-            _map = Instantiate(premadeMap).GetComponent<Map>();
-            _map.FromPrefab();
+            // try loading from rules (usually in campaign)
+            var mapRules = mod.GetMap(currentMapIndex);
+            if (mapRules.Generator == 0)
+            {
+                var premadeMap = premadeMapBlocks.First(map => map.name == mapRules.Premade);
+                _map = Instantiate(premadeMap).GetComponent<Map>();
+                _map.FromPrefab();
+            }
+            else
+            {
+                _map = Instantiate(gridMapPrefab).GetComponent<Map>();
+                _map.FromRules(mapRules);
+            }
         }
         else
         {
-            _map = Instantiate(gridMapPrefab).GetComponent<Map>();
-            _map.FromRules(mapRules);
+            _map.InitInScene(); // re-initialize the map
         }
-        
+
         Invoke(nameof(AfterMapLoad), 0.1f);
     }
 
@@ -139,15 +157,13 @@ public class BattleGame : MonoBehaviour, IGame
     private void AfterMapLoad()
     {
         GameFactory.Initialize(this, _map, mod);
-        if (GameController.ChosenMode == GameController.GameMode.AgainstAI)
+        if (GameController.ChosenMode == GameController.GameMode.Campaign)
         {
-            singlePlayerFaction = CurrentFaction;
-            Debug.Log("Singleplayer Faction: " + singlePlayerFaction);
+            singlePlayerFaction = playerFactions[GameController.CampaignFaction];
+            Debug.Log("Campaign Player Faction: " + singlePlayerFaction);
         }
-        if (GameController.ChosenMode != GameController.GameMode.HotSeat)
-        {
-            CreateAIPlayers();
-        }
+        
+        CreateAIPlayers();
 
         if (GameController.ChosenMode == GameController.GameMode.WatchAI)
         {
@@ -169,7 +185,7 @@ public class BattleGame : MonoBehaviour, IGame
     }
     private void CreateAIPlayers()
     {
-        foreach (var faction in factions)
+        foreach (var faction in playerFactions)
         {
             var playerAi = new AIPlayer(this, mod, _map, faction);
             aiPlayers[faction] = playerAi;
@@ -179,11 +195,11 @@ public class BattleGame : MonoBehaviour, IGame
     // Update is called once per frame
     private void Update()
     {
-        if (factions.Count <= 1) return;
+        if (playerFactions.Count <= 1) return;
         if (gameState == GameState.WaitForHotSeatPlayer) return;
         
         /* Automatic AI moves */
-        if ((spectatorMode || (GameController.ChosenMode == GameController.GameMode.AgainstAI && CurrentFaction != singlePlayerFaction)))
+        if ((spectatorMode || (GameController.ChosenMode == GameController.GameMode.Campaign && CurrentFaction != singlePlayerFaction)))
         {
             Debug.Log("CurrentFaction (AI Move): " + CurrentFaction);
             if (aiPlayers[CurrentFaction].State == AIState.Idle && currentAiCoroutine != null)
@@ -563,7 +579,7 @@ public class BattleGame : MonoBehaviour, IGame
     private bool IsMissionOver()
     {
         Dictionary<RuleFaction, int> unitCounts = new Dictionary<RuleFaction, int>();
-        foreach (var faction in factions)
+        foreach (var faction in playerFactions)
         {
             unitCounts[faction] = 0;
         }
@@ -578,12 +594,12 @@ public class BattleGame : MonoBehaviour, IGame
             if (unitCount != 0) continue;
             
             var faction = kvp.Key;
-            factions.Remove(faction);
+            playerFactions.Remove(faction);
             eliminatedFactions.Add(faction);
             Debug.Log(faction.Type + " has been eliminated.");
         }
 
-        if (factions.Count <= 1)
+        if (playerFactions.Count <= 1)
         {
             //only one or zero faction left
             MissionDebriefing();
@@ -604,14 +620,14 @@ public class BattleGame : MonoBehaviour, IGame
     {
         ToDefaultState();
         phaseFaction++;
-        if (phaseFaction > factions.Count - 1)
+        if (phaseFaction > playerFactions.Count - 1)
         {
             phaseFaction = 0;
             NextTurn();
         }
         
         PoVFaction = CurrentFaction;
-        if (GameController.ChosenMode == GameController.GameMode.AgainstAI)
+        if (GameController.ChosenMode == GameController.GameMode.Campaign)
         {
             PoVFaction = singlePlayerFaction;
         }
@@ -640,7 +656,7 @@ public class BattleGame : MonoBehaviour, IGame
             if (unit.Faction != CurrentFaction) continue;
             unit.PrepareNewPhase();
             
-            if (firstUnitFound || spectatorMode || (GameController.ChosenMode == GameController.GameMode.AgainstAI && CurrentFaction != singlePlayerFaction)) continue;
+            if (firstUnitFound || spectatorMode || (GameController.ChosenMode == GameController.GameMode.Campaign && CurrentFaction != singlePlayerFaction)) continue;
             firstUnitFound = true;            
             UnitSelected(unit.Cell);
             CenterCameraOn(unit);
@@ -812,7 +828,7 @@ public class BattleGame : MonoBehaviour, IGame
         }
     }
 
-    public RuleFaction CurrentFaction => factions[phaseFaction];
+    public RuleFaction CurrentFaction => playerFactions[phaseFaction];
 
 
     public void SetLabel(string text)
@@ -845,11 +861,12 @@ public class BattleGame : MonoBehaviour, IGame
     private void SpawnUnits()
     {
         var mapRules = mod.GetMap(currentMapIndex);
-        var spawnPointsByFaction = _map.GetSpawnPoints();
-        foreach (var ruleFaction in factions)
+        var spawnPointsByPlayer = _map.GetSpawnPoints();
+        var playerIndex = 0;
+        foreach (var ruleFaction in playerFactions)
         {
-            var factionIndex = ruleFaction.FactionPrefab;
-            var spawnPositions = spawnPointsByFaction[factionIndex];
+            var spawnPositions = spawnPointsByPlayer[playerIndex];
+            playerIndex++;
             int spawnIndex = 0;
             foreach (var loadOut in ruleFaction.LoadOut)
             {

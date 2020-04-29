@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using DefaultNamespace;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using Random = UnityEngine.Random;
 
@@ -18,11 +19,12 @@ public class MapGeneratorMenu : MonoBehaviour
     public int Height = 21;
     // Start is called before the first frame update
     void Start()
-    {
-        NewSeed();
+    {        
         currentMap = Instantiate(mapPrefab).GetComponent<Map>();
-        
+        DontDestroyOnLoad(currentMap.gameObject);        
         AlgorithmChanged(0);
+        NewSeed();
+        RunToCompletionButtonPressed(false);
     }
 
     private void NewSeed()
@@ -77,8 +79,12 @@ public class MapGeneratorMenu : MonoBehaviour
         }
     }
 
-    public void BackButtonPressed()
+    public void AcceptMap()
     {
-        
+        currentMap.RemoveAllLines();
+        currentMap.RemoveAllHighlights();
+        currentMap.RemoveAllCellLabels();
+        currentMap.RemoveAllTileMarker();
+        SceneManager.LoadScene("BattleGameScene");
     }
 }
