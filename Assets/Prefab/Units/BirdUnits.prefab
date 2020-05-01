@@ -51,7 +51,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: a97c105638bdf8b4a8650670310a4cd3, type: 2}
+  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -226,7 +226,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &8119051928241068884
 Transform:
   m_ObjectHideFlags: 0
@@ -328,6 +328,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6de6faf0488604afb89d26432d543eb8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  flashAnimationPrefab: {fileID: 7137829805566560586, guid: ab0bdd5e57f0b480eb1f4b3a0f482985,
+    type: 3}
   bloodSplatter: {fileID: 5972786585338085383, guid: 18b98604ca4274cdcbb7ea9a3dfce325,
     type: 3}
 --- !u!1 &3714060686728050621
@@ -379,7 +381,7 @@ LineRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: a97c105638bdf8b4a8650670310a4cd3, type: 2}
+  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

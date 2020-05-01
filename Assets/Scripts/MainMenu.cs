@@ -15,6 +15,15 @@ public class MainMenu : MonoBehaviour
     public GameObject[] skirmishPlayerSlots;
     public GameObject[] skirmishPlayerFactions;
     public Sprite[] factionSprites;
+
+    private void Awake()
+    {
+        float aspectRatio = Screen.width / (float)Screen.height; // we designed for 1.77777
+        // we want 480p so ? X 480
+        
+        //Screen.SetResolution(398, 224, FullScreenMode.ExclusiveFullScreen);
+    }
+
     // Start is called before the first frame update
     void Start()
     {

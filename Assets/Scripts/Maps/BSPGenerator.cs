@@ -269,7 +269,7 @@ public class BspGeneratorBase : GeneratorBase
             g.AddVerticesAndEdge(graphEdgeThree);
         }
 
-        return g.MinimumSpanningTreePrim<Vector3Int, STaggedEquatableEdge<Vector3Int, Corridor>>(edgeWeights);
+        return g.MinimumSpanningTreePrim(edgeWeights);
     }
 
     private void DrawTriangle(Triangle triangle)

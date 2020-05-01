@@ -234,11 +234,9 @@ public class BattleGame : MonoBehaviour, IGame
             return;
             
         }
-#if UNITY_IOS || UNITY_ANDROID
-        if (EventSystem.current.IsPointerOverGameObject(0)) return; // Touch devices
-#else
-        if (EventSystem.current.IsPointerOverGameObject()) return;           // Desktop & Web
-#endif
+
+        if (IsPointerOverGameObject()) return;
+        
         if (Input.GetMouseButtonDown(1)) // Right-Click on Desktop
         {
             DeselectAll();
@@ -304,7 +302,7 @@ public class BattleGame : MonoBehaviour, IGame
         selectedUnit = null;        
         ToDefaultState();
         UpdateUIButtons();
-        PlaySoundEffect(UiSoundEffect.AbortOrBack);
+        //PlaySoundEffect(UiSoundEffect.AbortOrBack);
     }
 
     public void ToDefaultState()
@@ -449,13 +447,11 @@ public class BattleGame : MonoBehaviour, IGame
             
             if (CurrentPlayer == PoVPlayer)
             {
-                selectedUnit.Mark();
+                selectedUnit.MarkAsSelected();
                 UpdateLabel();
             }
 
             UpdateUIButtons();
-            
-            _map.FlashEffect(mapPos, Color.cyan);
             
             PlaySoundEffect(UiSoundEffect.UnitSelection);
         }
@@ -958,12 +954,7 @@ public class BattleGame : MonoBehaviour, IGame
             if (_map.GetUnitAt(unit.Cell) == unit) // cannot end movement on the same tile as another unit
             {
                 unit.EndMovement();
-            }
-            
-            foreach (var enemyUnit in unitsBecameVisible)
-            {
-                _map.FlashEffect(enemyUnit.Cell, Color.red);
-            }
+            }            
         }
     }
 
@@ -1066,9 +1057,11 @@ public class BattleGame : MonoBehaviour, IGame
         foreach (var unitOccupiedTile in unit.OccupiedTiles)
         {
             var unitPos = unit.Cell + unitOccupiedTile;
-            if (_map.Cardinal.Any(direction => _map.IsDoorAt(unitPos + direction.ToVector())))
+            for (var index = 0; index < _map.Cardinal.Length; index++)
             {
-                return true;
+                var direction = _map.Cardinal[index];
+                var doorThere = _map.IsDoorAt(unitPos + direction.ToVector());
+                if (doorThere) return true;
             }
         }
 
@@ -1176,7 +1169,22 @@ public class BattleGame : MonoBehaviour, IGame
         nextAction.Invoke();
     }
 
-    
+    private static bool IsPointerOverGameObject()
+    {
+#if UNITY_IOS || UNITY_ANDROID
+        //check touch
+        if (Input.touchCount > 0 && Input.touches[0].phase == TouchPhase.Began)
+        {
+            if (EventSystem.current.IsPointerOverGameObject(Input.touches[0].fingerId))
+                return true;
+        }
+#else     
+        //check mouse
+        if (EventSystem.current.IsPointerOverGameObject())
+            return true;
+#endif
+        return false;
+    }
 }
 
 public enum UiSoundEffect

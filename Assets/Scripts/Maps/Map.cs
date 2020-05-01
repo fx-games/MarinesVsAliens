@@ -5,6 +5,7 @@ using System.Linq;
 using Default;
 using DefaultNamespace;
 using QuickGraph;
+using QuickGraph.Algorithms;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 using UnityEngine.UI;
@@ -75,16 +76,14 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
     private HashSet<Text> cellLabels = new HashSet<Text>();
     private Transform worldCanvas;
     private List<GameObject> allTileMarker = new List<GameObject>();
-    private List<ParticleSystem> activeParticleSystems = new List<ParticleSystem>();
-    private List<ParticleSystem.Particle[]> systemParticles = new List<ParticleSystem.Particle[]>();
-    private Dictionary<Vector3Int, Color> particleTiles = new Dictionary<Vector3Int, Color>();
+    private HashSet<Vector3Int> particleTiles = new HashSet<Vector3Int>();
 
     public Tile[] spawnFloorMarkerTiles;
-    private CellParticleSystem cellParticleSystem;
     private Dictionary<Color, Tile> glowTiles = new Dictionary<Color, Tile>();
     private List<LineRenderer> activeLines = new List<LineRenderer>();
     public GameObject linePrefab;
     private Raycaster raycaster;
+    private List<Vector3Int> neighborCache = new List<Vector3Int>();
 
     // Start is called before the first frame update
     public void Awake()
@@ -112,7 +111,6 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             damageMap[i] = new int[Height];
         }
         
-        cellParticleSystem = new CellParticleSystem(this);
         raycaster = new Raycaster(this);
 
         ((WallTile) walls[0]).Map = this;
@@ -156,90 +154,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         activeLines.ForEach(l => Destroy(l.gameObject));
         activeLines.Clear();
     }
-    public void FlashEffect(Vector3Int mapPos, Color color)
-    {
-        var selectionFlash = new Gradient(){
-                colorKeys = new[]
-                {
-                    new GradientColorKey(color, 0.0f),
-                    new GradientColorKey(color, 1.0f),
-                },
-                alphaKeys = new[]
-                {
-                    new GradientAlphaKey(0.2f, 0.0f), 
-                    new GradientAlphaKey(1.0f, 1.0f), 
-                }};
-        
-        var selectionSlow = new Gradient(){
-            colorKeys = new[]
-            {
-                new GradientColorKey(color, 0.0f),
-                new GradientColorKey(color, 1.0f),
-            },
-            alphaKeys = new[]
-            {
-                new GradientAlphaKey(0.0f, 0.0f),
-                new GradientAlphaKey(0.7f, 0.0f),
-                new GradientAlphaKey(1.0f, 1.0f), 
-            }};
-        
-        //CreateParticleEffect(CurrentCursorPosition);
-        var mouseInWorld = CellToWorld(mapPos);
-        
-        cellParticleSystem.AddParticle(new WorldParticleBase(this)
-        {
-            Lifetime = 0.5f,
-            Gradient = selectionSlow,
-            Position = mouseInWorld
-        });
-        
-        cellParticleSystem.AddParticle(new LineParticle(this)
-        {
-            Lifetime = 20,
-            Speed = 35,
-            Gradient = selectionFlash,
-            Direction = Vector3.down,
-            Length = 5,
-            EndLength = 1,
-            Position = mouseInWorld + Vector3.down * 10,
-            EndPosition = mouseInWorld,
-        });
-        cellParticleSystem.AddParticle(new LineParticle(this)
-        {
-            Lifetime = 20,
-            Speed = 35,
-            Gradient = selectionFlash,
-            Direction = Vector3.up,
-            Length = 5,
-            EndLength = 1,
-            Position = mouseInWorld + Vector3.up * 10,
-            EndPosition = mouseInWorld,
-        });
-        cellParticleSystem.AddParticle(new LineParticle(this)
-        {
-            Lifetime = 20,
-            Speed = 35,
-            Gradient = selectionFlash,
-            Direction = Vector3.left,
-            Length = 5,
-            EndLength = 1,
-            Position = mouseInWorld + Vector3.left * 10,
-            EndPosition = mouseInWorld,
-        });
-        cellParticleSystem.AddParticle(new LineParticle(this)
-        {
-            Lifetime = 20,
-            Speed = 35,
-            Gradient = selectionFlash,
-            Direction = Vector3.right,
-            Length = 5,
-            EndLength = 1,
-            Position = mouseInWorld + Vector3.right * 10,
-            EndPosition = mouseInWorld,
-        });
-    }
-    
-    
+
     public void DebugAction()
     {
         
@@ -293,7 +208,8 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             fogMap[i] = new bool[Height];
             damageMap[i] = new int[Height];
         }
-        
+
+        //FillLayer("Effects");
         //FillLayer("FogOfWar");
     }   
     private void Start()
@@ -319,31 +235,6 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
             CurrentCursorPosition = mapPos;
             selectionRect.transform.position = CellToWorld(mapPos);
             lastCursorPosition = mapPos;
-        }
-        
-        // update & synch particlesystems
-        SynchParticles();
-    }
-
-    private void SynchParticles()
-    {
-        cellParticleSystem.Update();
-        // reset the affected tiles
-        foreach (var particleTile in cellParticleSystem.TilesAffectedInLastFrame)
-        {
-            if (Contains(particleTile.x, particleTile.y))
-            {
-                layerMap["Effects"].SetTile(particleTile, null);
-            }
-        }
-        
-        foreach (var kvp in cellParticleSystem.TileColoring)
-        {
-            var mapPos = kvp.Key;
-            if (Contains(mapPos.x, mapPos.y))
-            {
-                layerMap["Effects"].SetTile(mapPos, GlowtileByColor(kvp.Value));
-            }
         }
     }
 
@@ -510,6 +401,13 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
                 layerMap["FogOfWar"].BoxFill(new Vector3Int(1, 1, 0), fogTile, 0, 0, Width, Height);
                 FillMapArray(fogMap, true);
                 break;
+            case "Effects":
+                layerMap["Effects"].BoxFill(new Vector3Int(1, 1, 0), glowtile, 0, 0, Width, Height);
+                AllPositions.ForEach(p =>
+                {
+                    layerMap["Effects"].SetTileFlags(p, TileFlags.LockTransform);
+                });
+                break;
         }        
     }
 
@@ -589,11 +487,23 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         }
     }
 
-    public void HighlightTile(Vector3Int mapPos, Color color, int layer = 0)
+    public void HighlightTile(Vector3Int mapPos, Color color, int layer = 0, float timer = -1)
     {
         var hilite = Instantiate(blanktilePrefab, CellToWorld(mapPos), Quaternion.identity);
         hilite.GetComponent<SpriteRenderer>().color = color;
         allHighlights[layer].Add(hilite);
+
+        if (timer > 0)
+        {
+            StartCoroutine(RemoveHighlight(hilite, layer, timer));
+        }
+    }
+    
+    private IEnumerator RemoveHighlight(GameObject hilight, int layer = 0, float delay = -1f)
+    {
+        yield return new WaitForSeconds(delay);
+        allHighlights[layer].Remove(hilight);
+        Destroy(hilight);
     }
     public void RemoveAllHighlights(int layer = 0)
     {
@@ -693,25 +603,21 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
 
     public List<Vector3Int> GetAllNeighborsForUnit(Unit currentUnit, Vector3Int mapPos)
     {
-        List<Vector3Int> neighbors = new List<Vector3Int>()
-        {
-            mapPos + Vector3Int.up,
-            mapPos + Vector3Int.right,
-            mapPos + Vector3Int.down,
-            mapPos + Vector3Int.left,
-        };
+        neighborCache.Clear();
+        neighborCache.Add(mapPos + Vector3Int.up);
+        neighborCache.Add(mapPos + Vector3Int.right);
+        neighborCache.Add(mapPos + Vector3Int.down);
+        neighborCache.Add(mapPos + Vector3Int.left);
+    
         if (currentUnit.Rules.CanMoveDiagonally && Options.AllowDiagonalMovement)
         {
-            neighbors.AddRange(new[]
-            {
-                mapPos + Vector3Int.up + Vector3Int.right,
-                mapPos + Vector3Int.up + Vector3Int.left,
-                mapPos + Vector3Int.down + Vector3Int.right,
-                mapPos + Vector3Int.down + Vector3Int.left
-            });
+            neighborCache.Add(mapPos + Vector3Int.up + Vector3Int.right);
+            neighborCache.Add(mapPos + Vector3Int.up + Vector3Int.left);
+            neighborCache.Add(mapPos + Vector3Int.down + Vector3Int.right);
+            neighborCache.Add(mapPos + Vector3Int.down + Vector3Int.left);
         }
 
-        return neighbors;
+        return neighborCache;
     }
     
     public bool AreNeighbors(Vector3Int posOne, Vector3Int posTwo, bool includeDiagonals = false)
@@ -1130,17 +1036,6 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
 
     public bool AreWorldPositionsOnSameTile(Vector3 positionOne, Vector3 positionTwo)
     {
-        if (!ContainsWorldPos(positionOne))
-        {
-            return !ContainsWorldPos(positionTwo);
-        }
-
-        if (!ContainsWorldPos(positionTwo))
-        {
-            return !ContainsWorldPos(positionOne);
-        }
-
-        // both inside
         var mapOne = WorldToCell(positionOne);
         var mapTwo = WorldToCell(positionTwo);
 

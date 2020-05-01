@@ -18,6 +18,7 @@ public class Unit : MonoBehaviour, IPlayerUnit
 {
     public enum UnitState { Idle, Moving }
 
+    public GameObject flashAnimationPrefab;
     private Dictionary<string, UnitStat> stats = new Dictionary<string, UnitStat>();
     private List<Buff> activeBuffs = new List<Buff>(); 
     public Weapon RangedWeapon { get; private set; }
@@ -100,20 +101,30 @@ public class Unit : MonoBehaviour, IPlayerUnit
     private int originalSpriteOffset;
     private int cardinalStepCost = 100;
     private int diagonalStepCost = 140;
+    private SimpleAnimation flashAnimation;
     public event UnitEvent FinishedMoving;
     public event UnitEvent StepCompleted;
     // Start is called before the first frame update
     private void Awake()
     {
+        flashAnimation = Instantiate(flashAnimationPrefab, transform, false).GetComponent<SimpleAnimation>();
+        flashAnimation.PlayOnStart = false;
+        flashAnimation.transform.localPosition = Vector3.zero;
+        flashAnimation.OnCompleted += FlashAnimationOnOnCompleted;
         healthBar = GetComponentInChildren<LineRenderer>();
         gameCamera = Camera.main;
         _map = FindObjectOfType<Map>();
         mod = FindObjectOfType<Mod>();
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
-        lightSource = GetComponentInChildren<Light2D>();
+        lightSource = GetComponentInChildren<Light2D>(includeInactive: true);
         animator = GetComponentInChildren<UnitAnimator>();
         pathfinder = new Pathfinder(_map, cardinalStepCost, diagonalStepCost);
         Procs = new ProcReceiver(activeBuffs);                
+    }
+
+    private void FlashAnimationOnOnCompleted(object sender)
+    {
+        _map.HighlightTile(Cell, Color.cyan, 0, 2);
     }
 
     private void Start()
@@ -470,21 +481,21 @@ public class Unit : MonoBehaviour, IPlayerUnit
         set
         {
             spriteRenderer.enabled = value;
-            lightSource.enabled = value;
+            //lightSource.enabled = value;
         }
     }
 
     public List<string> AvailableSkills { get; set; }
     public ProcReceiver Procs { get; set; }
 
-    public void Mark(bool asTarget = false)
+    public void MarkAsSelected(bool asTarget = false)
     {
-        var unitMarker = _map.GetUnitMarker();
-        
+        var unitMarker = _map.GetUnitMarker();        
         markerRenderer = unitMarker.GetComponent<SpriteRenderer>();
         markerRenderer.enabled = true;
         SetMarkerSize(unitMarker);
         UpdateMarker(asTarget);
+        flashAnimation.Play();        
     }
 
     public void Deselect()
