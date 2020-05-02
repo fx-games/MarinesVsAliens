@@ -166,7 +166,7 @@ namespace GridPathFinder
             Debug.Log(output);
         }
 
-        public float GetShortestPathDistance(Vector3Int goalNode)
+        public float GetPathCost(Vector3Int goalNode)
         {
             return mNodeMap[goalNode.y, goalNode.x].TentativeDistance;
         }

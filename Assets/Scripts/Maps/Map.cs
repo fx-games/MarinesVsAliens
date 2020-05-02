@@ -990,7 +990,7 @@ public class Map : MonoBehaviour, IGridMap, IPlayerMap
         return wallHere + doorHere + unitHere + floorHere + fogHere;
     }
 
-    public void SetTextAt(Vector3Int mapPos, string text)
+    public void AddTextLabelAt(Vector3Int mapPos, string text)
     {
         Text cellLabel = Instantiate(cellLabelPrefab, CellToWorld(mapPos), Quaternion.identity).GetComponent<Text>();
         cellLabel.transform.SetParent(worldCanvas);

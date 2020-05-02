@@ -71,6 +71,10 @@ namespace DefaultNamespace.Units.UnitActions
                     {
                         ActingUnit.ChangeSprite(ChangeSpriteTo);
                     }
+                    else
+                    {
+                        ActingUnit.ResetSprite();
+                    }
                     _game.ChangeStateTo(BattleGame.GameState.AttackTargetSelection);
                     targetList.Clear();
                 }

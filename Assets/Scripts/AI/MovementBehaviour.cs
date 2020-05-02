@@ -34,7 +34,7 @@ namespace AI
             if (visibleEnemies.Count == 0)
             {
                 Vector3Int target = FindExplorationTarget(mapKnowledge);
-                if (Options.Debug) map.SetTextAt(target, "EX");
+                if (Options.Debug) map.AddTextLabelAt(target, "EX");
                 // no moves or nothing left to explore
                 if (target == Vector3Int.down + Vector3Int.left)
                 {

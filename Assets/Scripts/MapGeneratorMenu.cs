@@ -17,6 +17,9 @@ public class MapGeneratorMenu : MonoBehaviour
     public int Width = 21;
 
     public int Height = 21;
+
+    private int currentSeed = -1;
+
     // Start is called before the first frame update
     void Start()
     {        
@@ -30,6 +33,7 @@ public class MapGeneratorMenu : MonoBehaviour
     private void NewSeed()
     {
         var randomSeed = Random.Range(Int32.MinValue, Int32.MaxValue);
+        currentSeed = randomSeed;
         seedField.text = randomSeed.ToString();
         Random.InitState(randomSeed);
     }
@@ -74,6 +78,7 @@ public class MapGeneratorMenu : MonoBehaviour
         if (int.TryParse(newSeed, out seedAsInt))
         {
             Debug.Log("Seed: " + seedAsInt);
+            currentSeed = seedAsInt;
             Random.InitState(seedAsInt);
             RunToCompletionButtonPressed(false);
         }
@@ -85,6 +90,8 @@ public class MapGeneratorMenu : MonoBehaviour
         currentMap.RemoveAllHighlights();
         currentMap.RemoveAllCellLabels();
         currentMap.RemoveAllTileMarker();
+        GameController.CurrentMapSeed = currentSeed;
+        Debug.Log("Chosen Map Seed: " + currentSeed);
         SceneManager.LoadScene("BattleGameScene");
     }
 }

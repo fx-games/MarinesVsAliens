@@ -16,6 +16,8 @@ namespace WorldEffects
         public List<Vector3Int> Targets { get; set; }
         public Dictionary<Vector3Int, List<Vector3Int>> AffectedTiles { get; set; }
         public string StringOne { get; set; }
+        public bool BoolOne { get; set; }
+
         public float FloatOne { get; set; }
         public int IntegerOne { get; set; }
         public int IntegerTwo { get; set; }

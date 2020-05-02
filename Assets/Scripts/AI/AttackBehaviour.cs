@@ -33,7 +33,7 @@ namespace AI
         public override IEnumerator Fire(Unit unit, MapTileInfo[,] mapKnowledge, List<Unit> visibleEnemies, Action<PlayerCommand> callback)
         {
             var attackTarget = unit.VisibleEnemies.First(unit.CanAttackUnit).Cell;
-            if (Options.Debug) map.SetTextAt(attackTarget, "ATT");
+            if (Options.Debug) map.AddTextLabelAt(attackTarget, "ATT");
             callback(new PlayerCommand(CommandType.Attack)
             {
                 PlayerUnit = unit,

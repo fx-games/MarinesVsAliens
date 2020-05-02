@@ -100,6 +100,7 @@ namespace DefaultNamespace.Units.UnitActions
             {
                 Identifier = nameof(T),
                 StringOne = effectRules.StringOne,
+                BoolOne = effectRules.BoolOne,
                 FloatOne = effectRules.FloatOne,
                 IntegerOne = effectRules.IntegerOne,
                 IntegerTwo = effectRules.IntegerTwo,

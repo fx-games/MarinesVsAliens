@@ -65,9 +65,10 @@ skills:
       affectedRange: 1
     effects:
       - name: ProjectileEffect
-        integerOne: 4
+        integerOne: 0
         integerTwo: 1
         floatOne: 4
+        boolOne: true
       - name: Explosion
         chained: true
       - name: ExplosionEffect
@@ -285,7 +286,7 @@ units:
 
 weapons:
   - type: STR_HARD_HITTER
-    useCost: 3
+    useCost: 1
     damage:
       - [3,4]
     isMelee: true

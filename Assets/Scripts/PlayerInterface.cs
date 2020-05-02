@@ -37,7 +37,7 @@ namespace DefaultNamespace
         bool IsLineOfFireBetween(Unit attacker, Vector3Int source, Vector3Int target);
         bool IsLineOfSightBetween(Vector3Int source, Vector3Int target);
         string GetPosDebugInfo(Vector3Int pos);
-        void SetTextAt(Vector3Int mapPos, string text);
+        void AddTextLabelAt(Vector3Int mapPos, string text);
         void RemoveAllCellLabels();
         List<Vector3Int> GetAllNeighborsForUnit(Unit unit, Vector3Int mapPos);
     }

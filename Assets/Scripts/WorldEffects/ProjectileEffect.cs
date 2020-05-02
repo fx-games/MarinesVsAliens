@@ -10,12 +10,14 @@ namespace WorldEffects
         public int Count { get; set; } = 3;
         public float Speed { get; set; }
         public bool WithDeviation { get; set; } = true;
-
+        public bool Arcing { get; set; } = false;
+        
         public override void Execute()
         {
             SelectedSprite = IntegerOne;
             Count = IntegerTwo;
             Speed = FloatOne;
+            Arcing = BoolOne;
             float timer = 0.0f;
             foreach (var targetedPos in Targets)
             {
@@ -45,7 +47,7 @@ namespace WorldEffects
                 targetPos += new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), 0);
             }
 
-            return _game.CreateProjectile(_map.CellToWorld(SourcePosition), targetPos, Speed, SelectedSprite);            
+            return _game.CreateProjectile(_map.CellToWorld(SourcePosition), targetPos, Speed, SelectedSprite, Arcing);            
         }
 
         

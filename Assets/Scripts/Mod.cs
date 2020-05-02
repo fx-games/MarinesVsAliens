@@ -125,6 +125,7 @@ public class Mod : MonoBehaviour
         public int IntegerTwo { get; set; }
         public float FloatOne { get; set; }
         public bool Chained { get; set; }
+        public bool BoolOne { get; set; }
     }
     public class RuleBuff
     {

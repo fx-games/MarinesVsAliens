@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Buffs;
 using DefaultNamespace;
@@ -293,20 +294,23 @@ public class Unit : MonoBehaviour, IPlayerUnit
         visualPathIndex = 0;
         currentPath = null;
 
-        
-        UpdateReachablePositions();
-        UpdateValidAttackTargets();
         OnFinishedMoving();
     }
 
     private void UpdateHealthBar()
     {
+        IsHealthBarVisible = true;
         var healthInPercent = CurrentHealth / (float)Rules.Stats["Health"];
         var leftPoint = healthBar.GetPosition(0);
         healthBar.SetPosition(1, new Vector3(leftPoint.x + healthInPercent, leftPoint.y, leftPoint.z));
+        healthBar.widthMultiplier = 0.5f;
+        Invoke(nameof(ScaleHealthbarBack), 0.5f);
     }
 
-
+    private void ScaleHealthbarBack()
+    {
+        healthBar.widthMultiplier = 0.1f;
+    }
     private void UpdateDirection(Vector3Int lastPos, Vector3Int nextPos)
     {
         if (lastPos.y == nextPos.y)
@@ -488,6 +492,28 @@ public class Unit : MonoBehaviour, IPlayerUnit
     public List<string> AvailableSkills { get; set; }
     public ProcReceiver Procs { get; set; }
 
+    public IEnumerable<Vector3Int> ReachablePositionsWithAttack
+    {
+        get
+        {
+            var apNeededForAttack = MinApCostsForAttack();
+            var apLeftToMove = ActionPoints - apNeededForAttack;
+            var scaledApToMove = apLeftToMove * 100;
+            return ReachablePositions.Where(p => pathfinder.GetPathCost(p) <= scaledApToMove);
+        }
+    }
+    
+    public IEnumerable<Vector3Int> ReachablePositionsWithoutAttack
+    {
+        get
+        {
+            var apNeededForAttack = MinApCostsForAttack();
+            var apLeftToMove = ActionPoints - apNeededForAttack;
+            var scaledApToMove = apLeftToMove * 100;
+            return ReachablePositions.Where(p => pathfinder.GetPathCost(p) > scaledApToMove);
+        }
+    }
+
     public void MarkAsSelected(bool asTarget = false)
     {
         var unitMarker = _map.GetUnitMarker();        
@@ -562,10 +588,10 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     public int DamageReceived(Unit source, Weapon weaponUsed, int damage)
     {
-        Debug.Log(name + " received " + damage + " damage from " + source);
+        
         var oldHealth = CurrentHealth;
         CurrentHealth -= damage;
-
+        Debug.Log(name + " received " + damage + " damage from " + source + ", HP left: " + CurrentHealth);
         UpdateHealthBar();
         
         if (damage > oldHealth)
@@ -608,12 +634,17 @@ public class Unit : MonoBehaviour, IPlayerUnit
 
     public bool CanAttack()
     {
+        var minApCosts = MinApCostsForAttack();
+        return ActionPoints >= minApCosts;
+    }
+
+    private int MinApCostsForAttack()
+    {
         var meleeCosts = HasMeleeWeapon ? MeleeWeapon.Rules.UseCost : int.MaxValue;
         var rangedCosts = HasRangedWeapon ? RangedWeapon.Rules.UseCost : int.MaxValue;
 
         var minApCosts = Mathf.Min(meleeCosts, rangedCosts);
-
-        return ActionPoints >= minApCosts;
+        return minApCosts;
     }
 
     public bool CanAffordRangedAttack()
@@ -718,13 +749,23 @@ public class Unit : MonoBehaviour, IPlayerUnit
         return ActionPoints == 0 ? new List<Vector3Int>() : pathfinder.ReachableList.ToList();
     }
 
+    public void LabelMovementMap()
+    {
+        _map.RemoveAllCellLabels();
+        foreach (var reachablePosition in ReachablePositions)
+        {
+            var dist = pathfinder.GetPathCost(reachablePosition);
+            _map.AddTextLabelAt(reachablePosition, dist.ToString(CultureInfo.InvariantCulture));
+        }
+    }
+    
     public List<Vector3Int> GetShortestPath(Vector3Int startPosition, Vector3Int goalPosition)
     {
 //        Debug.Log("GetShortestPath(" + startPosition + ", " + goalPosition + ")");
         //_map.SetTextAt(startPosition, "BGN");
         //_map.SetTextAt(goalPosition, "END");
         var shortestPath = pathfinder.GetShortestPath(goalPosition);
-        if (Options.Debug) shortestPath.ForEach(p => _map.SetTextAt(p, "."));
+        if (Options.Debug) shortestPath.ForEach(p => _map.AddTextLabelAt(p, "."));
         return shortestPath;
     }
     

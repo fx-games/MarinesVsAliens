@@ -171,7 +171,7 @@ public class BspGeneratorBase : GeneratorBase
             map.DrawLine(keyValuePair.Key, keyValuePair.Value, yellow);
         }
         
-        distanceList.ForEach(kvp => map.SetTextAt(kvp.Key, kvp.Value.ToString()));
+        distanceList.ForEach(kvp => map.AddTextLabelAt(kvp.Key, kvp.Value.ToString()));
         // choose by distance
         var start = randomLeaf;
         var keyVertex = distanceList.Skip(distanceList.Count / 2).First().Key;

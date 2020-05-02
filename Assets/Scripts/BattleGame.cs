@@ -443,7 +443,9 @@ public class BattleGame : MonoBehaviour, IGame
             {
                 gameState = GameState.MoveTargetSelection;
             }
-            HighlightTiles(selectedUnit.ReachablePositions, new Color(0, 0.8f, 0, 0.2f));
+            HighlightTiles(selectedUnit.ReachablePositionsWithAttack, new Color(0, 0.8f, 0, 0.2f));
+            HighlightTilesNoClear(selectedUnit.ReachablePositionsWithoutAttack, new Color(0.7f, 0.8f, 0, 0.2f));
+            //selectedUnit.LabelMovementMap();
             
             if (CurrentPlayer == PoVPlayer)
             {
@@ -459,7 +461,7 @@ public class BattleGame : MonoBehaviour, IGame
         ShowAllHealthBars();
     }
 
-    public Projectile CreateProjectile(Vector3 start, Vector3 end, float speed, int selectedSprite)
+    public Projectile CreateProjectile(Vector3 start, Vector3 end, float speed, int selectedSprite, bool arcing = false)
     {
         var moveDirection = (end - start);
 //        Debug.Log("Spawning projectile effect (" + start +" -> " + end + ")");
@@ -470,6 +472,7 @@ public class BattleGame : MonoBehaviour, IGame
         projectile.target = end;
         projectile.SelectedSprite = selectedSprite;
         projectile.speed = speed;
+        projectile.Arcing = arcing;
         return projectile;
     }
 
@@ -757,6 +760,10 @@ public class BattleGame : MonoBehaviour, IGame
     private void HighlightTiles(IEnumerable<Vector3Int> positions, Color color, int layer = 0)
     {
         _map.RemoveAllHighlights(layer);
+        HighlightTilesNoClear(positions, color, layer);
+    }
+    private void HighlightTilesNoClear(IEnumerable<Vector3Int> positions, Color color, int layer = 0)
+    {
         if (CurrentPlayer == PoVPlayer)
         {
             foreach (var pos in positions)
@@ -783,7 +790,12 @@ public class BattleGame : MonoBehaviour, IGame
     private void UnitFinishedMoving(object sender, UnitEventArgs args)
     {
         if (gameState == GameState.WaitForHotSeatPlayer) return;
-        
+        allUnits.ForEach(u =>
+        {
+            u.UpdateReachablePositions();
+            u.UpdateValidAttackTargets();
+        });
+       
         GlobalFOVUpdate();
         
         if (selectedUnit == args.unit && selectedUnit.ActionPoints > 0)
@@ -1101,21 +1113,21 @@ public class BattleGame : MonoBehaviour, IGame
             Debug.LogWarning("No path for " + unit + " to " + goalPosition + " ("+_map.GetPosDebugInfo(goalPosition)+")");
             return unit.Cell;
         }
-        if (Options.Debug) shortestPath.ForEach(p => _map.SetTextAt(p, "_"));
+        if (Options.Debug) shortestPath.ForEach(p => _map.AddTextLabelAt(p, "_"));
         
         if (reachable.Count == 0)
         {
             Debug.LogWarning("No reachable pos for " + unit + " to " + goalPosition + " (" + _map.GetPosDebugInfo(goalPosition) + ")");
             return unit.Cell;
         }
-        if (Options.Debug) reachable.ToList().ForEach(p => _map.SetTextAt(p, "R"));
+        if (Options.Debug) reachable.ToList().ForEach(p => _map.AddTextLabelAt(p, "R"));
         shortestPath.Reverse();
 
         foreach (var pos in shortestPath)
         {
             if (reachable.Contains(pos))
             {
-                if (Options.Debug) _map.SetTextAt(pos, "BST");
+                if (Options.Debug) _map.AddTextLabelAt(pos, "BST");
                 return pos;
             }
         }
@@ -1171,18 +1183,18 @@ public class BattleGame : MonoBehaviour, IGame
 
     private static bool IsPointerOverGameObject()
     {
-#if UNITY_IOS || UNITY_ANDROID
         //check touch
-        if (Input.touchCount > 0 && Input.touches[0].phase == TouchPhase.Began)
+        if (Input.touchCount > 0)
         {
-            if (EventSystem.current.IsPointerOverGameObject(Input.touches[0].fingerId))
-                return true;
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                if (EventSystem.current.IsPointerOverGameObject(Input.touches[i].fingerId))
+                    return true;
+            }            
         }
-#else     
         //check mouse
         if (EventSystem.current.IsPointerOverGameObject())
             return true;
-#endif
         return false;
     }
 }

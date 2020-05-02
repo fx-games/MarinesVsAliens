@@ -569,11 +569,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   projectilePrefab: {fileID: 6725833041707733498, guid: 8184769571f4143439f5dc8f9eb84ff0,
     type: 3}
+  arcingProjectilePrefab: {fileID: 6725833041707733498, guid: 5c425d5f33e1b46af881a7bd62655fe3,
+    type: 3}
   unitLabelPrefab: {fileID: 4860974059615001587, guid: 4e4b815aad9d347d69c6d2dae5a0bd75,
     type: 3}
   worldCanvasTransform: {fileID: 936566739}
   uiCanvasTransform: {fileID: 223010927}
-  gridMapPrefab: {fileID: 7611691132212880480, guid: d1fe88e0659b2491886d42c3b4e1efe1,
+  gridMapPrefab: {fileID: 2223305004873385641, guid: 4373d706cfe934cf581754da9fdb3a37,
     type: 3}
   premadeMapBlocks:
   - {fileID: 2223305004873385641, guid: 4373d706cfe934cf581754da9fdb3a37, type: 3}
