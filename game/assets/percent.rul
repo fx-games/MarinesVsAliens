@@ -18,16 +18,8 @@ maps:
   - type: STR_FIRST_MISSION
     premade: MVA_SpaceBlock01
   - type: STR_SECOND_MISSION
-    generator: dungeon # was mapScript: QUADRANT_ONE is unfinished, its rooms are sealed 3x3 cells
+    generator: dungeon
     size: [26,26]
-    mapScript:
-      - command: placeBlock
-        blocks: [QUADRANT_ONE]
-        rects:
-          - [1, 1]
-          - [13, 1]
-          - [1, 13]
-          - [13, 13]
 
 
 # targetMode.type:            self, single, multiple
@@ -149,25 +141,6 @@ skills:
             value: 30
         endCondition: onFirstAttack
 
-mapBlocks:
-  - type: QUADRANT_ONE
-    size: [12,12]
-    rooms:
-      - [0, 7, 4, 11]
-      - [2, 2, 6, 4]
-      - [7, 0, 11, 4]
-    horizontalWalls:
-      - [9, 9, 9, 9]
-      - [10, 7, 11, 7]
-    verticalWalls:
-      - [6, 5, 6, 9]
-      - [9, 8, 9, 9]
-    horizontalDoors:
-      - [1, 6, 2, 7]
-      - [4, 1, 5, 2]
-      - [9, 4, 10, 5]
-      - [7, 9, 8, 10]
-
 factions:
   - type: STR_GREEN_MARINES
     factionPrefab: 0
@@ -191,7 +164,7 @@ factions:
       - unit: STR_DRONE
         doNotSpawn: true
         weapons:
-          - STR_NORMAL_HITTER
+          - STR_LOW_HITTER
   - type: STR_BLUE_BIRD_PEOPLE
     factionPrefab: 1
     color: [226,55,60,1]
@@ -202,7 +175,7 @@ factions:
       - unit: STR_HUNTER
         weapons:
           - STR_NORMAL_HITTER
-          - STR_RIFLE
+          - STR_ANDROID_RIFLE
       - unit: STR_HEAVY
         weapons:
           - STR_NORMAL_HITTER
@@ -214,14 +187,14 @@ factions:
       - unit: STR_DRONE
         doNotSpawn: true
         weapons:
-          - STR_NORMAL_HITTER
+          - STR_LOW_HITTER
   - type: STR_YELLOW_ROBOTS
     factionPrefab: 2
     color: [226,55,60,1]
     loadOut:
       - unit: STR_ROGUE
         weapons:
-          - STR_HARD_HITTER
+          - STR_HEAVY_HITTER
       - unit: STR_HUNTER
         weapons:
           - STR_NORMAL_HITTER
@@ -237,7 +210,7 @@ factions:
       - unit: STR_DRONE
         doNotSpawn: true
         weapons:
-          - STR_NORMAL_HITTER
+          - STR_LOW_HITTER
   - type: STR_RED_SPACEMEN
     factionPrefab: 3
     color: [226,55,60,1]
@@ -256,11 +229,11 @@ factions:
       - unit: STR_ENGINEER
         weapons:
           - STR_NORMAL_HITTER
-          - STR_HEAVY_ASSAULT_CANNON
+          - STR_PLASMA_GUN
       - unit: STR_DRONE
         doNotSpawn: true
         weapons:
-          - STR_NORMAL_HITTER
+          - STR_LOW_HITTER
 units:
   - type: STR_DRONE
     factionPrefab: 4 # DroneUnits
@@ -322,9 +295,6 @@ units:
     unitSkills:
       - DeployDrone
 
-#    occupiedTiles: [[0,0],[0,1],[1,0],[1,1]]
-#    canMoveDiagonally: false
-
 weapons:
   - type: STR_HARD_HITTER
     useCost: 1
@@ -363,7 +333,7 @@ weapons:
   - type: STR_HEAVY_HITTER
     useCost: 2
     damage:
-      - [3,4]
+      - [4,5]
     isMelee: true
   - type: STR_ROCKET_LAUNCHER
     projectile: {sprite: 4, count: 1, speed: 8, arc: true}
@@ -372,7 +342,6 @@ weapons:
     useCost: 3
     damage:
       - [3,4]
-    radius: 1
   - type: STR_HEAVY_ASSAULT_CANNON
     projectile: {sprite: 5, count: 6, speed: 11}
     weaponSprite: Heavy

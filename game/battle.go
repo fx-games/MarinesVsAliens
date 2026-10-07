@@ -916,7 +916,7 @@ func (g *Battle) tick() {
 }
 
 func (g *Battle) handleInput() {
-	mx, my := ebiten.CursorPosition()
+	mx, my := cursorPos()
 	wx, wy := g.cam.toWorld(float64(mx), float64(my))
 	cell := P{int(math.Floor(wx)), int(math.Floor(wy))}
 	onMap := g.m.Contains(cell)
@@ -943,7 +943,7 @@ func (g *Battle) selectNext() {
 }
 
 func (g *Battle) handleMapInput(cell P, onMap bool, mx, my int) {
-	released := inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) && !g.drag.Active
+	released := pointerJustReleased() && !g.drag.Active
 	if g.over {
 		if released {
 			g.leave()
@@ -965,7 +965,7 @@ func (g *Battle) handleMapInput(cell P, onMap bool, mx, my int) {
 		g.selectNext()
 		return
 	}
-	if g.leaving && (released || inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight)) {
+	if g.leaving && (released || backJustPressed()) {
 		g.leaving = false
 		g.setCenter("")
 		return
@@ -976,7 +976,7 @@ func (g *Battle) handleMapInput(cell P, onMap bool, mx, my int) {
 	if pointerOver(g.roots, float64(mx), float64(my)) {
 		return
 	}
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
+	if backJustPressed() {
 		g.cancel()
 	}
 	if onMap {
@@ -990,7 +990,7 @@ func (g *Battle) handleMapInput(cell P, onMap bool, mx, my int) {
 			g.UpdateLabel()
 		}
 		g.lastCursor = cell
-	} else if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+	} else if pointerJustPressed() {
 		g.DeselectAll()
 	}
 }
@@ -1105,7 +1105,7 @@ func (g *Battle) drawCostPips(dst *ebiten.Image) {
 
 // drawTooltip explains the action button under the cursor.
 func (g *Battle) drawTooltip(dst *ebiten.Image) {
-	cx, cy := ebiten.CursorPosition()
+	cx, cy := cursorPos()
 	mx, my := float64(cx), float64(cy)
 	u := g.selected
 	var tip string

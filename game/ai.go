@@ -194,7 +194,8 @@ func attackValue(a *Unit, from P, t *Unit, melee bool) float64 {
 	if dmg >= float64(t.Health()) {
 		v *= 2
 	}
-	return v
+	// focus fire: finishing a wounded enemy takes it out of the fight sooner
+	return v * (2 - float64(t.Health())/float64(t.Rules.Stats["Health"]))
 }
 
 // bestAttack picks the attack skill and target with the highest value, attacking from `from`.
@@ -231,6 +232,13 @@ func threat(u *Unit, p P, enemies []*Unit) float64 {
 		}
 	}
 	return t
+}
+
+// inCorridor: a floor tile passable only in a straight line (walls on both other sides).
+func inCorridor(m *Map, p P) bool {
+	open := func(d P) bool { return !m.IsWallAt(p.Add(d)) }
+	ns, ew := open(North) || open(South), open(East) || open(West)
+	return ns != ew
 }
 
 func chebyshev(a, b P) int { return max(abs(a.X-b.X), abs(a.Y-b.Y)) }
@@ -280,8 +288,12 @@ func (ai *TacticalAI) bestPosition(u *Unit, enemies []*Unit) P {
 			}
 		}
 	}
+	m := ai.w.Map()
 	scoreAt := func(p P) float64 {
 		s := -threat(u, p, enemies) * 0.3
+		if p != u.Cell && inCorridor(m, p) {
+			s -= 0.4 // don't park in a corridor, teammates need to get past
+		}
 		if harmless {
 			return s - math.Max(3-dist(p), 0)
 		}

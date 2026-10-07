@@ -37,18 +37,24 @@ type game struct{}
 
 func (game) Update() error {
 	now += 1.0 / 60
+	updatePointer()
 	switch {
 	case inpututil.IsKeyJustPressed(ebiten.KeyF11):
-		ebiten.SetFullscreen(!ebiten.IsFullscreen())
+		fs := !ebiten.IsFullscreen()
+		ebiten.SetFullscreen(fs)
+		saveSettings(fs)
 	case inpututil.IsKeyJustPressed(ebiten.KeyM):
 		musicMuted = !musicMuted
 		updateMusicVolume()
+		saveSettings(ebiten.IsFullscreen())
 	case inpututil.IsKeyJustPressed(ebiten.KeyMinus):
 		volume = math.Max(volume-0.1, 0)
 		updateMusicVolume()
+		saveSettings(ebiten.IsFullscreen())
 	case inpututil.IsKeyJustPressed(ebiten.KeyEqual):
 		volume = math.Min(volume+0.1, 1)
 		updateMusicVolume()
+		saveSettings(ebiten.IsFullscreen())
 	case inpututil.IsKeyJustPressed(ebiten.KeyF1):
 		showHelp = !showHelp
 	}
@@ -99,6 +105,7 @@ func main() {
 	if mod, err = LoadMod("percent.rul"); err != nil {
 		log.Fatal(err)
 	}
+	loadSettings()
 	loadSprites()
 	loadUI()
 	scene = newMainMenu()
@@ -303,7 +310,7 @@ func (g *mapGenerator) Update() error {
 	input := findIn(g.roots, "SeedInputField")
 	input.Find("Placeholder").Text.Enabled = input.Find("Text").Text.Text == ""
 	updateUI(g.roots, g.call)
-	x, y := ebiten.CursorPosition()
+	x, y := cursorPos()
 	g.drag.update(&g.cam, float64(x), float64(y))
 	return nil
 }
@@ -341,19 +348,19 @@ func (d *camDrag) update(c *Camera, mx, my float64) {
 		c.X += dx / n * 8.0 / 60
 		c.Y += dy / n * 8.0 / 60
 	}
-	_, wheel := ebiten.Wheel()
+	wheel := wheelY()
 	c.Size = math.Min(math.Max(c.Size-wheel*0.1, 1), 20)
 
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+	if pointerJustPressed() {
 		d.start, d.screen, d.pressed = [2]float64{wx, wy}, [2]float64{mx, my}, true
 	}
 	// a drag starts once the cursor moves a few pixels; a long but still click stays a click
-	if d.pressed && ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) && (d.Active || math.Hypot(mx-d.screen[0], my-d.screen[1]) > 6) {
+	if d.pressed && pointerDown() && (d.Active || math.Hypot(mx-d.screen[0], my-d.screen[1]) > 6) {
 		c.X += d.start[0] - wx
 		c.Y += d.start[1] - wy
 		d.Active = true
 	}
-	if !ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+	if !pointerDown() {
 		d.Active, d.pressed = false, false
 	}
 }

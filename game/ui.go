@@ -243,9 +243,9 @@ func walk(roots []*Node, fn func(*Node)) {
 
 // updateUI handles clicks for buttons, input fields and dropdowns; call handles persistent calls.
 func updateUI(roots []*Node, call func(uiCall, *Node)) {
-	x, y := ebiten.CursorPosition()
+	x, y := cursorPos()
 	mx, my := float64(x), float64(y)
-	if uiDropdown != nil && inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
+	if uiDropdown != nil && pointerJustReleased() {
 		d := uiDropdown
 		uiDropdown = nil
 		for i := range d.Dropdown.Options {
@@ -266,7 +266,7 @@ func updateUI(roots []*Node, call func(uiCall, *Node)) {
 			top = n
 		}
 	})
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+	if pointerJustPressed() {
 		uiPressed = top
 		walk(roots, func(n *Node) {
 			if n.Input != nil && n.focused && n != top {
@@ -277,7 +277,7 @@ func updateUI(roots []*Node, call func(uiCall, *Node)) {
 			}
 		})
 	}
-	if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
+	if pointerJustReleased() {
 		if top != nil && top == uiPressed {
 			switch {
 			case top.Button != nil && top.Disabled:
@@ -340,7 +340,7 @@ func toColor(c [4]float64) color.Color {
 }
 
 func drawUI(dst *ebiten.Image, roots []*Node) {
-	x, y := ebiten.CursorPosition()
+	x, y := cursorPos()
 	walk(roots, func(n *Node) { drawNode(dst, n, float64(x), float64(y)) })
 	walk(roots, func(n *Node) { // InputField caret: 1 unit wide, blink rate 0.85
 		if n.Input == nil || !n.focused || math.Mod(now*0.85, 1) >= 0.5 {
@@ -400,7 +400,7 @@ func drawCheckmark(dst *ebiten.Image, cx, cy, size float64) {
 
 // isDown: the button is held under the cursor, or was just clicked.
 func (n *Node) isDown(mx, my float64) bool {
-	return n != nil && n.Button != nil && !n.Disabled && (uiPressed == n && ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) && n.contains(mx, my) || now < n.downTill)
+	return n != nil && n.Button != nil && !n.Disabled && (uiPressed == n && pointerDown() && n.contains(mx, my) || now < n.downTill)
 }
 
 func drawNode(dst *ebiten.Image, n *Node, mx, my float64) {
@@ -423,7 +423,7 @@ func drawNode(dst *ebiten.Image, n *Node, mx, my float64) {
 			tint := b.Normal
 			if n.contains(mx, my) {
 				tint = b.Highlighted
-				if uiPressed == n && ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+				if uiPressed == n && pointerDown() {
 					tint = b.Pressed
 				}
 			}
