@@ -38,6 +38,8 @@ type game struct {
 	msgs    []msg
 	wake    chan struct{} // closed and replaced on every new message
 	touched time.Time
+	seen    [2]time.Time // last poll per seat: a closed tab stops polling
+	left    bool
 }
 
 var (
@@ -130,6 +132,11 @@ func api(w http.ResponseWriter, r *http.Request, path string) {
 			writeJSON(w, len(g.msgs))
 		case "recv":
 			from, _ := strconv.Atoi(r.URL.Query().Get("from"))
+			for i, t := range g.tokens {
+				if t != "" && t == r.URL.Query().Get("token") {
+					g.seen[i] = time.Now()
+				}
+			}
 			deadline := time.After(25 * time.Second)
 			for from >= len(g.msgs) {
 				wake := g.wake
@@ -175,10 +182,16 @@ func main() {
 	base := flag.String("base", "/mva-battles", "URL prefix")
 	play := flag.String("play", "/games/marines-vs-aliens/play/", "where the web game is")
 	flag.Parse()
-	go func() { // drop games idle for 2 h
-		for range time.Tick(time.Minute) {
+	go func() { // drop games idle for 2 h; tell a player when the other one stopped polling
+		for range time.Tick(10 * time.Second) {
 			mu.Lock()
 			for id, g := range games {
+				for i, t := range g.seen {
+					if g.tokens[1] != "" && !g.left && !t.IsZero() && time.Since(t) > time.Minute {
+						g.left = true
+						g.push(i, json.RawMessage(`{"quit":true}`))
+					}
+				}
 				if time.Since(g.touched) > 2*time.Hour {
 					delete(games, id)
 				}

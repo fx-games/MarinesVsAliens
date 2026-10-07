@@ -112,7 +112,7 @@ func (l *link) poll() {
 			return
 		}
 		l.mu.Unlock()
-		resp, err := http.Get(fmt.Sprintf("%s/%s/recv?from=%d", onlineURL, l.id, from))
+		resp, err := http.Get(fmt.Sprintf("%s/%s/recv?from=%d&token=%s", onlineURL, l.id, from, l.token))
 		var ms []netMsg
 		if err == nil {
 			if resp.StatusCode != 200 {
@@ -290,5 +290,11 @@ func startOnline(l *link, s *startMsg) {
 		}
 	})
 	g.net = l
+	for _, u := range g.units { // the guest moves second: show its own squad, not the empty middle
+		if u.Player == g.PoV {
+			g.cam.X, g.cam.Y = u.Cell.Center()
+			break
+		}
+	}
 	scene = g
 }
