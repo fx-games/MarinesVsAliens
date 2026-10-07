@@ -1,0 +1,11 @@
+# Installed by server/deploy.sh to /etc/nginx/snippets/mva-battles.conf (included from the ruzzoli.de server block).
+location = /mva-battles { return 301 /mva-battles/; }
+location ^~ /mva-battles/ {
+    proxy_pass http://127.0.0.1:8378;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_read_timeout 60s; # long-polls answer within 25 s
+    proxy_buffering off;
+    client_max_body_size 64k;
+}

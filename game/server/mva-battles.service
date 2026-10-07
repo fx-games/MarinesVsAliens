@@ -1,0 +1,29 @@
+# Installed by server/deploy.sh to /etc/systemd/system/mva-battles.service
+[Unit]
+Description=Marines vs Aliens online lobby and relay
+After=network.target
+
+[Service]
+ExecStart=/opt/mva-battles/mva-battles -addr 127.0.0.1:8378 -base /mva-battles
+Restart=on-failure
+RestartSec=2
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target

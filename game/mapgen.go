@@ -65,7 +65,7 @@ func rng(lo, hi int) int {
 	if hi <= lo {
 		return lo
 	}
-	return lo + rand.Intn(hi-lo)
+	return lo + gen.Intn(hi-lo)
 }
 
 type corridor struct {
@@ -78,6 +78,11 @@ type bsp struct {
 	leafs []rect
 	adj   map[P]map[P]*corridor // MST adjacency
 }
+
+// gen drives the map generators. A seed always gives the same map (rand.Seed is a no-op since Go 1.24).
+var gen = rand.New(rand.NewSource(rand.Int63()))
+
+func seedGen(seed int64) { gen = rand.New(rand.NewSource(seed)) }
 
 // GenerateBSP builds a skirmish map with spawn zones for `players` players.
 func GenerateBSP(w, h, players int) *Map {
@@ -149,9 +154,9 @@ func (g *bsp) connectRoomsFromMST() {
 	in := map[P]bool{pts[0]: true}
 	for len(in) < len(pts) {
 		best, ba, bb := math.Inf(1), P{}, P{}
-		for a := range in {
+		for _, a := range pts { // slices, not the maps: same seed, same map (online play needs that)
 			for _, b := range pts {
-				if d := a.Sub(b).Mag(); !in[b] && d < best {
+				if d := a.Sub(b).Mag(); in[a] && !in[b] && d < best {
 					best, ba, bb = d, a, b
 				}
 			}
@@ -190,6 +195,16 @@ func (g *bsp) connectTwoRooms(one, two rect) *corridor {
 	return c
 }
 
+// sortedP returns the map's keys in a fixed order.
+func sortedP[V any](m map[P]V) []P {
+	res := make([]P, 0, len(m))
+	for p := range m {
+		res = append(res, p)
+	}
+	sort.Slice(res, func(a, b int) bool { return res[a].X < res[b].X || res[a].X == res[b].X && res[a].Y < res[b].Y })
+	return res
+}
+
 func (g *bsp) mstLeafs() []P {
 	var res []P
 	for v, n := range g.adj {
@@ -206,7 +221,7 @@ func (g *bsp) chooseRegions(players int) bool {
 	if len(leafs) < players {
 		return false
 	}
-	start := leafs[rand.Intn(len(leafs))]
+	start := leafs[gen.Intn(len(leafs))]
 	dist, pred := map[P]int{}, map[P]P{}
 	var walk func(v P, d int)
 	walk = func(v P, d int) {
@@ -214,7 +229,7 @@ func (g *bsp) chooseRegions(players int) bool {
 			return
 		}
 		dist[v] = d
-		for o := range g.adj[v] {
+		for _, o := range sortedP(g.adj[v]) {
 			if _, ok := pred[o]; !ok {
 				pred[o] = v
 			}
@@ -222,10 +237,7 @@ func (g *bsp) chooseRegions(players int) bool {
 		}
 	}
 	walk(start, 0)
-	var byDist []P
-	for v := range dist {
-		byDist = append(byDist, v)
-	}
+	byDist := sortedP(dist)
 	sort.SliceStable(byDist, func(a, b int) bool { return dist[byDist[a]] < dist[byDist[b]] })
 	key, end := byDist[len(byDist)/2], byDist[len(byDist)-1]
 	if debug {
@@ -257,7 +269,7 @@ func (g *bsp) chooseRegions(players int) bool {
 
 func (g *bsp) placeSpawnPoints(players int) {
 	leafs := g.mstLeafs()
-	rand.Shuffle(len(leafs), func(a, b int) { leafs[a], leafs[b] = leafs[b], leafs[a] })
+	gen.Shuffle(len(leafs), func(a, b int) { leafs[a], leafs[b] = leafs[b], leafs[a] })
 	for f := 0; f < players; f++ {
 		r, _ := g.room(leafs[f])
 		placed := 0
@@ -337,7 +349,7 @@ func GenerateDungeon(w, h int) *Map {
 	}
 	var rooms []rect
 	for i := 0; i < 2000; i++ {
-		x, y := rand.Intn(w)|1, rand.Intn(h)|1
+		x, y := gen.Intn(w)|1, gen.Intn(h)|1
 		r := rect{x, y, rng(3, 5) | 1, rng(3, 5) | 1}
 		if r.X <= 0 || r.X+r.W >= w-1 || r.Y <= 0 || r.Y+r.H >= h-1 {
 			continue
@@ -373,7 +385,7 @@ func GenerateDungeon(w, h int) *Map {
 					cells, last = cells[:len(cells)-1], P{}
 					continue
 				}
-				d := open[rand.Intn(len(open))]
+				d := open[gen.Intn(len(open))]
 				for _, o := range open {
 					if o == last && rng(0, 100) > 23 { // windingPercent
 						d = last
@@ -420,7 +432,7 @@ func GenerateDungeon(w, h int) *Map {
 		return res
 	}
 	for open := cur + 1; open > 1 && len(connectors) > 0; {
-		c := connectors[rand.Intn(len(connectors))]
+		c := connectors[gen.Intn(len(connectors))]
 		m.CreateDoor(c, 0)
 		rs := regionsOf(c)
 		for i := range merged {
@@ -480,7 +492,7 @@ func GenerateFromScript(r *RuleMap) *Map {
 			continue
 		}
 		for _, off := range c.Rects {
-			b := mod.MapBlock(c.Blocks[rand.Intn(len(c.Blocks))])
+			b := mod.MapBlock(c.Blocks[gen.Intn(len(c.Blocks))])
 			ox, oy := off[0], off[1]
 			for _, rm := range b.Rooms {
 				x0, y0, x1, y1 := rm[0]+ox, rm[1]+oy, rm[2]+ox, rm[3]+oy
@@ -577,7 +589,7 @@ func (m *Map) placeSpawns(players int) bool {
 	if len(cands) < players*perZone*2 {
 		return false
 	}
-	centers := []P{cands[rand.Intn(len(cands))]}
+	centers := []P{cands[gen.Intn(len(cands))]}
 	for len(centers) < players {
 		far, farD := centers[0], -1
 		m.flood(centers, func(p P, d int) {

@@ -416,7 +416,8 @@ type effect struct {
 
 func (a *UnitAction) executeOn(targets []P, aff []affected) {
 	u := a.Unit
-	roll := rand.Intn(100)
+	a.g.sendCmd(u, cmd{Skill: a.Skill.Name, Targets: targets})
+	roll := dice.Intn(100)
 	dmg := 0
 	if a.Skill.IsOffensiveAction {
 		if a.Skill.IsMelee {
@@ -490,7 +491,7 @@ func (a *UnitAction) afterAction() {
 // ---- WorldEffects ----
 
 var knownEffects = map[string]bool{"FlashEffect": true, "Attack": true, "Explosion": true, "ExplosionEffect": true, "MeleeHitEffect": true,
-	"OpenDoorEffect": true, "ProjectileEffect": true, "SpawnUnit": true}
+	"OpenDoorEffect": true, "ProjectileEffect": true, "SpawnUnit": true, "SpriteEffect": true}
 
 func (e *effect) done() {
 	for _, f := range e.onDone {
@@ -506,6 +507,14 @@ func (e *effect) execute() {
 			for _, p := range af.tiles {
 				f := g.addAnim(spr.Flash, p, 0.04, nil)
 				f.layer, f.ppu, f.tint = layerUnits, 32.0/8, flashColors[e.r.StringOne]
+			}
+		}
+		playSound(sndSelect, 0.6)
+	case "SpriteEffect": // a named animation on the affected tiles (e.g. the drone deploy sparkle)
+		for _, af := range e.aff {
+			for _, p := range af.tiles {
+				a := g.addAnim(spr.Hits[e.r.StringOne], p, 0.08, nil)
+				a.layer, a.ppu = layerUnits, 20
 			}
 		}
 		playSound(sndSelect, 0.6)
@@ -542,7 +551,11 @@ func (e *effect) execute() {
 	case "MeleeHitEffect":
 		for _, af := range e.aff {
 			for _, p := range af.tiles {
-				g.addAnim(spr.MeleeHit, p, 0.1, nil)
+				hit := "slash"
+				if w := e.weapon; w != nil && w.Rules.MeleeHit != "" {
+					hit = w.Rules.MeleeHit
+				}
+				g.addAnim(spr.Hits[hit], p, 0.1, nil)
 				playSound(sndSwords[rand.Intn(len(sndSwords))], 1)
 			}
 		}

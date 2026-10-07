@@ -7,8 +7,7 @@ Go/Ebiten port lives in `game/`. Run with `cd game && go run .` (`-debug` shows 
 - [x] Unity exporter script was not kept; `game/ui.json` is the frozen export
 - [x] Copy the assets the game uses into `game/assets` (embedded in the binary; sources in `assets/CREDITS.md`)
 - [x] Check the licences in `assets/CREDITS.md` before distributing a build
-- [ ] Side-by-side check against a Unity build (text layout, wall damage sprites) — needs someone with Unity
-- [ ] Delete the Unity project once the port is accepted (this also drops the obsolete `core.rul`)
+- [x] Unity project deleted (still in git history before this commit)
 
 ## Bugs (fixed in the port)
 - [x] Movement reached one step further than AP paid for
@@ -22,6 +21,7 @@ Go/Ebiten port lives in `game/`. Run with `cd game && go run .` (`-debug` shows 
 - [x] Removed the 5 s movement trail (it also showed hidden enemy movement)
 - [x] Hovering a unit hidden in the fog showed its stats
 - [x] Dungeon generator could stop merging regions early (duplicate region ids)
+- [x] Map seeds did nothing (`rand.Seed` is a no-op since Go 1.24) and BSP depended on map iteration order; generators now use their own seeded source
 
 ## Game loop
 - [x] Win/lose screen ("MISSION COMPLETE / FAILED", "<player> WINS"), click to continue
@@ -39,7 +39,8 @@ Go/Ebiten port lives in `game/`. Run with `cd game && go run .` (`-debug` shows 
 - [x] Unused content now in use (see factions); Shredder buff and multi-tile units dropped
 - [x] Missile Launcher weapon lost `radius`: the plain shot hits one target, only the Rocket Launcher skill explodes
 - [x] Hot-seat: the handover screen hides the whole map until the next player clicks
-- [ ] Online play (after campaign and hot-seat are solid)
+- [x] Online play: lobby + relay at ruzzoli.de/mva-battles (`game/server`), lockstep commands, shared seed; `TestLockstep` checks replays stay in sync
+- [ ] Online: reconnect after a dropped connection (today the game ends with CONNECTION LOST)
 - [x] Touch: one finger = click/drag, two-finger tap = back (right-click), pinch = zoom
 
 ## AI
@@ -60,9 +61,9 @@ Go/Ebiten port lives in `game/`. Run with `cd game && go run .` (`-debug` shows 
 - [x] Keys: F1 help/tutorial, F11 fullscreen, M music, -/= volume; menu and battle music, win/lose jingles
 - [x] Hit chance shown over every target before committing ("100%" for explosions)
 - [x] Per-weapon projectiles (`projectile:` in the rules) and flash effects for Stun Strike, Aimed Shot, Deploy Drone
-- [ ] Dedicated sprites for melee variants, plasma beam, drone deploy
+- [x] Melee hit variants (`meleeHit: slash|hammer|swirl`), plasma bolt, drone deploy sparkle (`SpriteEffect`)
 - [x] Volume, music and fullscreen saved to the user config dir (desktop; web starts with defaults)
-- [ ] Settings screen (keys only for now)
+- [x] Settings screen (music, volume, fullscreen)
 
 ## Unity dead code
 - [x] Cavern smoothing passes, dungeon (maze) generator and map scripts wired up (map generator dropdown: BSP, Cellular Automata, Dungeon; rules `generator: dungeon` etc.)

@@ -121,8 +121,8 @@ skills:
       affectedTiles: [[0,0]]
     apCost: 2
     effects:
-      - name: FlashEffect
-        stringOne: cyan
+      - name: SpriteEffect
+        stringOne: sparkle
       - name: SpawnUnit
         stringOne: STR_DRONE
   - name: AimedShot
@@ -297,6 +297,7 @@ units:
 
 weapons:
   - type: STR_HARD_HITTER
+    meleeHit: swirl # slash (default), hammer, swirl
     useCost: 1
     damage:
       - [3,4]
@@ -331,6 +332,7 @@ weapons:
       - [1,2]
     isMelee: true
   - type: STR_HEAVY_HITTER
+    meleeHit: hammer
     useCost: 2
     damage:
       - [4,5]
@@ -351,7 +353,7 @@ weapons:
     multipleTargets: true
     damageDistribution: true
   - type: STR_PLASMA_GUN
-    projectile: {sprite: 3, count: 2, speed: 12}
+    projectile: {sprite: 6, count: 2, speed: 16} # 6: plasma bolt
     weaponSprite: Heavy
     useCost: 3
     damage:

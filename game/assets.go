@@ -49,13 +49,14 @@ type WallSet struct {
 }
 
 type Sprites struct {
-	Floors                     []*ebiten.Image // station, rock, decorated station
-	WallSets                   []WallSet       // station, rock
-	Doors, SpawnFloors         []*ebiten.Image
-	FactionRows                [][]*ebiten.Image // idle frames per faction prefab
-	Explosion, MeleeHit, Blood []*ebiten.Image
-	Flash, Bullets             []*ebiten.Image
-	SelectRect, Blank          *ebiten.Image
+	Floors             []*ebiten.Image // station, rock, decorated station
+	WallSets           []WallSet       // station, rock
+	Doors, SpawnFloors []*ebiten.Image
+	FactionRows        [][]*ebiten.Image // idle frames per faction prefab
+	Explosion, Blood   []*ebiten.Image
+	Hits               map[string][]*ebiten.Image // melee hit and SpriteEffect animations by name
+	Flash, Bullets     []*ebiten.Image
+	SelectRect, Blank  *ebiten.Image
 }
 
 var spr Sprites
@@ -102,16 +103,22 @@ func loadSprites() {
 	for i := 0; i <= 5; i++ {
 		spr.Explosion = append(spr.Explosion, fx(i))
 	}
-	spr.MeleeHit = []*ebiten.Image{fx(6), fx(7), fx(8)}
+	b := loadImage("sprites/bullets.png")
+	hold := func(img *ebiten.Image) []*ebiten.Image { return []*ebiten.Image{img, img, img} }
+	spr.Hits = map[string][]*ebiten.Image{
+		"slash":   {fx(6), fx(7), fx(8)},
+		"hammer":  hold(sub(e, 99, 226, 30, 24)),
+		"swirl":   hold(sub(e, 68, 231, 26, 17)),
+		"sparkle": hold(sub(b, 321, 267, 17, 17)),
+	}
 	spr.Blood = []*ebiten.Image{fx(11), fx(12), fx(13), fx(14)}
 	spr.SelectRect, spr.Blank = fx(9), fx(10)
 	for i := 0; i < 7; i++ {
 		spr.Flash = append(spr.Flash, sub(e, 40*i, 476, 36, 36))
 	}
 
-	b := loadImage("sprites/bullets.png")
 	spr.Bullets = []*ebiten.Image{sub(b, 21, 14, 10, 6), sub(b, 21, 32, 10, 6), sub(b, 21, 50, 10, 6),
-		sub(b, 21, 68, 10, 6), sub(b, 280, 215, 13, 10), sub(b, 211, 30, 11, 8)}
+		sub(b, 21, 68, 10, 6), sub(b, 280, 215, 13, 10), sub(b, 211, 30, 11, 8), sub(b, 376, 316, 39, 11)}
 }
 
 // ---- audio ----

@@ -7,7 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Rule structs mirror Mod.cs; the .rul files are read unchanged from Assets/StreamingAssets.
+// Rule structs mirror Mod.cs of the original Unity game; the rules live in assets/percent.rul.
 
 type Rules struct {
 	Options      RuleOptions     `yaml:"options"`
@@ -216,6 +216,7 @@ type RuleWeapon struct {
 		Speed         float64
 		Arc           bool
 	} `yaml:"projectile"`
+	MeleeHit string `yaml:"meleeHit"` // hit animation: slash (default), hammer, swirl
 }
 
 func (w *RuleWeapon) UnmarshalYAML(n *yaml.Node) error {

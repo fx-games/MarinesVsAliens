@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io/fs"
-	"math/rand"
 	"path"
 	"strings"
 	"testing"
@@ -19,7 +18,7 @@ func headless(t *testing.T) {
 	}
 	blank := func(n int) []*ebiten.Image { return make([]*ebiten.Image, n) }
 	spr = Sprites{FactionRows: [][]*ebiten.Image{blank(32), blank(32), blank(32), blank(32), blank(32)},
-		Blood: blank(4), Explosion: blank(6), MeleeHit: blank(3), Flash: blank(7),
+		Blood: blank(4), Explosion: blank(6), Hits: map[string][]*ebiten.Image{"slash": blank(3), "hammer": blank(3), "swirl": blank(3), "sparkle": blank(4)}, Flash: blank(7),
 		WallSets: []WallSet{{Sprites: blank(16), Damaged: blank(8), Destroyed: blank(3), NorthAlt: blank(6), NorthChance: 5}, {Sprites: blank(16), Destroyed: blank(3)}}}
 	loadUI()
 }
@@ -28,7 +27,7 @@ func headless(t *testing.T) {
 func TestAIMatch(t *testing.T) {
 	headless(t)
 	for seed := int64(1); seed <= 3; seed++ {
-		rand.Seed(seed)
+		seedGen(seed)
 		m := GenerateBSP(21, 21, 3)
 		if sp := m.SpawnPoints(); len(sp) != 3 {
 			t.Fatalf("seed %d: want 3 spawn zones, got %d", seed, len(sp))
@@ -64,7 +63,7 @@ func TestGenerators(t *testing.T) {
 	headless(t)
 	GenerateFromScript(mod.Maps[1]) // must not panic; the block data has no usable layout yet
 	for seed := int64(1); seed <= 20; seed++ {
-		rand.Seed(seed)
+		seedGen(seed)
 		for name, m := range map[string]*Map{
 			"cavern":   withSpawns(4, func() *Map { return GenerateCavern(21, 21) }),
 			"dungeon":  withSpawns(4, func() *Map { return GenerateDungeon(21, 21) }),
@@ -122,7 +121,7 @@ func TestSounds(t *testing.T) {
 // TestSkirmishVsAI: a human ends the turn, the computer plays under the human's fog and hands back.
 func TestSkirmishVsAI(t *testing.T) {
 	headless(t)
-	rand.Seed(1)
+	seedGen(1)
 	g := NewBattle(GenerateBSP(21, 21, 2), ModeSkirmish, []int{0, 1})
 	human := g.players[0]
 	if human.AI != nil || g.players[1].AI == nil {

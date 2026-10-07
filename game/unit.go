@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image/color"
 	"math"
-	"math/rand"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -85,9 +84,9 @@ func rollDamage(r *RuleWeapon) int {
 		case len(d) == 1:
 			sum += d[0]
 		case len(d) == 2:
-			sum += d[0] + rand.Intn(d[1]-d[0]+1)
+			sum += d[0] + dice.Intn(d[1]-d[0]+1)
 		case len(d) > 2:
-			sum += d[rand.Intn(len(d))]
+			sum += d[dice.Intn(len(d))]
 		}
 	}
 	return sum

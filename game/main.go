@@ -100,6 +100,7 @@ func (game) Layout(w, h int) (int, int) {
 
 func main() {
 	flag.BoolVar(&debug, "debug", false, "show map generator and pathfinding debug output")
+	flag.StringVar(&onlineURL, "server", onlineURL, "online lobby API")
 	flag.Parse()
 	var err error
 	if mod, err = LoadMod("percent.rul"); err != nil {
@@ -124,13 +125,17 @@ func factionSprite(faction int) *uiSprite {
 // ---- MainMenu.cs ----
 
 type mainMenu struct {
-	roots []*Node
-	quit  bool
+	roots           []*Node
+	quit            bool
+	lobby           *lobby
+	onlineMenu      *Node
+	refreshSettings func()
 }
 
 func newMainMenu() *mainMenu {
 	m := &mainMenu{roots: loadScene("MainMenuScene")}
 	playMusic("music/menu.mp3", true)
+	m.extendMainMenu()
 	m.slotFaction(1).Image.Sprite = factionSprite(skirmishFactions[1])
 	// the scene never wired these buttons up; CampaignSelection is what they were meant to call
 	for i, name := range []string{"Marines", "Birds", "Legion", "Travellers"} {
@@ -175,7 +180,7 @@ func (m *mainMenu) slot(i int) *Node {
 func (m *mainMenu) slotFaction(i int) *Node { return m.slot(i).Find("FactionSprite") }
 
 func (m *mainMenu) show(menu string) {
-	for _, n := range []string{"MainMenu", "ChooseFactionMenu", "SkirmishMenu"} {
+	for _, n := range m.menus() {
 		findIn(m.roots, n).Active = n == menu
 	}
 }
@@ -223,6 +228,7 @@ func (m *mainMenu) Update() error {
 	for _, r := range m.roots {
 		layoutCanvas(r, screenW, screenH)
 	}
+	m.updateOnline()
 	updateUI(m.roots, m.call)
 	if m.quit {
 		return ebiten.Termination
@@ -258,7 +264,7 @@ func newMapGenerator() *mapGenerator {
 func (g *mapGenerator) newSeed() {
 	g.seed = int(int32(rand.Uint32()))
 	findIn(g.roots, "SeedInputField").Find("Text").SetText(strconv.Itoa(g.seed))
-	rand.Seed(int64(g.seed))
+	seedGen(int64(g.seed))
 }
 
 func (g *mapGenerator) generate() {
@@ -283,7 +289,7 @@ func (g *mapGenerator) call(c uiCall, n *Node) {
 	case "SeedChanged":
 		if v, err := strconv.ParseInt(n.Find("Text").Text.Text, 10, 32); err == nil {
 			g.seed = int(v)
-			rand.Seed(v)
+			seedGen(v)
 			g.generate()
 		}
 	case "AlgorithmChanged":

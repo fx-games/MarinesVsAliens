@@ -28,6 +28,7 @@ const (
 const (
 	ModeCampaign = iota
 	ModeSkirmish
+	ModeOnline
 )
 
 const (
@@ -84,7 +85,8 @@ type Battle struct {
 	leaving     bool  // Esc pressed once, waiting for confirmation
 	status      *Node // top-left label: turn and player (FPS in debug mode)
 	help        bool
-	toastID     int // the latest toast; older ones don't clear it
+	toastID     int   // the latest toast; older ones don't clear it
+	net         *link // online: the relay connection, nil offline
 }
 
 type scheduled struct {
@@ -92,7 +94,8 @@ type scheduled struct {
 	fn func()
 }
 
-func NewBattle(m *Map, mode int, factions []int) *Battle {
+// setup, if given, adjusts each skirmish/online player before the first phase (names, remote seats).
+func NewBattle(m *Map, mode int, factions []int, setup ...func(g *Battle, i int, p *Player)) *Battle {
 	g := &Battle{m: m, mode: mode, state: StateWaitForHotSeatPlayer, roots: loadScene("BattleGameScene")}
 	g.cam = Camera{X: 0.17, Y: 0.42, Size: 7.421875}
 	playMusic("music/battle.mp3", true)
@@ -113,8 +116,11 @@ func NewBattle(m *Map, mode int, factions []int) *Battle {
 		for i, f := range factions {
 			p := NewPlayer(i)
 			p.Faction = mod.Factions[f]
-			if skirmishAI[i] {
+			if mode == ModeSkirmish && skirmishAI[i] {
 				p.Name, p.AI = "Computer", NewTacticalAI(g, p)
+			}
+			for _, f := range setup {
+				f(g, i, p)
 			}
 			g.players = append(g.players, p)
 		}
@@ -306,6 +312,7 @@ func (g *Battle) tryMove(u *Unit, p P) bool {
 	g.m.ClearHighlights(0)
 	g.m.ClearHighlights(1)
 	g.m.ClearLines()
+	g.sendCmd(u, cmd{Move: &p})
 	u.Move(path)
 	g.state = StateDefault
 	return true
@@ -418,10 +425,11 @@ func (g *Battle) isMissionOver() bool {
 	}
 	g.players, g.phase = alive, phase // -1 until PrepareNextPhase if the first player just died
 	lost := g.mode == ModeCampaign && counts[g.campaign] == 0
+	won := g.mode != ModeOnline || counts[g.PoV] > 0
 	if len(alive) > 1 && !lost {
 		return false
 	}
-	g.over, g.won, g.phase = true, !lost, 0
+	g.over, g.won, g.phase = true, !lost && won, 0
 	if len(alive) == 0 {
 		g.players = []*Player{g.PoV} // keep CurrentPlayer valid on the end screen
 	}
@@ -455,6 +463,11 @@ func (g *Battle) isMissionOver() bool {
 
 // leave is the click on the end screen or a confirmed Esc: next campaign mission or back to the menu.
 func (g *Battle) leave() {
+	if g.net != nil {
+		g.net.out <- cmd{Quit: true}
+		g.net.close()
+		g.net = nil
+	}
 	if g.over && g.won && g.mode == ModeCampaign && g.mission+1 < len(mod.Maps) {
 		startMission(g.campaign.Faction, g.mission+1)
 		return
@@ -474,6 +487,13 @@ func (g *Battle) PrepareNextPhase() {
 	}
 	if g.mode == ModeCampaign {
 		g.PoV = g.campaign
+	}
+	if g.mode == ModeOnline && g.PoV.AI != nil { // always this client's seat, even before its first turn
+		for _, p := range g.players {
+			if p.AI == nil {
+				g.PoV = p
+			}
+		}
 	}
 	g.UpdateUIButtons()
 	g.selected, g.marker = nil, nil
@@ -626,7 +646,7 @@ func (g *Battle) startTargeting(skill string) {
 
 func (g *Battle) skillButton(skill string) func() {
 	return func() {
-		if g.selected == nil || g.CurrentPlayer() != g.PoV {
+		if g.selected == nil || g.CurrentPlayer() != g.PoV || g.waitNet() {
 			return
 		}
 		if g.state == StateAttackTargetSelection && g.action.tm.Type == TargetMultiple {
@@ -667,6 +687,9 @@ func (g *Battle) UseSkill(u *Unit, skill string, p P) bool {
 	return true
 }
 
+// waitNet: online, the next command waits until the board is idle, so both clients see the same state.
+func (g *Battle) waitNet() bool { return g.net != nil && g.busy() }
+
 // busy is true while something is still moving or in flight; the AI waits for it.
 func (g *Battle) busy() bool {
 	for _, u := range g.units {
@@ -681,6 +704,9 @@ func (g *Battle) busy() bool {
 func (g *Battle) hiddenOnly() bool {
 	if g.over || g.state == StateWaitForHotSeatPlayer || g.CurrentPlayer().AI == nil {
 		return false
+	}
+	if r, ok := g.CurrentPlayer().AI.(*remote); ok && r.idle() && !g.busy() {
+		return false // waiting for the opponent: nothing to fast-forward
 	}
 	seen := func(p P) bool { return g.m.Contains(p) && !g.m.InFog(p) }
 	for _, u := range g.units {
@@ -749,7 +775,10 @@ func (g *Battle) call(c uiCall, _ *Node) {
 	playSound(sndButton, 1)
 	switch c.Method {
 	case "EndTurnButtonClicked":
-		if g.CurrentPlayer() == g.PoV && !g.over {
+		if g.CurrentPlayer() == g.PoV && !g.over && !g.waitNet() {
+			if g.net != nil {
+				g.net.out <- cmd{End: true}
+			}
 			g.EndPhase()
 		}
 	case "OpenDoorButtonClicked":
@@ -859,6 +888,9 @@ func (g *Battle) Update() error {
 			layoutCanvas(r, screenW, screenH)
 		}
 	}
+	if g.net != nil {
+		g.pumpNet()
+	}
 	g.tick()
 	for i := 0; i < 60*60 && g.hiddenOnly(); i++ { // fast-forward what the player can't see, without drawing
 		silent = true
@@ -905,7 +937,8 @@ func (g *Battle) tick() {
 		u.update()
 	}
 	if !g.over && g.state != StateWaitForHotSeatPlayer && !g.busy() {
-		if ai := g.CurrentPlayer().AI; ai != nil && now-g.lastAI > 0.8 {
+		_, replay := g.CurrentPlayer().AI.(*remote)
+		if ai := g.CurrentPlayer().AI; ai != nil && (replay || now-g.lastAI > 0.8) {
 			g.ToDefaultState()
 			if !ai.Step() {
 				g.EndPhase()
@@ -970,7 +1003,7 @@ func (g *Battle) handleMapInput(cell P, onMap bool, mx, my int) {
 		g.setCenter("")
 		return
 	}
-	if len(g.players) <= 1 || g.state == StateWaitForHotSeatPlayer || g.CurrentPlayer().AI != nil {
+	if len(g.players) <= 1 || g.state == StateWaitForHotSeatPlayer || g.CurrentPlayer().AI != nil || g.waitNet() {
 		return
 	}
 	if pointerOver(g.roots, float64(mx), float64(my)) {
