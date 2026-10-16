@@ -1,0 +1,387 @@
+# Game-wide rules. Every stat and rule the game uses lives in this file.
+options:
+  allowDiagonalMovement: true
+  allowDiagonalAdjacentAttacks: false
+  allowRangedWeaponsRangeOne: false
+  diagonalMoveCost: 1.4 # times a straight step
+  minimumDamage: 1      # a hit always deals at least this much, whatever the armour
+  wallHealth: 4         # damage a wall piece takes before it breaks
+  skillAPCost: 1        # AP for skills without apCost that aren't attacks (attacks cost the weapon's useCost)
+  weaponDefaults:       # used for any of these a weapon leaves out
+    minRange: 1         # accuracy drops closer than this ...
+    minDropOff: 5       # ... by this much per tile
+    maxRange: 20        # accuracy drops farther than this ...
+    maxDropOff: 5       # ... by this much per tile
+    effectiveRange: 40  # hard range limit
+
+maps:
+  - type: STR_FIRST_MISSION
+    premade: MVA_SpaceBlock01
+  - type: STR_SECOND_MISSION
+    generator: dungeon
+    size: [26,26]
+
+
+# targetMode.type:            self, single, multiple
+# targetMode.allowedTargetTypes: list of floor, wall, enemies, friendlies
+# targetMode.allowedTargetPreset: none, cardinalMelee, rangedAttack, visibleTiles, reachableTiles
+# targetMode.activeAffectedPreset: none, explosion, straightLine
+# buffs.endCondition:         none, onFirstAttack
+# maps.generator:             premade, mapScript, dungeon, cavern
+skills:
+  - name: OpenDoor
+    description: "Opens the doors next to this unit."
+    apCost: 1
+    targetMode:
+      type: self
+    effects:
+      - name: OpenDoorEffect
+  - name: MeleeAttack
+    description: "Strike an adjacent enemy with the melee weapon."
+    isMelee: true
+    isOffensiveAction: true
+    changeSpriteTo: 8
+    targetMode:
+      type: single
+      allowedTargetTypes: [enemies, friendlies]
+      allowedTargetPreset: cardinalMelee
+      affectedTiles: [[0,0]]
+    effects:
+      - name: MeleeHitEffect
+      - name: Attack
+        chained: true
+        lastEffect: true
+  - name: RangedAttack
+    description: "Shoot a visible enemy in range. Hover a target to see the hit chance."
+    isOffensiveAction: true
+    targetMode:
+      type: single
+      allowedTargetTypes: [enemies, friendlies]
+      allowedTargetPreset: rangedAttack
+      affectedTiles: [[0,0]]
+    effects:
+      - name: ProjectileEffect
+        integerOne: 1
+        integerTwo: 3
+        floatOne: 8
+      - name: Attack
+        chained: true
+      - name: ExplosionEffect
+        chained: true
+        lastEffect: true
+  - name: RocketLauncher
+    description: "Fire a rocket that explodes around the target tile. Hurts everyone in the blast, friends too, and damages walls."
+    displayName: "Rocket\nLauncher"
+    isOffensiveAction: true
+    changeSpriteTo: 10
+    targetMode:
+      type: single
+      allowedTargetTypes: [floor, enemies, friendlies]
+      allowedTargetPreset: rangedAttack
+      activeAffectedPreset: explosion
+      affectedRange: 1
+    effects:
+      - name: ProjectileEffect
+        integerOne: 0
+        integerTwo: 1
+        floatOne: 8
+        boolOne: true
+      - name: Explosion
+        chained: true
+      - name: ExplosionEffect
+        chained: true
+        lastEffect: true
+  - name: StunMelee
+    description: "Hit an adjacent enemy so it loses its action points for 2 turns."
+    displayName: "Stun\nStrike"
+    changeSpriteTo: 0
+    isMelee: true
+    targetMode:
+      type: single
+      allowedTargetTypes: [enemies, friendlies]
+      allowedTargetPreset: cardinalMelee
+      affectedTiles: [[0,0]]
+    apCost: 2
+    effects:
+      - name: MeleeHitEffect
+      - name: FlashEffect
+        stringOne: yellow
+    buffs:
+      - name: Stun
+        timer: 2
+  - name: DeployDrone
+    description: "Place a combat drone on an empty tile next to this unit."
+    maxActive: 1 # drones per team
+    displayName: "Deploy\nDrone"
+    isMelee: true
+    targetMode:
+      type: single
+      allowedTargetTypes: [floor]
+      allowedTargetPreset: cardinalMelee
+      affectedTiles: [[0,0]]
+    apCost: 2
+    effects:
+      - name: SpriteEffect
+        stringOne: sparkle
+      - name: SpawnUnit
+        stringOne: STR_DRONE
+  - name: AimedShot
+    description: "+30 accuracy for this unit's next attack."
+    displayName: "Aimed\nShot"
+    apCost: 1
+    targetMode:
+      type: self
+    effects:
+      - name: FlashEffect
+        stringOne: red
+    buffs:
+      - name: Buff
+        statModifiers:
+          - name: Accuracy
+            value: 30
+        endCondition: onFirstAttack
+
+factions:
+  - type: STR_GREEN_MARINES
+    factionPrefab: 0
+    color: [57,135,203,1]
+    loadOut:
+      - unit: STR_ROGUE
+        weapons:
+          - STR_HARD_HITTER
+      - unit: STR_HUNTER
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_RIFLE
+      - unit: STR_HEAVY
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_ROCKET_LAUNCHER
+      - unit: STR_ENGINEER
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_HEAVY_ASSAULT_CANNON
+      - unit: STR_DRONE
+        doNotSpawn: true
+        weapons:
+          - STR_LOW_HITTER
+  - type: STR_BLUE_BIRD_PEOPLE
+    factionPrefab: 1
+    color: [226,55,60,1]
+    loadOut:
+      - unit: STR_ROGUE
+        weapons:
+          - STR_HARD_HITTER
+      - unit: STR_HUNTER
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_ANDROID_RIFLE
+      - unit: STR_HEAVY
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_ROCKET_LAUNCHER
+      - unit: STR_ENGINEER
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_HEAVY_ASSAULT_CANNON
+      - unit: STR_DRONE
+        doNotSpawn: true
+        weapons:
+          - STR_LOW_HITTER
+  - type: STR_YELLOW_ROBOTS
+    factionPrefab: 2
+    color: [226,55,60,1]
+    loadOut:
+      - unit: STR_ROGUE
+        weapons:
+          - STR_HEAVY_HITTER
+      - unit: STR_HUNTER
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_RIFLE
+      - unit: STR_HEAVY
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_ROCKET_LAUNCHER
+      - unit: STR_ENGINEER
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_HEAVY_ASSAULT_CANNON
+      - unit: STR_DRONE
+        doNotSpawn: true
+        weapons:
+          - STR_LOW_HITTER
+  - type: STR_RED_SPACEMEN
+    factionPrefab: 3
+    color: [226,55,60,1]
+    loadOut:
+      - unit: STR_ROGUE
+        weapons:
+          - STR_HARD_HITTER
+      - unit: STR_HUNTER
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_RIFLE
+      - unit: STR_HEAVY
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_ROCKET_LAUNCHER
+      - unit: STR_ENGINEER
+        weapons:
+          - STR_NORMAL_HITTER
+          - STR_PLASMA_GUN
+      - unit: STR_DRONE
+        doNotSpawn: true
+        weapons:
+          - STR_LOW_HITTER
+units:
+  - type: STR_DRONE
+    factionPrefab: 4 # DroneUnits
+    spriteOffset: 0
+    stats:
+      ActionPoints: 4
+      VisionRange: 10
+      Accuracy: 65
+      Defense: 0
+      Movement: 4
+      Health: 3
+      Armor: 2
+  - type: STR_ROGUE
+    spriteOffset: 8
+    stats:
+      ActionPoints: 4
+      VisionRange: 10
+      Accuracy: 65
+      Defense: 0
+      Movement: 4
+      Health: 5
+      Armor: 1
+    unitSkills:
+      - StunMelee
+  - type: STR_HEAVY
+    spriteOffset: 14
+    stats:
+      ActionPoints: 4
+      VisionRange: 10
+      Accuracy: 65
+      Defense: 0
+      Movement: 4
+      Health: 5
+      Armor: 2
+    unitSkills:
+      - RocketLauncher
+  - type: STR_HUNTER
+    spriteOffset: 2
+    stats:
+      ActionPoints: 4
+      VisionRange: 10
+      Accuracy: 70
+      Defense: 0
+      Movement: 6
+      Health: 6
+      Armor: 2
+    unitSkills:
+      - AimedShot
+  - type: STR_ENGINEER
+    spriteOffset: 4
+    stats:
+      ActionPoints: 4
+      VisionRange: 10
+      Accuracy: 65
+      Defense: 0
+      Movement: 4
+      Health: 5
+      Armor: 1
+    unitSkills:
+      - DeployDrone
+
+weapons:
+  - type: STR_HARD_HITTER
+    meleeHit: swirl # slash (default), hammer, swirl
+    useCost: 1
+    damage:
+      - [3,4]
+    isMelee: true
+  - type: STR_RIFLE
+    projectile: {sprite: 1, count: 3, speed: 8}
+    useCost: 2
+    minRange: 1
+    maxRange: 8
+    weaponSprite: Rifle
+    damage:
+      - [1,3]
+  - type: STR_ANDROID_RIFLE
+    projectile: {sprite: 2, count: 1, speed: 14}
+    useCost: 3
+    maxRange: 20
+    maxDropOff: 10
+    minRange: 6
+    minDropOff: 10
+    accuracyModifier: 10
+    weaponSprite: Rifle
+    damage:
+      - [1,4]
+  - type: STR_LOW_HITTER
+    useCost: 2
+    damage:
+      - [1]
+    isMelee: true
+  - type: STR_NORMAL_HITTER
+    useCost: 2
+    damage:
+      - [1,2]
+    isMelee: true
+  - type: STR_HEAVY_HITTER
+    meleeHit: hammer
+    useCost: 2
+    damage:
+      - [4,5]
+    isMelee: true
+  - type: STR_ROCKET_LAUNCHER
+    projectile: {sprite: 4, count: 1, speed: 8, arc: true}
+    accuracyModifier: -10
+    weaponSprite: Rocket
+    useCost: 3
+    damage:
+      - [3,4]
+  - type: STR_HEAVY_ASSAULT_CANNON
+    projectile: {sprite: 5, count: 6, speed: 11}
+    weaponSprite: Heavy
+    useCost: 3
+    damage:
+      - [2,4]
+    multipleTargets: true
+    damageDistribution: true
+  - type: STR_PLASMA_GUN
+    projectile: {sprite: 6, count: 2, speed: 16} # 6: plasma bolt
+    weaponSprite: Heavy
+    useCost: 3
+    damage:
+      - [1,3]
+    straightLineOnly: true
+    damageLineOfFire: true
+
+translations:
+  - lang: en-US
+    strings:
+      STR_FIRST_MISSION: Mission One
+      STR_SECOND_MISSION: Mission Two
+      STR_GREEN_MARINES: Colonial Marines
+      STR_RED_SPACEMEN: Travellers
+      STR_YELLOW_ROBOTS: Legion
+      STR_BLUE_BIRD_PEOPLE: Birds of Prey
+      STR_PLASMA_GUN: Plasma Gun
+      STR_HEAVY_ASSAULT_CANNON: Assault Cannon
+      STR_ROCKET_LAUNCHER: Missile Launcher
+      STR_NORMAL_HITTER: Melee
+      STR_RIFLE: Plasma Rifle
+      STR_HARD_HITTER: Charged Punch
+      STR_ANDROID_ALIEN: Manic-depressive Android
+      STR_HEAVY_HITTER: Mechanic Punch
+      STR_ANDROID_RIFLE: Laser Rifle
+      STR_LOW_HITTER: Pummel
+      STR_ROGUE: Rogue
+      STR_HUNTER: Bounty Hunter
+      STR_HEAVY: Heavy Weapons Expert
+      STR_ENGINEER: Engineer
+      STR_DRONE: drone
